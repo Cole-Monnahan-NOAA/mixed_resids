@@ -9,7 +9,7 @@
 compile("models/randomwalk.cpp") # modified for simulation
 dyn.load(dynlib("models/randomwalk"))
 
-sim_pvalues_list <- list()
+osa_pvalues_list <- sim_pvalues_list <- list()
 
 for(ii in 1:Nreps){
 ## simulate data with these parameters
@@ -121,6 +121,21 @@ data.frame(version='m1', RE='uncond', test='disp', pvalue=disp1_uncond$p.value))
 pvals$replicate <- ii
 sim_pvalues_list[[ii]] <- pvals
 
+  ## Do the normalized process noise test from section 5 of OSA
+  ## paper using one sample from the posterior
+  require(MASS)
+
+C0 <- solve(obj0$env$spHess(random=TRUE))  ## Covariance matrix of random effects
+Xr0 <- mvrnorm(1,estX0[,1],C0)             ## Generate one sample of random effects
+W0 <- diff(Xr0)/exp(opt0$par["logsigma"])  ## Compute corresponding driving process noise
+C1 <- solve(obj1$env$spHess(random=TRUE))  ## .. repeat for H1
+Xr1 <- mvrnorm(1,estX1[,1],C1)
+W1 <- (diff(Xr1)-opt1$par["mu"])/exp(opt1$par["logsigma"])
+  ## W0 and W1 should be mean 0 and they use a t-test to test
+  ## this
+  osa_pvalues_list[[ii]] <- rbind(data.frame(version='m0', pvalue=t.test(W0)$p.value),
+                       data.frame(version='m1',
+                                  pvalue=t.test(W1)$p.value)) %>% cbind(replicate=ii)
 
 ### Exploratory plots for first replicate
   if(ii==1){
@@ -161,4 +176,8 @@ sim_pvalues_list[[ii]] <- pvals
 sim_pvalues <- do.call(rbind, sim_pvalues_list)
 g <- ggplot(sim_pvalues, aes(pvalue, )) + geom_histogram() +
   facet_grid(version+RE~test)
-ggsave('plots/randomwalk_pvalues.png', g, width=7, height=5)
+ggsave('plots/randomwalk_pvalues_sim.png', g, width=7, height=5)
+osa_pvalues <- do.call(rbind, osa_pvalues_list)
+g <- ggplot(osa_pvalues, aes(pvalue, )) + geom_histogram() +
+  facet_wrap('version', nrow=2)
+ggsave('plots/randomwalk_pvalues_osa.png', g, width=7, height=5)
