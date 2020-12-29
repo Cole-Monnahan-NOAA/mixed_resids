@@ -1,5 +1,5 @@
 ## estimate and validate a random walk model with and without
-## drift. based on code example provided by uffe høgsbro thygesen
+## drift. based on code example provided by uffe h?gsbro thygesen
 ## and kasper kristensen, 2016, in the tmb package examples:
 ## randomwalkvalidation.r.
 
@@ -60,6 +60,7 @@ osa1 <- tryCatch(oneStepPredict(obj1, observation.name="y",
     next
   }
 
+
   ### Validation using one sample from the posterior
 
 C0 <- solve(obj0$env$spHess(random=TRUE))  ## Covariance matrix of random effects
@@ -73,19 +74,19 @@ W1 <- (diff(Xr1)-opt1$par["mu"])/exp(opt1$par["logsigma"])
 
 ### DHARMa resids, both conditional and unconditional
 tmp <- replicate(1000, {obj0$simulate()$y})
-dharma0_cond <- createDHARMa(tmp, Y, integerResponse=FALSE)
+dharma0_cond <- createDHARMa(tmp, Y, integerResponse=FALSE, fittedPredictedResponse = rep(0, 50))
 tmp <- replicate(1000, {obj0$simulate()$y2})
-dharma0_uncond <- createDHARMa(tmp, Y, integerResponse=FALSE)
+dharma0_uncond <- createDHARMa(tmp, Y, integerResponse=FALSE, fittedPredictedResponse = rep(0, 50))
 tmp <- replicate(1000, {obj1$simulate()$y})
-dharma1_cond <- createDHARMa(tmp, Y, integerResponse=FALSE)
+dharma1_cond <- createDHARMa(tmp, Y, integerResponse=FALSE, fittedPredictedResponse = rep(opt1$par['mu'], 50))
 tmp <- replicate(1000, {obj1$simulate()$y2})
-dharma1_uncond <- createDHARMa(tmp, Y, integerResponse=FALSE)
+dharma1_uncond <- createDHARMa(tmp, Y, integerResponse=FALSE, fittedPredictedResponse = rep(opt1$par['mu'], 50))
 
-  ## warning("don't know the right way to calculate DHARMa resids")
-sim0_cond <- qnorm(dharma0_cond$scaledResiduals)
-sim0_uncond <- qnorm(dharma0_uncond$scaledResiduals)
-sim1_cond <- qnorm(dharma0_cond$scaledResiduals)
-sim1_uncond <- qnorm(dharma0_uncond$scaledResiduals)
+## warning("don't know the right way to calculate DHARMa resids")
+sim0_cond <- residuals(dharma0_cond, quantileFunction = qnorm, outlierValues = c(-7,7))
+sim0_uncond <- residuals(dharma0_uncond, quantileFunction = qnorm, outlierValues = c(-7,7))
+sim1_cond <- residuals(dharma1_cond, quantileFunction = qnorm, outlierValues = c(-7,7))
+sim1_uncond <- residuals(dharma1_uncond, quantileFunction = qnorm, outlierValues = c(-7,7))
 
 ### Combine together in tidy format for analysis and plotting
 d0 <- data.frame(x=1:nt, version='m0', pearson=pearson0,
@@ -101,23 +102,44 @@ resids.long <- resids %>% pivot_longer(-c(x, version))
 ## Note: Type binomial for continuous, if integer be careful. Not
 ## sure if we want two-sided for dispersion? Using defaults for
 ## now.
+## AMH: change to alternative = 'greater' when testing for overdispersion in positive only distributions
+#AMH: Add significance tests
 disp0_uncond <- testDispersion(dharma0_uncond, plot=FALSE)
 outlier0_uncond <- testOutliers(dharma0_uncond, type='binomial', plot=FALSE)
+pval0_uncond <- suppressWarnings(ks.test(dharma0_uncond$scaledResiduals,'punif')$p.value)
 disp1_uncond <- testDispersion(dharma1_uncond, plot=FALSE)
 outlier1_uncond <- testOutliers(dharma1_uncond, type='binomial', plot=FALSE)
+pval1_uncond <- suppressWarnings(ks.test(dharma1_uncond$scaledResiduals,'punif')$p.value)
 disp0_cond <- testDispersion(dharma0_cond, plot=FALSE)
 outlier0_cond <- testOutliers(dharma0_cond, type='binomial', plot=FALSE)
+pval0_cond <- suppressWarnings(ks.test(dharma0_cond$scaledResiduals,'punif')$p.value)
 disp1_cond <- testDispersion(dharma1_cond, plot=FALSE)
 outlier1_cond <- testOutliers(dharma1_cond, type='binomial', plot=FALSE)
+pval1_cond <- suppressWarnings(ks.test(dharma1_cond$scaledResiduals,'punif')$p.value)
+#osa
+pval0_osa <- suppressWarnings(ks.test(osa0,'pnorm')$p.value)
+pval1_osa <- suppressWarnings(ks.test(osa1,'pnorm')$p.value)
+
+
 pvals <- rbind(
 data.frame(version='m0', RE='cond', test='outlier', pvalue=outlier0_cond$p.value),
 data.frame(version='m0', RE='uncond', test='outlier', pvalue=outlier0_uncond$p.value),
+data.frame(version='m0', RE='osa', test='outlier', pvalue=NA),
 data.frame(version='m0', RE='cond', test='disp', pvalue=disp0_cond$p.value),
 data.frame(version='m0', RE='uncond', test='disp', pvalue=disp0_uncond$p.value),
+data.frame(version='m0', RE='osa', test='disp', pvalue=NA),
+data.frame(version='m0', RE='cond', test='GOF', pvalue=pval0_cond),
+data.frame(version='m0', RE='uncond', test='GOF', pvalue=pval0_uncond),
+data.frame(version='m0', RE='osa', test='GOF', pvalue=pval0_osa),
 data.frame(version='m1', RE='cond', test='outlier', pvalue=outlier1_cond$p.value),
 data.frame(version='m1', RE='uncond', test='outlier', pvalue=outlier1_uncond$p.value),
+data.frame(version='m1', RE='osa', test='outlier', pvalue=NA),
 data.frame(version='m1', RE='cond', test='disp', pvalue=disp1_cond$p.value),
-data.frame(version='m1', RE='uncond', test='disp', pvalue=disp1_uncond$p.value))
+data.frame(version='m1', RE='uncond', test='disp', pvalue=disp1_uncond$p.value),
+data.frame(version='m1', RE='osa', test='disp', pvalue=NA),
+data.frame(version='m1', RE='cond', test='GOF', pvalue=pval1_cond),
+data.frame(version='m1', RE='uncond', test='GOF', pvalue=pval1_uncond),
+data.frame(version='m1', RE='osa', test='GOF', pvalue=pval1_osa))
 pvals$replicate <- ii
 sim_pvalues_list[[ii]] <- pvals
 
