@@ -27,10 +27,9 @@ run.iter <- function(ii){
   ## Simulate spatial random effects
   Loc <- matrix(runif(n*2,0,100),ncol=2)
   dmat <- as.matrix(dist(Loc))
-  mesh <- tryCatch(
+  mesh <- try(
     withTimeout( INLA::inla.mesh.2d(Loc, max.edge = c(Range, Range/3), offset = c(2, Range*.75)),
-                 timeout = 30, onTimeout = 'Silent' ),
-    error = function(e) 'mesh error')
+                 timeout = 30, onTimeout = 'silent' ))
   if(is.character(mesh)){
     system("Taskkill /IM fmesher.exe /F") 
     warning("mesh failed in rep=", ii)
@@ -130,18 +129,21 @@ run.iter <- function(ii){
   disp0_cond <- testDispersion(dharma0_cond, alternative = 'greater', plot=FALSE)
   outlier0_cond <- testOutliers(dharma0_cond, alternative = 'greater', 
                                 margin = 'upper', type='binomial', plot=FALSE)
-  sac0_cond <- testSpatialAutocorrelation(dharma0_cond, distMat = dmat, alternative = 'greater') #only test for positive correlation
+  sac0_cond <- testSpatialAutocorrelation(dharma0_cond, x=Loc[,1], y=Loc[,2], alternative = 'greater') #only test for positive correlation
   pval0_cond <- suppressWarnings(ks.test(dharma0_cond$scaledResiduals,'punif')$p.value)
   disp1_cond <- testDispersion(dharma1_cond, alternative = 'greater', plot=FALSE)
   outlier1_cond <- testOutliers(dharma1_cond, alternative = 'greater', 
                                 margin = 'upper', type='binomial', plot=FALSE)
-  sac1_cond <- testSpatialAutocorrelation(dharma1_cond, distMat = dmat, alternative = 'greater') #only test for positive correlation
+  sac1_cond <- testSpatialAutocorrelation(dharma1_cond, x=Loc[,1], y=Loc[,2], alternative = 'greater') #only test for positive correlation
   pval1_cond <- suppressWarnings(ks.test(dharma1_cond$scaledResiduals,'punif')$p.value)
                                         #osa
   pval0_osa <- suppressWarnings(ks.test(osa0,'pnorm')$p.value)
-  sac0_osa <- testSpatialAutocorrelation(osa0, distMat = dmat, alternative = 'greater') #only test for positive correlation
+  #calculate Moran's I by hand for osa
+  w <- 1/dmat
+  diag(w) <- 0
+  sac0_osa <- ape::Moran.I(osa0, w, alternative = 'greater') #only test for positive correlation
   pval1_osa <- suppressWarnings(ks.test(osa1,'pnorm')$p.value)
-  sac1_osa <- testSpatialAutocorrelation(osa1, distMat = dmat, alternative = 'greater') #only test for positive correlation
+  sac1_osa <- ape::Moran.I(osa1, w, alternative = 'greater') #only test for positive correlation
 
   pvals <- rbind(
     data.frame(version='m0', RE='cond', test='outlier', pvalue=outlier0_cond$p.value),
