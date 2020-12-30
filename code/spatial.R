@@ -111,16 +111,20 @@ run.iter <- function(ii){
   ## AMH: change to alternative = 'greater' when testing for overdispersion in positive only distributions
                                         #AMH: Add significance tests
   disp0_uncond <- testDispersion(dharma0_uncond, alternative = 'greater', plot=FALSE)
-  outlier0_uncond <- testOutliers(dharma0_uncond, type='binomial', plot=FALSE)
+  outlier0_uncond <- testOutliers(dharma0_uncond, alternative = 'greater', 
+                                  margin = 'upper', type='binomial', plot=FALSE)
   pval0_uncond <- suppressWarnings(ks.test(dharma0_uncond$scaledResiduals,'punif')$p.value)
   disp1_uncond <- testDispersion(dharma1_uncond, alternative = 'greater', plot=FALSE)
-  outlier1_uncond <- testOutliers(dharma1_uncond, type='binomial', plot=FALSE)
+  outlier1_uncond <- testOutliers(dharma1_uncond, alternative = 'greater', 
+                                  margin = 'upper', type='binomial', plot=FALSE)
   pval1_uncond <- suppressWarnings(ks.test(dharma1_uncond$scaledResiduals,'punif')$p.value)
   disp0_cond <- testDispersion(dharma0_cond, alternative = 'greater', plot=FALSE)
-  outlier0_cond <- testOutliers(dharma0_cond, type='binomial', plot=FALSE)
+  outlier0_cond <- testOutliers(dharma0_cond, alternative = 'greater', 
+                                margin = 'upper', type='binomial', plot=FALSE)
   pval0_cond <- suppressWarnings(ks.test(dharma0_cond$scaledResiduals,'punif')$p.value)
   disp1_cond <- testDispersion(dharma1_cond, alternative = 'greater', plot=FALSE)
-  outlier1_cond <- testOutliers(dharma1_cond, type='binomial', plot=FALSE)
+  outlier1_cond <- testOutliers(dharma1_cond, alternative = 'greater', 
+                                margin = 'upper', type='binomial', plot=FALSE)
   pval1_cond <- suppressWarnings(ks.test(dharma1_cond$scaledResiduals,'punif')$p.value)
                                         #osa
   pval0_osa <- suppressWarnings(ks.test(osa0,'pnorm')$p.value)
