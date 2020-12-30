@@ -9,17 +9,16 @@
 ## Wrapper function to use parallel. Runs a single simulation
 ## iteration. Called below
 run.iter <- function(ii){
-  library(INLA)
   library(TMB)
   library(DHARMa)
+  library(INLA)
   library(dplyr)
   library(tidyr)
-  TMB::compile("models/spatial.cpp") # modified for simulation
   dyn.load(TMB::dynlib("models/spatial"))
   ## simulate data with these parameters
   message(ii, ": Simulating data...")
   set.seed(ii)
-  n <- 200
+  n <- 50
   sp.var <- 0.5
   Beta <- 1
   CV <- 0.5
@@ -150,8 +149,6 @@ run.iter <- function(ii){
 
   ## Exploratory plots for first replicate
   if(ii==1){
-    library(dplyr)
-    library(tidyr)
     library(ggplot2)
     g <- ggplot(resids.long, aes(x, y, size=abs(value), color=value<0)) +
       geom_point(alpha=.5) + facet_wrap('version', ncol=1)
@@ -173,22 +170,37 @@ run.iter <- function(ii){
       facet_grid(version+RE~replicate)
     ggsave('plots/spatial_simdata.png', g, width=9, height=9)
   }
+  saveRDS(pvals, file=paste0('results/spatial_pvals/pvals_', ii, '.RDS'))
   return(pvals)
 }
 
 library(snowfall)
-## sfLibrary(INLA)
-sfLibrary(TMB)
-## sfLibrary(DHARMa)
+TMB::compile("models/spatial.cpp") # modified for simulation
 sfInit( parallel=TRUE, cpus=cpus )
 sfExport('run.iter', 'sim.omega', 'cMatern', 'sim.data')
-test <- sfLapply(1:Nrep, function(ii) run.iter(ii))
+results <- sfLapply(1:Nreps, function(ii) run.iter(ii))
 
-## sim_pvalues <- do.call(rbind, sim_pvalues_list)
-## g <- ggplot(sim_pvalues, aes(pvalue, )) + geom_histogram() +
-##   facet_grid(version+RE~test)
-## ggsave('plots/spatial_pvalues_sim.png', g, width=7, height=5)
-# osa_pvalues <- do.call(rbind, osa_pvalues_list)
-# g <- ggplot(osa_pvalues, aes(pvalue, )) + geom_histogram() +
-#   facet_wrap('version', nrow=2)
-# ggsave('plots/randomwalk_pvalues_osa.png', g, width=7, height=5)
+## Read results back in from file
+fs <- list.files('results/spatial_pvals', full.names=TRUE)
+results <- lapply(fs, readRDS) %>% do.call(rbind, .) %>%
+  filter(!is.na(pvalue))
+## Did any fail to run? Try to rerun
+bad <- which(!1:Nreps %in% results$replicate)
+results <- sfLapply(bad, function(ii) run.iter(ii))
+
+## Read results back in from file
+fs <- list.files('results/spatial_pvals', full.names=TRUE)
+results <- lapply(fs, readRDS) %>% do.call(rbind, .) %>%
+  filter(!is.na(pvalue))
+
+g <- ggplot(filter(results, test=='outlier') , aes(pvalue, )) + geom_histogram() +
+  facet_grid(version+RE~test, scales='free')
+ggsave('plots/spatial_pvalues_outlier.png', g, width=5, height=5)
+g <- ggplot(filter(results, test=='disp') , aes(pvalue, )) + geom_histogram() +
+  facet_grid(version+RE~test, scales='free')
+ggsave('plots/spatial_pvalues_disp.png', g, width=5, height=5)
+g <- ggplot(filter(results, test=='GOF') , aes(pvalue, )) + geom_histogram() +
+  facet_grid(version+RE~test, scales='free')
+ggsave('plots/spatial_pvalues_GOF.png', g, width=5, height=5)
+
+

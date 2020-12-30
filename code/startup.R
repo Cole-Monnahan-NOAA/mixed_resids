@@ -25,16 +25,16 @@ sim.omega <- function(Range, sig2, Dmat, Nu = 1, method, mesh){
   Phi <- Range
   Tau <- sqrt(1/(4*pi*Kappa^2*sig2))
   n <- dim(Dmat)[1]
-  
+
   #Simulate random field and obs
   if(method == 'TMB.matern'){
   #  dyn.load(dynlib('spatial'))
     dat <- list(y = rep(0,n), X = matrix(1, n,1),
-                dd = Dmat, nu = Nu, v_i = (1:n)-1, simRE = 1, 
+                dd = Dmat, nu = Nu, v_i = (1:n)-1, simRE = 1,
                 family = 000, link = 2, reStruct = 00)
-    dat$spde <- inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
-    obj <- MakeADFun(data =  dat,
-                     parameters = list(beta = 0, theta = 0, log_tau = log(Tau),  
+    dat$spde <- INLA::inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
+    obj <- TMB::MakeADFun(data =  dat,
+                     parameters = list(beta = 0, theta = 0, log_tau = log(Tau),
                                        log_kappa = log(Kappa),
                                        omega = rep(0,n)),
                      random = 'omega',
@@ -46,11 +46,11 @@ sim.omega <- function(Range, sig2, Dmat, Nu = 1, method, mesh){
   if(method == 'TMB.spde'){
  #   dyn.load(dynlib('spatial'))
     dat <- list(y = rep(0,n), X = matrix(1, n,1),
-                dd = Dmat, nu = 1, v_i = mesh$idx$loc-1, simRE = 1, 
+                dd = Dmat, nu = 1, v_i = mesh$idx$loc-1, simRE = 1,
                 family = 000, link = 2, reStruct = 10)
-    dat$spde <- inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
-    obj <- MakeADFun(data =  dat,
-                     parameters = list(beta = 0, theta = 0, log_tau = log(Tau),  
+    dat$spde <- INLA::inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
+    obj <- TMB::MakeADFun(data =  dat,
+                     parameters = list(beta = 0, theta = 0, log_tau = log(Tau),
                                        log_kappa = log(Kappa),
                                        omega = rep(0,mesh$n)),
                      random = 'omega',

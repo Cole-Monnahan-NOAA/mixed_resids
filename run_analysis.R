@@ -26,9 +26,11 @@ packageVersion('DHARMa')                # 0.3.3.0
 Nreps <- 100
 source('code/randomwalk.R')
 
-## Add others. VAST, TMB spatial?
-
-cpus <- parallel::detectCores()-1
+### Spatial example from TMB
+## For some reason this hangs up when run in parallel despite
+## completing the simulation. So I save the results to individual
+## files and restart R and continue with the analysis
+cpus <- parallel::detectCores()-2
 Nreps <- 1000
 source('code/spatial.R')
 
