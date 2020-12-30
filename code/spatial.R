@@ -64,12 +64,12 @@ run.iter <- function(ii){
   ## OSA residuals
   osa0 <- tryCatch(
     oneStepPredict(obj0, observation.name="y",
-                   data.term.indicator='keep' ,
+                   data.term.indicator='keep' , range = c(0,Inf),
                    method="cdf", trace=FALSE)$residual,
     error=function(e) 'error')
   osa1 <- tryCatch(
     oneStepPredict(obj1, observation.name="y",
-                   data.term.indicator='keep' ,
+                   data.term.indicator='keep' , range = c(0,Inf),
                    method="cdf", trace=FALSE)$residual,
     error=function(e) 'error')
   if(is.character(osa0) | is.character(osa1)){
