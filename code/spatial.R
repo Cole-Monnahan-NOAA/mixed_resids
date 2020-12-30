@@ -14,6 +14,7 @@ run.iter <- function(ii){
   library(INLA)
   library(dplyr)
   library(tidyr)
+  library(R.utils)
   dyn.load(TMB::dynlib("models/spatial"))
   ## simulate data with these parameters
   message(ii, ": Simulating data...")
@@ -26,7 +27,15 @@ run.iter <- function(ii){
   ## Simulate spatial random effects
   Loc <- matrix(runif(n*2,0,100),ncol=2)
   dmat <- as.matrix(dist(Loc))
-  mesh <- INLA::inla.mesh.2d(Loc, max.edge = c(Range, Range/3), offset = c(2, Range*.75))
+  mesh <- tryCatch(
+    withTimeout( INLA::inla.mesh.2d(Loc, max.edge = c(Range, Range/3), offset = c(2, Range*.75)),
+                 timeout = 30, onTimeout = 'Silent' ),
+    error = function(e) 'mesh error')
+  if(is.character(mesh)){
+    system("Taskkill /IM fmesher.exe /F") 
+    warning("mesh failed in rep=", ii)
+    next
+  }
   Omega <- sim.omega(Range,sp.var,dmat,method="TMB.spde",mesh=mesh)
   ## simulate random measurements
   y <- sim.data(X = matrix(1, nrow(Loc),1), Beta=Beta, omega = Omega[mesh$idx$loc],
