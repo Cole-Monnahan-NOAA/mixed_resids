@@ -23,7 +23,7 @@ packageVersion('DHARMa')                # 0.3.3.0
 ## sim_uncon= simulation residual (DHARMa) unconditioned on RE
 
 ## Basic random walk time series model
-Nreps <- 100
+Nreps <- 1000
 source('code/randomwalk.R')
 
 ### Spatial example from TMB
