@@ -28,6 +28,10 @@ source('code/randomwalk.R')
 
 ## Add others. VAST, TMB spatial?
 
+cpus <- parallel::detectCores()-1
+Nreps <- 1000
+source('code/spatial.R')
+
 
 ### Load results
 source('code/load_results.R')
