@@ -130,14 +130,18 @@ run.iter <- function(ii){
   disp0_cond <- testDispersion(dharma0_cond, alternative = 'greater', plot=FALSE)
   outlier0_cond <- testOutliers(dharma0_cond, alternative = 'greater', 
                                 margin = 'upper', type='binomial', plot=FALSE)
+  sac0_cond <- testSpatialAutocorrelation(dharma0_cond, distMat = dmat, alternative = 'greater') #only test for positive correlation
   pval0_cond <- suppressWarnings(ks.test(dharma0_cond$scaledResiduals,'punif')$p.value)
   disp1_cond <- testDispersion(dharma1_cond, alternative = 'greater', plot=FALSE)
   outlier1_cond <- testOutliers(dharma1_cond, alternative = 'greater', 
                                 margin = 'upper', type='binomial', plot=FALSE)
+  sac1_cond <- testSpatialAutocorrelation(dharma1_cond, distMat = dmat, alternative = 'greater') #only test for positive correlation
   pval1_cond <- suppressWarnings(ks.test(dharma1_cond$scaledResiduals,'punif')$p.value)
                                         #osa
   pval0_osa <- suppressWarnings(ks.test(osa0,'pnorm')$p.value)
+  sac0_osa <- testSpatialAutocorrelation(osa0, distMat = dmat, alternative = 'greater') #only test for positive correlation
   pval1_osa <- suppressWarnings(ks.test(osa1,'pnorm')$p.value)
+  sac1_osa <- testSpatialAutocorrelation(osa1, distMat = dmat, alternative = 'greater') #only test for positive correlation
 
   pvals <- rbind(
     data.frame(version='m0', RE='cond', test='outlier', pvalue=outlier0_cond$p.value),
@@ -146,6 +150,9 @@ run.iter <- function(ii){
     data.frame(version='m0', RE='cond', test='disp', pvalue=disp0_cond$p.value),
     data.frame(version='m0', RE='uncond', test='disp', pvalue=disp0_uncond$p.value),
     data.frame(version='m0', RE='osa', test='disp', pvalue=NA),
+    data.frame(version='m0', RE='cond', test='sac', pvalue=sac0_cond$p.value),
+    data.frame(version='m0', RE='uncond', test='sac', pvalue=NA),
+    data.frame(version='m0', RE='osa', test='sac', pvalue=sac0_osa$p.value),
     data.frame(version='m0', RE='cond', test='GOF', pvalue=pval0_cond),
     data.frame(version='m0', RE='uncond', test='GOF', pvalue=pval0_uncond),
     data.frame(version='m0', RE='osa', test='GOF', pvalue=pval0_osa),
@@ -155,6 +162,9 @@ run.iter <- function(ii){
     data.frame(version='m1', RE='cond', test='disp', pvalue=disp1_cond$p.value),
     data.frame(version='m1', RE='uncond', test='disp', pvalue=disp1_uncond$p.value),
     data.frame(version='m1', RE='osa', test='disp', pvalue=NA),
+    data.frame(version='m1', RE='cond', test='sac', pvalue=sac1_cond$p.value),
+    data.frame(version='m1', RE='uncond', test='sac', pvalue=NA),
+    data.frame(version='m1', RE='osa', test='sac', pvalue=sac1_osa$p.value),
     data.frame(version='m1', RE='cond', test='GOF', pvalue=pval1_cond),
     data.frame(version='m1', RE='uncond', test='GOF', pvalue=pval1_uncond),
     data.frame(version='m1', RE='osa', test='GOF', pvalue=pval1_osa))
@@ -212,6 +222,9 @@ ggsave('plots/spatial_pvalues_outlier.png', g, width=5, height=5)
 g <- ggplot(filter(results, test=='disp') , aes(pvalue, )) + geom_histogram() +
   facet_grid(version+RE~test, scales='free')
 ggsave('plots/spatial_pvalues_disp.png', g, width=5, height=5)
+g <- ggplot(filter(results, test=='sac') , aes(pvalue, )) + geom_histogram() +
+  facet_grid(version+RE~test, scales='free')
+ggsave('plots/spatial_pvalues_sac.png', g, width=5, height=5)
 g <- ggplot(filter(results, test=='GOF') , aes(pvalue, )) + geom_histogram() +
   facet_grid(version+RE~test, scales='free')
 ggsave('plots/spatial_pvalues_GOF.png', g, width=5, height=5)
