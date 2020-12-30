@@ -14,6 +14,7 @@ run.iter <- function(ii){
   library(INLA)
   library(dplyr)
   library(tidyr)
+  library(R.utils)
   dyn.load(TMB::dynlib("models/spatial"))
   ## simulate data with these parameters
   message(ii, ": Simulating data...")
@@ -26,7 +27,15 @@ run.iter <- function(ii){
   ## Simulate spatial random effects
   Loc <- matrix(runif(n*2,0,100),ncol=2)
   dmat <- as.matrix(dist(Loc))
-  mesh <- INLA::inla.mesh.2d(Loc, max.edge = c(Range, Range/3), offset = c(2, Range*.75))
+  mesh <- tryCatch(
+    withTimeout( INLA::inla.mesh.2d(Loc, max.edge = c(Range, Range/3), offset = c(2, Range*.75)),
+                 timeout = 30, onTimeout = 'Silent' ),
+    error = function(e) 'mesh error')
+  if(is.character(mesh)){
+    system("Taskkill /IM fmesher.exe /F") 
+    warning("mesh failed in rep=", ii)
+    next
+  }
   Omega <- sim.omega(Range,sp.var,dmat,method="TMB.spde",mesh=mesh)
   ## simulate random measurements
   y <- sim.data(X = matrix(1, nrow(Loc),1), Beta=Beta, omega = Omega[mesh$idx$loc],
@@ -64,12 +73,12 @@ run.iter <- function(ii){
   ## OSA residuals
   osa0 <- tryCatch(
     oneStepPredict(obj0, observation.name="y",
-                   data.term.indicator='keep' ,
+                   data.term.indicator='keep' , range = c(0,Inf),
                    method="cdf", trace=FALSE)$residual,
     error=function(e) 'error')
   osa1 <- tryCatch(
     oneStepPredict(obj1, observation.name="y",
-                   data.term.indicator='keep' ,
+                   data.term.indicator='keep' , range = c(0,Inf),
                    method="cdf", trace=FALSE)$residual,
     error=function(e) 'error')
   if(is.character(osa0) | is.character(osa1)){
@@ -110,21 +119,29 @@ run.iter <- function(ii){
   ## now.
   ## AMH: change to alternative = 'greater' when testing for overdispersion in positive only distributions
                                         #AMH: Add significance tests
-  disp0_uncond <- testDispersion(dharma0_uncond, plot=FALSE)
-  outlier0_uncond <- testOutliers(dharma0_uncond, type='binomial', plot=FALSE)
+  disp0_uncond <- testDispersion(dharma0_uncond, alternative = 'greater', plot=FALSE)
+  outlier0_uncond <- testOutliers(dharma0_uncond, alternative = 'greater', 
+                                  margin = 'upper', type='binomial', plot=FALSE)
   pval0_uncond <- suppressWarnings(ks.test(dharma0_uncond$scaledResiduals,'punif')$p.value)
-  disp1_uncond <- testDispersion(dharma1_uncond, plot=FALSE)
-  outlier1_uncond <- testOutliers(dharma1_uncond, type='binomial', plot=FALSE)
+  disp1_uncond <- testDispersion(dharma1_uncond, alternative = 'greater', plot=FALSE)
+  outlier1_uncond <- testOutliers(dharma1_uncond, alternative = 'greater', 
+                                  margin = 'upper', type='binomial', plot=FALSE)
   pval1_uncond <- suppressWarnings(ks.test(dharma1_uncond$scaledResiduals,'punif')$p.value)
-  disp0_cond <- testDispersion(dharma0_cond, plot=FALSE)
-  outlier0_cond <- testOutliers(dharma0_cond, type='binomial', plot=FALSE)
+  disp0_cond <- testDispersion(dharma0_cond, alternative = 'greater', plot=FALSE)
+  outlier0_cond <- testOutliers(dharma0_cond, alternative = 'greater', 
+                                margin = 'upper', type='binomial', plot=FALSE)
+  sac0_cond <- testSpatialAutocorrelation(dharma0_cond, distMat = dmat, alternative = 'greater') #only test for positive correlation
   pval0_cond <- suppressWarnings(ks.test(dharma0_cond$scaledResiduals,'punif')$p.value)
-  disp1_cond <- testDispersion(dharma1_cond, plot=FALSE)
-  outlier1_cond <- testOutliers(dharma1_cond, type='binomial', plot=FALSE)
+  disp1_cond <- testDispersion(dharma1_cond, alternative = 'greater', plot=FALSE)
+  outlier1_cond <- testOutliers(dharma1_cond, alternative = 'greater', 
+                                margin = 'upper', type='binomial', plot=FALSE)
+  sac1_cond <- testSpatialAutocorrelation(dharma1_cond, distMat = dmat, alternative = 'greater') #only test for positive correlation
   pval1_cond <- suppressWarnings(ks.test(dharma1_cond$scaledResiduals,'punif')$p.value)
                                         #osa
   pval0_osa <- suppressWarnings(ks.test(osa0,'pnorm')$p.value)
+  sac0_osa <- testSpatialAutocorrelation(osa0, distMat = dmat, alternative = 'greater') #only test for positive correlation
   pval1_osa <- suppressWarnings(ks.test(osa1,'pnorm')$p.value)
+  sac1_osa <- testSpatialAutocorrelation(osa1, distMat = dmat, alternative = 'greater') #only test for positive correlation
 
   pvals <- rbind(
     data.frame(version='m0', RE='cond', test='outlier', pvalue=outlier0_cond$p.value),
@@ -133,6 +150,9 @@ run.iter <- function(ii){
     data.frame(version='m0', RE='cond', test='disp', pvalue=disp0_cond$p.value),
     data.frame(version='m0', RE='uncond', test='disp', pvalue=disp0_uncond$p.value),
     data.frame(version='m0', RE='osa', test='disp', pvalue=NA),
+    data.frame(version='m0', RE='cond', test='sac', pvalue=sac0_cond$p.value),
+    data.frame(version='m0', RE='uncond', test='sac', pvalue=NA),
+    data.frame(version='m0', RE='osa', test='sac', pvalue=sac0_osa$p.value),
     data.frame(version='m0', RE='cond', test='GOF', pvalue=pval0_cond),
     data.frame(version='m0', RE='uncond', test='GOF', pvalue=pval0_uncond),
     data.frame(version='m0', RE='osa', test='GOF', pvalue=pval0_osa),
@@ -142,6 +162,9 @@ run.iter <- function(ii){
     data.frame(version='m1', RE='cond', test='disp', pvalue=disp1_cond$p.value),
     data.frame(version='m1', RE='uncond', test='disp', pvalue=disp1_uncond$p.value),
     data.frame(version='m1', RE='osa', test='disp', pvalue=NA),
+    data.frame(version='m1', RE='cond', test='sac', pvalue=sac1_cond$p.value),
+    data.frame(version='m1', RE='uncond', test='sac', pvalue=NA),
+    data.frame(version='m1', RE='osa', test='sac', pvalue=sac1_osa$p.value),
     data.frame(version='m1', RE='cond', test='GOF', pvalue=pval1_cond),
     data.frame(version='m1', RE='uncond', test='GOF', pvalue=pval1_uncond),
     data.frame(version='m1', RE='osa', test='GOF', pvalue=pval1_osa))
@@ -199,6 +222,9 @@ ggsave('plots/spatial_pvalues_outlier.png', g, width=5, height=5)
 g <- ggplot(filter(results, test=='disp') , aes(pvalue, )) + geom_histogram() +
   facet_grid(version+RE~test, scales='free')
 ggsave('plots/spatial_pvalues_disp.png', g, width=5, height=5)
+g <- ggplot(filter(results, test=='sac') , aes(pvalue, )) + geom_histogram() +
+  facet_grid(version+RE~test, scales='free')
+ggsave('plots/spatial_pvalues_sac.png', g, width=5, height=5)
 g <- ggplot(filter(results, test=='GOF') , aes(pvalue, )) + geom_histogram() +
   facet_grid(version+RE~test, scales='free')
 ggsave('plots/spatial_pvalues_GOF.png', g, width=5, height=5)
