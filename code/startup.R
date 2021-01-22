@@ -65,8 +65,8 @@ sim.omega <- function(Range, sig2, Dmat, Nu = 1, method, mesh){
 
 # Simulate data
 sim.data <- function(X, Beta, omega, parm, fam, link, Loc){
-  Xbeta <- X%*%matrix(Beta, nrow=1)
-  eta <- Xbeta + omega
+  Xbeta <- X %*% Beta
+  eta <- as.numeric(Xbeta + omega)
   N <- nrow(X)
   if(link == 'identity'){
     mu <- eta
