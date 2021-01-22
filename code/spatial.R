@@ -185,8 +185,7 @@ run.iter <- function(ii){
     ggsave('plots/spatial_data_example.png', g, width=7, height=5)
     ## plot of resids
     g <- ggplot(resids.long, aes(x, y, size=abs(value), color=value<0)) +
-      geom_point(alpha=.5) + facet_wrap('version', ncol=1)
-    labs(x='Time Step', y='Residual Value', title='Random Walk')
+      geom_point(alpha=.5) + facet_grid(version~name)
     ggsave('plots/spatial_resids_by_space.png', g, width=7, height=8)
     g <- GGally::ggpairs(resids, columns=4:6, mapping=aes(color=version), title='Random Walk')
     ggsave('plots/spatial_resids_pairs.png', g, width=7, height=5)
