@@ -47,30 +47,35 @@ run.iter <- function(ii){
               dd = dmat, nu = 1, v_i = mesh$idx$loc-1,
               simRE = 0, family = 100, link = 0, reStruct = 10)
   dat$spde <- INLA::inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
+  ## par <- list(beta = c(0,0), theta = 0, log_tau = 0, log_kappa = 0,
+  ##             omega = rep(0,mesh$n))
   par <- list(beta = c(0,0), theta = 0, log_tau = 0, log_kappa = 0,
-              omega = rep(0,mesh$n))
+              log_zeta=0, omega = rep(0,n), u=rep(0,n))
 
-  ## estimate states and parameters under h0: No covariate
+  ## estimate states and parameters under h0: No space, instead overdispersion
   message(ii, ": Optimizing two competing models...")
   dummy.mesh <- INLA::inla.mesh.create(matrix(runif(4), ncol=2))
-  dat <- list(y=y, X=matrix(X1, ncol=1),
+  dat <- list(y=y, X=X,
               dd=dmat, nu=1, v_i=(1:n)-1,
-              simRE=0, family=100, link=0, reStruct=00)
+              simRE=0, family=100, link=0, reStruct=20)
   dat$spde <- INLA::inla.spde2.matern(dummy.mesh)$param.inla[c('M0', 'M1', 'M2')]
-  par = list(beta = 0, theta = 0, log_tau = 0, log_kappa = 0,
-             omega = rep(0,n))
-  obj0 <- TMB::MakeADFun(dat, par, random=c("omega"), dll="spatial")
+  map <- list(log_tau=factor(NA), log_kappa=factor(NA), omega=factor(NA*par$omega))
+  obj0 <- TMB::MakeADFun(dat, par, random=c("omega", 'u'),
+                         dll="spatial", map=map)
   trash <- obj0$env$beSilent()
+  str(obj0$report())
   opt0 <- nlminb(obj0$par, obj0$fn, obj0$gr)
   sdr0 <- sdreport(obj0)
-  estOmega0 <- summary(sdr0,"random")
-  ## estimate states and parameters under h1: yes covariate
-  dat$X <- X; par$beta <- c(1,1)
-  obj1 <- TMB::MakeADFun(dat, par, random=c("omega"), dll="spatial")
+  ##estOmega0 <- summary(sdr0,"random")
+  ## estimate states and parameters under h1: spatial variance
+  map <- list(log_zeta=factor(NA), u=factor(NA*par$u))
+  dat$reStruct <- 00
+  obj1 <- TMB::MakeADFun(dat, par, random=c("omega", 'u'),
+                         dll="spatial", map=map)
   trash <- obj1$env$beSilent()
   opt1 <- nlminb(obj1$par, obj1$fn, obj1$gr)
   sdr1 <- sdreport(obj1)
-  estOmega1 <- summary(sdr1,"random")
+  ## estOmega1 <- summary(sdr1,"random")
 
   message(ii, ": Calculating residuals..")
   ## OSA residuals

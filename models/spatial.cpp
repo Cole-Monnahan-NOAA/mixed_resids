@@ -77,18 +77,21 @@ Type objective_function<Type>::operator() ()
   PARAMETER(theta);      
   PARAMETER(log_tau);
   PARAMETER(log_kappa);
-  PARAMETER_VECTOR(omega);  
+  PARAMETER(log_zeta);  	// overdispersion SD
+  PARAMETER_VECTOR(omega);
+  PARAMETER_VECTOR(u);		// overdispersion REs
   DATA_VECTOR_INDICATOR( keep, y );
 
   int i,j; 
   int n = y.size();
 
+  Type zeta=exp(log_zeta);
   Type tau = exp(log_tau);
   Type kappa = exp(log_kappa);
+  Type marg_sp_sd = 1/(2*sqrt(M_PI)*kappa*tau);
+  Type Range= sqrt(8)/kappa;
 
   Type nll = 0.0;
-
-  Type marg_sp_sd = 1/(2*sqrt(M_PI)*exp(log_kappa)*exp(log_tau));
 
   //Spatial Likelihood
  if(reStruct==00){
@@ -96,7 +99,7 @@ Type objective_function<Type>::operator() ()
    for (i=0;i<n;i++){
        cov(i,i)=Type(1);
        for ( j=0;j<i;j++){
-         cov(i,j)=matern(dd(i,j), sqrt(8)/kappa, Type(nu)); //nu=0.5: exponential decay; nu=1: approx. gaussian decay 
+         cov(i,j)=matern(dd(i,j), Range, Type(nu)); //nu=0.5: exponential decay; nu=1: approx. gaussian decay 
          cov(j,i)=cov(i,j);
       }
     }
@@ -121,14 +124,24 @@ Type objective_function<Type>::operator() ()
     }
     REPORT(Q);
   }
-  
+  if(reStruct==20){
+    // Only overdispersion, no spatial
+    nll -= dnorm(u, 0, zeta, true).sum();
+    if(simRE == 1){
+      SIMULATE{
+	for(int i=0; i<n; i++) u(i) = rnorm(Type(0.0), zeta);
+        REPORT(u);
+      }
+    }
+  }
+
   vector<Type> Xbeta = X*beta;  
   vector<Type> eta(n);
   vector<Type> mu(n);
   Type cdf;
   //Data Likelihood
   for(int i=0; i<n; i++){    
-    eta(i) = Xbeta(i) + omega(v_i(i));
+    eta(i) = Xbeta(i) + omega(v_i(i)) + u(i);
 
     mu(i) = inverse_linkfun(eta(i), link);
 
@@ -176,8 +189,10 @@ Type objective_function<Type>::operator() ()
     REPORT(y);
   }
 
+  REPORT(Range);
   REPORT(marg_sp_sd);
   REPORT(eta);
+  REPORT(zeta);
   REPORT(mu);
   REPORT(nll);
 

@@ -35,8 +35,8 @@ sim.omega <- function(Range, sig2, Dmat, Nu = 1, method, mesh){
     dat$spde <- INLA::inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
     obj <- TMB::MakeADFun(data =  dat,
                      parameters = list(beta = 0, theta = 0, log_tau = log(Tau),
-                                       log_kappa = log(Kappa),
-                                       omega = rep(0,n)),
+                                       log_kappa = log(Kappa), log_zeta=0,
+                                       omega = rep(0,n), u=rep(0,n)),
                      random = 'omega',
                      DLL = 'spatial')
     sim <- obj$simulate()
@@ -51,8 +51,8 @@ sim.omega <- function(Range, sig2, Dmat, Nu = 1, method, mesh){
     dat$spde <- INLA::inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
     obj <- TMB::MakeADFun(data =  dat,
                      parameters = list(beta = 0, theta = 0, log_tau = log(Tau),
-                                       log_kappa = log(Kappa),
-                                       omega = rep(0,mesh$n)),
+                                       log_kappa = log(Kappa), log_zeta=0,
+                                       omega = rep(0,mesh$n), u=rep(0,n)),
                      random = 'omega',
                      DLL = 'spatial')
     sim <- obj$simulate()
