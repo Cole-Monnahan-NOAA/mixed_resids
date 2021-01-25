@@ -267,6 +267,7 @@ run.spatial.iter <- function(ii){
   ## Exploratory plots for first replicate
   if(ii==1){
     library(ggplot2)
+    theme_set(theme_bw())
     ## Plot of data
     g <- data.frame(x=Loc[,1], y=Loc[,2], z=y) %>%
       ggplot(aes(x,y, size=z)) + geom_point(alpha=.5)

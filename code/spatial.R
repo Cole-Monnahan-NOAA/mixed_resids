@@ -25,6 +25,7 @@ results <- sfLapply(bad, function(ii) run.spatial.iter(ii))
 fs <- list.files('results/spatial_pvals', full.names=TRUE)
 results <- lapply(fs, readRDS) %>% do.call(rbind, .) %>%
   filter(!is.na(pvalue))
+saveRDS(results, file='results/spatial_pvals.RDS')
 
 g <- ggplot(filter(results, test=='outlier') , aes(pvalue, )) + geom_histogram() +
   facet_grid(version+RE~test, scales='free')
