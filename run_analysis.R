@@ -31,7 +31,7 @@ source('code/randomwalk.R')
 ## completing the simulation. So I save the results to individual
 ## files and restart R and continue with the analysis
 cpus <- parallel::detectCores()-2
-Nreps <- 1000
+Nreps <- 2000
 source('code/spatial.R')
 
 

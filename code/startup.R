@@ -2,12 +2,13 @@ library(MASS) # rmvnorm
 library(TMB)
 library(INLA)
 library(DHARMa)
-library(VAST)
+## library(VAST)
 library(ggplot2)
 library(dplyr)
 library(tidyr)
 ## Has ggpairs for comparing residual types
 library(GGally)
+library(snowfall)
 
 ## Some global settings
 ggwidth <- 7
@@ -86,3 +87,210 @@ sim.data <- function(X, Beta, omega, parm, fam, link, Loc){
   return(Y)
 }
 
+
+
+## Wrapper function to use spatial model in parallel. Runs a
+## single simulation iteration. Called in spatial.R.
+run.spatial.iter <- function(ii){
+  library(TMB)
+  library(DHARMa)
+  library(INLA)
+  library(dplyr)
+  library(tidyr)
+  library(R.utils)
+  dyn.load(TMB::dynlib("models/spatial"))
+  ## simulate data with these parameters
+  message(ii, ": Simulating data...")
+  set.seed(ii)
+  n <- 100
+  sp.var <- 0.5
+  CV <- 0.5
+  Range <- 10
+  ## Simulate spatial random effects
+  Loc <- matrix(runif(n*2,0,100),ncol=2)
+  dmat <- as.matrix(dist(Loc))
+  mesh <- try(
+    withTimeout( INLA::inla.mesh.2d(Loc, max.edge = c(Range, Range/3), offset = c(2, Range*.75)),
+                 timeout = 30, onTimeout = 'silent' ))
+  if(is.character(mesh)){
+    system("Taskkill /IM fmesher.exe /F")
+    warning("mesh failed in rep=", ii)
+    next
+  }
+  Omega <- sim.omega(Range,sp.var,dmat,method="TMB.spde",mesh=mesh)
+  ## simulate random measurements
+  ## True beta, an interecept and single covariate
+  Beta <- c(1,2)
+  X1 <- rep(1, nrow(Loc))               # intercept
+  X2 <- rnorm(n=nrow(Loc), 0, 1)        # random
+  X <- as.matrix(cbind(X1, X2))
+  y <- sim.data(X=X, Beta=Beta, omega=Omega[mesh$idx$loc],
+                parm=CV, fam='Gamma', link='log')
+  dat <- list(y = y, X = X,
+              dd = dmat, nu = 1, v_i = mesh$idx$loc-1,
+              simRE = 0, family = 100, link = 0, reStruct = 10)
+  dat$spde <- INLA::inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
+  ## par <- list(beta = c(0,0), theta = 0, log_tau = 0, log_kappa = 0,
+  ##             omega = rep(0,mesh$n))
+  par <- list(beta = c(0,0), theta = 0, log_tau = 0, log_kappa = 0,
+              log_zeta=0, omega = rep(0,n), u=rep(0,n))
+
+  ## estimate states and parameters under h0: No space, instead overdispersion
+  message(ii, ": Optimizing two competing models...")
+  dummy.mesh <- INLA::inla.mesh.create(matrix(runif(4), ncol=2))
+  dat <- list(y=y, X=X,
+              dd=dmat, nu=1, v_i=(1:n)-1,
+              simRE=0, family=100, link=0, reStruct=20)
+  dat$spde <- INLA::inla.spde2.matern(dummy.mesh)$param.inla[c('M0', 'M1', 'M2')]
+  map <- list(log_tau=factor(NA), log_kappa=factor(NA), omega=factor(NA*par$omega))
+  obj0 <- TMB::MakeADFun(dat, par, random=c("omega", 'u'),
+                         dll="spatial", map=map)
+  trash <- obj0$env$beSilent()
+  str(obj0$report())
+  opt0 <- nlminb(obj0$par, obj0$fn, obj0$gr)
+  sdr0 <- sdreport(obj0)
+  ##estOmega0 <- summary(sdr0,"random")
+  ## estimate states and parameters under h1: spatial variance
+  map <- list(log_zeta=factor(NA), u=factor(NA*par$u))
+  dat$reStruct <- 00
+  obj1 <- TMB::MakeADFun(dat, par, random=c("omega", 'u'),
+                         dll="spatial", map=map)
+  trash <- obj1$env$beSilent()
+  opt1 <- nlminb(obj1$par, obj1$fn, obj1$gr)
+  sdr1 <- sdreport(obj1)
+  ## estOmega1 <- summary(sdr1,"random")
+
+  message(ii, ": Calculating residuals..")
+  ## OSA residuals
+  osa0 <- tryCatch(
+    oneStepPredict(obj0, observation.name="y",
+                   data.term.indicator='keep' , range = c(0,Inf),
+                   method="cdf", trace=FALSE)$residual,
+    error=function(e) 'error')
+  osa1 <- tryCatch(
+    oneStepPredict(obj1, observation.name="y",
+                   data.term.indicator='keep' , range = c(0,Inf),
+                   method="cdf", trace=FALSE)$residual,
+    error=function(e) 'error')
+  if(is.character(osa0) | is.character(osa1)){
+    warning("OSA failed in rep=", ii)
+    next
+  }
+
+### DHARMa resids, both conditional and unconditional
+  tmp <- replicate(1000, {obj0$simulate()$y})
+  dharma0_cond <- createDHARMa(tmp, y, fittedPredictedResponse = rep(opt0$par['beta'],n))
+  obj0$env$data$simRE <- 1 #turn on RE simulation
+  tmp <- replicate(1000, {obj0$simulate()$y})
+  dharma0_uncond <- createDHARMa(tmp, y, fittedPredictedResponse = rep(opt0$par['beta'],n))
+  tmp <- replicate(1000, {obj1$simulate()$y})
+  dharma1_cond <- createDHARMa(tmp, y, fittedPredictedResponse = rep(opt1$par['beta'], n))
+  obj1$env$data$simRE <- 1 #turn on RE simulation
+  tmp <- replicate(1000, {obj1$simulate()$y})
+  dharma1_uncond <- createDHARMa(tmp, y, fittedPredictedResponse = rep(opt1$par['beta'], n))
+  ## warning("don't know the right way to calculate DHARMa resids")
+  sim0_cond <- residuals(dharma0_cond, quantileFunction = qnorm, outlierValues = c(-7,7))
+  sim0_uncond <- residuals(dharma0_uncond, quantileFunction = qnorm, outlierValues = c(-7,7))
+  sim1_cond <- residuals(dharma1_cond, quantileFunction = qnorm, outlierValues = c(-7,7))
+  sim1_uncond <- residuals(dharma1_uncond, quantileFunction = qnorm, outlierValues = c(-7,7))
+
+### Combine together in tidy format for analysis and plotting
+  d0 <- data.frame(x=Loc[,1], y=Loc[,2], version='m0',# pearson=pearson0,
+                   osa=osa0, sim_cond=sim0_cond,
+                   sim_uncond=sim0_uncond)
+  d1 <- data.frame(x=Loc[,1], y=Loc[,2], version='m1', #pearson=pearson1,
+                   osa=osa1, sim_cond=sim1_cond,
+                   sim_uncond=sim1_uncond)
+  resids <- rbind(d0, d1)
+  resids.long <- resids %>% pivot_longer(-c(x, y, version))
+
+### Extract p-values calculated by DHARMa
+  ## Note: Type binomial for continuous, if integer be careful. Not
+  ## sure if we want two-sided for dispersion? Using defaults for
+  ## now.
+  ## AMH: change to alternative = 'greater' when testing for overdispersion in positive only distributions
+  ## AMH: Add significance tests
+  disp0_uncond <- testDispersion(dharma0_uncond, alternative = 'greater', plot=FALSE)
+  outlier0_uncond <- testOutliers(dharma0_uncond, alternative = 'greater',
+                                  margin = 'upper', type='binomial', plot=FALSE)
+  pval0_uncond <- suppressWarnings(ks.test(dharma0_uncond$scaledResiduals,'punif')$p.value)
+  disp1_uncond <- testDispersion(dharma1_uncond, alternative = 'greater', plot=FALSE)
+  outlier1_uncond <- testOutliers(dharma1_uncond, alternative = 'greater',
+                                  margin = 'upper', type='binomial', plot=FALSE)
+  pval1_uncond <- suppressWarnings(ks.test(dharma1_uncond$scaledResiduals,'punif')$p.value)
+  disp0_cond <- testDispersion(dharma0_cond, alternative = 'greater', plot=FALSE)
+  outlier0_cond <- testOutliers(dharma0_cond, alternative = 'greater',
+                                margin = 'upper', type='binomial', plot=FALSE)
+  sac0_cond <- testSpatialAutocorrelation(dharma0_cond, x=Loc[,1], y=Loc[,2], alternative = 'greater') #only test for positive correlation
+  pval0_cond <- suppressWarnings(ks.test(dharma0_cond$scaledResiduals,'punif')$p.value)
+  disp1_cond <- testDispersion(dharma1_cond, alternative = 'greater', plot=FALSE)
+  outlier1_cond <- testOutliers(dharma1_cond, alternative = 'greater',
+                                margin = 'upper', type='binomial', plot=FALSE)
+  sac1_cond <- testSpatialAutocorrelation(dharma1_cond, x=Loc[,1], y=Loc[,2], alternative = 'greater') #only test for positive correlation
+  pval1_cond <- suppressWarnings(ks.test(dharma1_cond$scaledResiduals,'punif')$p.value)
+  ## osa
+  pval0_osa <- suppressWarnings(ks.test(osa0,'pnorm')$p.value)
+  #calculate Moran's I by hand for osa
+  w <- 1/dmat
+  diag(w) <- 0
+  sac0_osa <- ape::Moran.I(osa0, w, alternative = 'greater') #only test for positive correlation
+  pval1_osa <- suppressWarnings(ks.test(osa1,'pnorm')$p.value)
+  sac1_osa <- ape::Moran.I(osa1, w, alternative = 'greater') #only test for positive correlation
+
+  pvals <- rbind(
+    data.frame(version='m0', RE='cond', test='outlier', pvalue=outlier0_cond$p.value),
+    data.frame(version='m0', RE='uncond', test='outlier', pvalue=outlier0_uncond$p.value),
+    data.frame(version='m0', RE='osa', test='outlier', pvalue=NA),
+    data.frame(version='m0', RE='cond', test='disp', pvalue=disp0_cond$p.value),
+    data.frame(version='m0', RE='uncond', test='disp', pvalue=disp0_uncond$p.value),
+    data.frame(version='m0', RE='osa', test='disp', pvalue=NA),
+    data.frame(version='m0', RE='cond', test='sac', pvalue=sac0_cond$p.value),
+    data.frame(version='m0', RE='uncond', test='sac', pvalue=NA),
+    data.frame(version='m0', RE='osa', test='sac', pvalue=sac0_osa$p.value),
+    data.frame(version='m0', RE='cond', test='GOF', pvalue=pval0_cond),
+    data.frame(version='m0', RE='uncond', test='GOF', pvalue=pval0_uncond),
+    data.frame(version='m0', RE='osa', test='GOF', pvalue=pval0_osa),
+    data.frame(version='m1', RE='cond', test='outlier', pvalue=outlier1_cond$p.value),
+    data.frame(version='m1', RE='uncond', test='outlier', pvalue=outlier1_uncond$p.value),
+    data.frame(version='m1', RE='osa', test='outlier', pvalue=NA),
+    data.frame(version='m1', RE='cond', test='disp', pvalue=disp1_cond$p.value),
+    data.frame(version='m1', RE='uncond', test='disp', pvalue=disp1_uncond$p.value),
+    data.frame(version='m1', RE='osa', test='disp', pvalue=NA),
+    data.frame(version='m1', RE='cond', test='sac', pvalue=sac1_cond$p.value),
+    data.frame(version='m1', RE='uncond', test='sac', pvalue=NA),
+    data.frame(version='m1', RE='osa', test='sac', pvalue=sac1_osa$p.value),
+    data.frame(version='m1', RE='cond', test='GOF', pvalue=pval1_cond),
+    data.frame(version='m1', RE='uncond', test='GOF', pvalue=pval1_uncond),
+    data.frame(version='m1', RE='osa', test='GOF', pvalue=pval1_osa))
+  pvals$replicate <- ii
+
+  ## Exploratory plots for first replicate
+  if(ii==1){
+    library(ggplot2)
+    ## Plot of data
+    g <- data.frame(x=Loc[,1], y=Loc[,2], z=y) %>%
+      ggplot(aes(x,y, size=z)) + geom_point(alpha=.5)
+    ggsave('plots/spatial_data_example.png', g, width=7, height=5)
+    ## plot of resids
+    g <- ggplot(resids.long, aes(x, y, size=abs(value), color=value<0)) +
+      geom_point(alpha=.5) + facet_grid(version~name)
+    ggsave('plots/spatial_resids_by_space.png', g, width=9, height=6)
+    g <- GGally::ggpairs(resids, columns=4:6, mapping=aes(color=version), title='Random Walk')
+    ggsave('plots/spatial_resids_pairs.png', g, width=7, height=5)
+    ## Plot of  DHARMa simulated data look like
+    ff <- function(x, v, re) data.frame(x=Loc[,1], y=Loc[,2], version=v, RE=re, x$simulatedResponse[,1:4])
+    g <- rbind(ff(dharma0_cond, 'm0', 'cond'),
+               ff(dharma0_uncond, 'm0', 'uncond'),
+               ff(dharma1_cond, 'm1', 'cond'),
+               ff(dharma1_uncond, 'm1', 'uncond')) %>%
+      pivot_longer(cols=c(-x,-y, -version, -RE), names_prefix="X",
+                   names_to='replicate', values_to='z') %>%
+      mutate(replicate=as.numeric(replicate))  %>%
+      ggplot(aes(x, y, size=z)) + geom_point(alpha=.2) +
+      facet_grid(version+RE~replicate)
+    ggsave('plots/spatial_simdata.png', g, width=9, height=9)
+  }
+  ## save to file in case it crashes can recover what did run
+  saveRDS(pvals, file=paste0('results/spatial_pvals/pvals_', ii, '.RDS'))
+  return(pvals)
+}
