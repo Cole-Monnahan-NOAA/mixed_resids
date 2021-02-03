@@ -22,23 +22,19 @@ packageVersion('DHARMa')                # 0.3.3.0
 ## sim_cond = simulation residuals (DHARMa) conditioned on RE
 ## sim_uncon= simulation residual (DHARMa) unconditioned on RE
 
-## Basic random walk time series model
-Nreps <- 1000
-source('code/randomwalk.R')
+## ## Basic random walk time series model
+## Nreps <- 1000
+## source('code/randomwalk.R')
 
-### Spatial example from TMB
-## For some reason this hangs up when run in parallel despite
-## completing the simulation. So I save the results to individual
-## files and restart R and continue with the analysis
+## Spatial model. For now this script does everything. We can
+## restructure later.
 cpus <- parallel::detectCores()-2
 Nreps <- 2000
 source('code/spatial.R')
 
 
-### Load results
-source('code/load_results.R')
-
-
-### Make plots of results
-source("code/plot_results.R")
+## ### Load results
+## source('code/load_results.R')
+## ### Make plots of results
+## source("code/plot_results.R")
 

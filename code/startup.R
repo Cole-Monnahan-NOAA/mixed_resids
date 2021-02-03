@@ -9,11 +9,21 @@ library(tidyr)
 ## Has ggpairs for comparing residual types
 library(GGally)
 library(snowfall)
+library(R.utils)
 
 ## Some global settings
 ggwidth <- 7
 ggheight <- 5
 theme_set(theme_bw())
+
+## Quick fn to check for failed runs by looking at results output
+## that doesn't exist
+which.failed <- function(Nreps){
+  success <- gsub('results/spatial_pvals/pvals_|.RDS', "", x=fs) %>%
+    as.numeric()
+  fail <- which(! 1:Nreps %in% success)
+  fail
+}
 
 ## functions for simulating data
 cMatern <- function(H, Nu, Kap) {
