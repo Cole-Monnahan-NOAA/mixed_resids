@@ -10,11 +10,25 @@ library(tidyr)
 library(GGally)
 library(snowfall)
 library(R.utils)
+library(Matrix)
 
 ## Some global settings
 ggwidth <- 7
 ggheight <- 5
 theme_set(theme_bw())
+
+## Function to simulate parameters from the joint precisions
+## matrix (fixed + random effects). Modified from
+## FishStatsUtils::simulate_data
+rmvnorm_prec <- function(mu, prec ) {
+  ##set.seed( random_seed )
+  z = matrix(rnorm(length(mu)), ncol=1)
+  L = Matrix::Cholesky(prec, super=TRUE)
+  z = Matrix::solve(L, z, system = "Lt") ## z = Lt^-1 %*% z
+  z = Matrix::solve(L, z, system = "Pt") ## z = Pt    %*% z
+  z = as.vector(z)
+  return(mu + z)
+}
 
 ## Quick fn to check for failed runs by looking at results output
 ## that doesn't exist
@@ -157,8 +171,7 @@ run.spatial.iter <- function(ii){
                          dll="spatial", map=map)
   trash <- obj0$env$beSilent()
   opt0 <- nlminb(obj0$par, obj0$fn, obj0$gr)
-  sdr0 <- sdreport(obj0)
-  ##estOmega0 <- summary(sdr0,"random")
+  sdr0 <- sdreport(obj0, getJointPrecision=TRUE)
   ## estimate states and parameters under h1: spatial variance
   map <- list(log_zeta=factor(NA), u=factor(NA*par$u))
   dat$reStruct <- 00
@@ -166,11 +179,12 @@ run.spatial.iter <- function(ii){
                          dll="spatial", map=map)
   trash <- obj1$env$beSilent()
   opt1 <- nlminb(obj1$par, obj1$fn, obj1$gr)
-  sdr1 <- sdreport(obj1)
-  ## estOmega1 <- summary(sdr1,"random")
-  ## Make sure to get predicted Y while last par is the MLE
+  sdr1 <- sdreport(obj1, getJointPrecision=TRUE)
+  ## Make sure to get predicted Y and MLE while last par is the MLE
   opt0$ypred <- obj0$report()$mu
   opt1$ypred <- obj1$report()$mu
+  opt0$joint.mle <- obj0$env$last.par.best
+  opt1$joint.mle <- obj1$env$last.par.best
 
   message(ii, ": Calculating residuals..")
   ## OSA residuals
@@ -206,18 +220,40 @@ run.spatial.iter <- function(ii){
   sim1_cond <- residuals(dharma1_cond, quantileFunction = qnorm, outlierValues = c(-7,7))
   sim1_uncond <- residuals(dharma1_uncond, quantileFunction = qnorm, outlierValues = c(-7,7))
 
+  ## Try adding residuals from the joint precisions matrix
+
+  ## Sample from joint distribution
+  jp.sim0 <- function(){
+    newpar <- rmvnorm_prec(mu=opt0$joint.mle, prec=sdr0$jointPrecision)
+    obj0$env$data$simRE <- 0 # turn off RE simulation
+    obj0$simulate(par=newpar)$y
+  }
+  jp.sim1 <- function(){
+    newpar <- rmvnorm_prec(mu=opt1$joint.mle, prec=sdr1$jointPrecision)
+    obj1$env$data$simRE <- 0 # turn off RE simulation
+    obj1$simulate(par=newpar)$y
+  }
+  tmp0 <- replicate(1000, {jp.sim0()})
+  tmp1 <- replicate(1000, {jp.sim1()})
+  dharma0_parcond <- createDHARMa(tmp0, y, fittedPredictedResponse=NULL)
+  dharma1_parcond <- createDHARMa(tmp1, y, fittedPredictedResponse=NULL)
+  sim0_parcond <- residuals(dharma1_parcond, quantileFunction = qnorm, outlierValues = c(-7,7))
+  sim1_parcond <- residuals(dharma1_parcond, quantileFunction = qnorm, outlierValues = c(-7,7))
+
   ## Combine together in tidy format for analysis and plotting later
   d0 <- data.frame(model='spatial', replicate=ii, ytrue=dat$y,
                    ypred=opt0$ypred,
                    x=Loc[,1], y=Loc[,2], version='m0',
                    osa=osa0, sim_cond=sim0_cond,
                    sim_uncond=sim0_uncond,
+                   sim_parcond=sim0_parcond,
                    maxgrad=max(abs(obj0$gr(opt0$par))))
   d1 <- data.frame(model='spatial', replicate=ii, ytrue=dat$y,
                    ypred=opt1$ypred,
                    x=Loc[,1], y=Loc[,2], version='m1',
                    osa=osa1, sim_cond=sim1_cond,
                    sim_uncond=sim1_uncond,
+                   sim_parcond=sim0_parcond,
                    maxgrad=max(abs(obj1$gr(opt1$par))))
   resids <- rbind(d0, d1)
 
@@ -246,6 +282,17 @@ run.spatial.iter <- function(ii){
                                 margin = 'upper', type='binomial', plot=FALSE)
   sac1_cond <- testSpatialAutocorrelation(dharma1_cond, x=Loc[,1], y=Loc[,2], alternative = 'greater') #only test for positive correlation
   pval1_cond <- suppressWarnings(ks.test(dharma1_cond$scaledResiduals,'punif')$p.value)
+  ## The joint precision resids
+  disp0_parcond <- testDispersion(dharma0_parcond, alternative = 'greater', plot=FALSE)
+  outlier0_parcond <- testOutliers(dharma0_parcond, alternative = 'greater',
+                                margin = 'upper', type='binomial', plot=FALSE)
+  sac0_parcond <- testSpatialAutocorrelation(dharma0_parcond, x=Loc[,1], y=Loc[,2], alternative = 'greater') #only test for positive correlation
+  pval0_parcond <- suppressWarnings(ks.test(dharma0_parcond$scaledResiduals,'punif')$p.value)
+  disp1_parcond <- testDispersion(dharma1_parcond, alternative = 'greater', plot=FALSE)
+  outlier1_parcond <- testOutliers(dharma1_parcond, alternative = 'greater',
+                                margin = 'upper', type='binomial', plot=FALSE)
+  sac1_parcond <- testSpatialAutocorrelation(dharma1_parcond, x=Loc[,1], y=Loc[,2], alternative = 'greater') #only test for positive correlation
+  pval1_parcond <- suppressWarnings(ks.test(dharma1_parcond$scaledResiduals,'punif')$p.value)
   ## osa
   pval0_osa <- suppressWarnings(ks.test(osa0,'pnorm')$p.value)
   #calculate Moran's I by hand for osa
@@ -256,27 +303,35 @@ run.spatial.iter <- function(ii){
   sac1_osa <- ape::Moran.I(osa1, w, alternative = 'greater') #only test for positive correlation
 
   pvals <- rbind(
+    data.frame(version='m0', RE='parcond', test='outlier', pvalue=outlier0_parcond$p.value),
     data.frame(version='m0', RE='cond', test='outlier', pvalue=outlier0_cond$p.value),
     data.frame(version='m0', RE='uncond', test='outlier', pvalue=outlier0_uncond$p.value),
     data.frame(version='m0', RE='osa', test='outlier', pvalue=NA),
+    data.frame(version='m0', RE='parcond', test='disp', pvalue=disp0_parcond$p.value),
     data.frame(version='m0', RE='cond', test='disp', pvalue=disp0_cond$p.value),
     data.frame(version='m0', RE='uncond', test='disp', pvalue=disp0_uncond$p.value),
     data.frame(version='m0', RE='osa', test='disp', pvalue=NA),
+    data.frame(version='m0', RE='parcond', test='sac', pvalue=sac0_parcond$p.value),
     data.frame(version='m0', RE='cond', test='sac', pvalue=sac0_cond$p.value),
     data.frame(version='m0', RE='uncond', test='sac', pvalue=NA),
     data.frame(version='m0', RE='osa', test='sac', pvalue=sac0_osa$p.value),
+    data.frame(version='m0', RE='parcond', test='GOF', pvalue=pval0_parcond),
     data.frame(version='m0', RE='cond', test='GOF', pvalue=pval0_cond),
     data.frame(version='m0', RE='uncond', test='GOF', pvalue=pval0_uncond),
     data.frame(version='m0', RE='osa', test='GOF', pvalue=pval0_osa),
+    data.frame(version='m1', RE='parcond', test='outlier', pvalue=outlier1_parcond$p.value),
     data.frame(version='m1', RE='cond', test='outlier', pvalue=outlier1_cond$p.value),
     data.frame(version='m1', RE='uncond', test='outlier', pvalue=outlier1_uncond$p.value),
     data.frame(version='m1', RE='osa', test='outlier', pvalue=NA),
+    data.frame(version='m1', RE='parcond', test='disp', pvalue=disp1_parcond$p.value),
     data.frame(version='m1', RE='cond', test='disp', pvalue=disp1_cond$p.value),
     data.frame(version='m1', RE='uncond', test='disp', pvalue=disp1_uncond$p.value),
     data.frame(version='m1', RE='osa', test='disp', pvalue=NA),
+    data.frame(version='m1', RE='parcond', test='sac', pvalue=sac1_parcond$p.value),
     data.frame(version='m1', RE='cond', test='sac', pvalue=sac1_cond$p.value),
     data.frame(version='m1', RE='uncond', test='sac', pvalue=NA),
     data.frame(version='m1', RE='osa', test='sac', pvalue=sac1_osa$p.value),
+    data.frame(version='m1', RE='parcond', test='GOF', pvalue=pval1_parcond),
     data.frame(version='m1', RE='cond', test='GOF', pvalue=pval1_cond),
     data.frame(version='m1', RE='uncond', test='GOF', pvalue=pval1_uncond),
     data.frame(version='m1', RE='osa', test='GOF', pvalue=pval1_osa))
@@ -285,7 +340,8 @@ run.spatial.iter <- function(ii){
   ## Exploratory plots for first replicate
   if(ii==1){
     library(ggplot2)
-    resids.long <- resids %>% pivot_longer(c('osa', 'sim_cond', 'sim_uncond'))
+    resids.long <- resids %>%
+      pivot_longer(c('osa', 'sim_cond', 'sim_uncond', 'sim_parcond'))
     theme_set(theme_bw())
     ## Plot of data
     g <- data.frame(x=Loc[,1], y=Loc[,2], z=y) %>%
@@ -295,18 +351,20 @@ run.spatial.iter <- function(ii){
     g <- ggplot(resids.long, aes(x, y, size=abs(value), color=value<0)) +
       geom_point(alpha=.5) + facet_grid(version~name)
     ggsave('plots/spatial_resids_by_space.png', g, width=9, height=6)
-    g <- GGally::ggpairs(resids, columns=4:6, mapping=aes(color=version), title='Random Walk')
+    g <- GGally::ggpairs(resids, columns=8:11, mapping=aes(color=version), title='Random Walk')
     ggsave('plots/spatial_resids_pairs.png', g, width=7, height=5)
     ## Plot of  DHARMa simulated data look like
     ff <- function(x, v, re) data.frame(x=Loc[,1], y=Loc[,2], version=v, RE=re, x$simulatedResponse[,1:4])
     g <- rbind(ff(dharma0_cond, 'm0', 'cond'),
+               ff(dharma0_parcond, 'm0', 'parcond'),
                ff(dharma0_uncond, 'm0', 'uncond'),
                ff(dharma1_cond, 'm1', 'cond'),
+               ff(dharma1_parcond, 'm1', 'parcond'),
                ff(dharma1_uncond, 'm1', 'uncond')) %>%
       pivot_longer(cols=c(-x,-y, -version, -RE), names_prefix="X",
                    names_to='replicate', values_to='z') %>%
       mutate(replicate=as.numeric(replicate))  %>%
-      ggplot(aes(x, y, size=z)) + geom_point(alpha=.2) +
+      ggplot(aes(x, y, size=log(z))) + geom_point(alpha=.2) +
       facet_grid(version+RE~replicate)
     ggsave('plots/spatial_simdata.png', g, width=9, height=9)
   }
