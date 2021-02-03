@@ -50,9 +50,11 @@ ggsave('plots/spatial_pvalues_disp.png', g, width=5, height=5)
 g <- ggplot(filter(pvals, test=='sac') , aes(pvalue, )) + geom_histogram() +
   facet_grid(version+RE~test, scales='free')
 ggsave('plots/spatial_pvalues_sac.png', g, width=5, height=5)
-g <- ggplot(filter(pvals, test=='GOF') , aes(pvalue, )) + geom_histogram() +
+g <- ggplot(filter(results, test=='GOF'& (RE=='cond' | RE=='uncond')) , aes(pvalue, )) + geom_histogram() +
   facet_grid(version+RE~test, scales='free')
-ggsave('plots/spatial_pvalues_GOF.png', g, width=5, height=5)
+ggsave('plots/spatial_pvalues_GOF_DHARMa.png', g, width=5, height=5)
+g <- ggplot(filter(results, test=='GOF'& RE!='cond' & RE!='uncond') , aes(pvalue, )) + geom_histogram() +
+  facet_grid(version+RE~test, scales='free')
 
 ## resids.long <- pivot_longer(resids, c('osa', 'sim_cond', 'sim_uncond'),
 ##                             names_to='type',
