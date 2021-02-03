@@ -194,6 +194,7 @@ Type objective_function<Type>::operator() ()
   REPORT(eta);
   REPORT(zeta);
   REPORT(mu);
+  REPORT(Xbeta);
   REPORT(nll);
 
   return nll;

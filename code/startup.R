@@ -128,13 +128,13 @@ run.spatial.iter <- function(ii){
   set.seed(ii)
   n <- 100
   sp.var <- 0.5
-  CV <- 0.5
-  Range <- 10
+  CV <- 1
+  Range <- 20
   ## Simulate spatial random effects
   Loc <- matrix(runif(n*2,0,100),ncol=2)
   dmat <- as.matrix(dist(Loc))
   mesh <- try(
-    withTimeout( INLA::inla.mesh.2d(Loc, max.edge = c(Range, Range/3), offset = c(2, Range*.75)),
+    withTimeout( INLA::inla.mesh.2d(Loc, max.edge = c(Range/3, Range), offset = c(2, Range*.75)),
                  timeout = 30, onTimeout = 'silent' ))
   if(is.character(mesh)){
     system("Taskkill /IM fmesher.exe /F")
@@ -150,14 +150,9 @@ run.spatial.iter <- function(ii){
   X <- as.matrix(cbind(X1, X2))
   y <- sim.data(X=X, Beta=Beta, omega=Omega[mesh$idx$loc],
                 parm=CV, fam='Gamma', link='log')
-  dat <- list(y = y, X = X,
-              dd = dmat, nu = 1, v_i = mesh$idx$loc-1,
-              simRE = 0, family = 100, link = 0, reStruct = 10)
-  dat$spde <- INLA::inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
-  ## par <- list(beta = c(0,0), theta = 0, log_tau = 0, log_kappa = 0,
-  ##             omega = rep(0,mesh$n))
-  par <- list(beta = c(0,0), theta = 0, log_tau = 0, log_kappa = 0,
-              log_zeta=0, omega = rep(0,n), u=rep(0,n))
+
+  par <- list(beta = 0*Beta, theta = 0, log_tau = 0, log_kappa = 0,
+              log_zeta=0, omega = rep(0,mesh$n), u=rep(0,n))
 
   ## estimate states and parameters under h0: No space, instead overdispersion
   message(ii, ": Optimizing two competing models...")
@@ -172,15 +167,18 @@ run.spatial.iter <- function(ii){
   trash <- obj0$env$beSilent()
   opt0 <- nlminb(obj0$par, obj0$fn, obj0$gr)
   sdr0 <- sdreport(obj0, getJointPrecision=TRUE)
+  rep0 <- obj0$report(obj0$env$last.par.best)
   ## estimate states and parameters under h1: spatial variance
   map <- list(log_zeta=factor(NA), u=factor(NA*par$u))
-  dat$reStruct <- 00
+  dat$v_i <- mesh$idx$loc-1
+  dat$reStruct <- 10
+  dat$spde <- INLA::inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
   obj1 <- TMB::MakeADFun(dat, par, random=c("omega", 'u'),
                          dll="spatial", map=map)
   trash <- obj1$env$beSilent()
   opt1 <- nlminb(obj1$par, obj1$fn, obj1$gr)
   sdr1 <- sdreport(obj1, getJointPrecision=TRUE)
-  ## Make sure to get predicted Y and MLE while last par is the MLE
+  rep1 <- obj1$report(obj1$env$last.par.best)
   opt0$ypred <- obj0$report()$mu
   opt1$ypred <- obj1$report()$mu
   opt0$joint.mle <- obj0$env$last.par.best
@@ -188,32 +186,80 @@ run.spatial.iter <- function(ii){
 
   message(ii, ": Calculating residuals..")
   ## OSA residuals
-  osa0 <- tryCatch(
+
+  ## Full Gaussian method
+  # osa0.fg <- tryCatch(
+  #   oneStepPredict(obj0, observation.name="y",
+  #                  method="fullGaussian", trace=FALSE)$residual,
+  #   error=function(e) 'error')
+  # osa1.fg <- tryCatch(
+  #   oneStepPredict(obj1, observation.name="y",
+  #                  method="fullGaussian", trace=FALSE)$residual,
+  #   error=function(e) 'error')
+  #
+  # if(is.character(osa0.fg) | is.character(osa1.fg)){
+  #   warning("OSA Full Gaussian failed in rep=", ii)
+  #   next
+  # }
+
+  ## one step Gaussian method
+  # osa0.osg <- tryCatch(
+  #   oneStepPredict(obj0, observation.name="y",
+  #                  data.term.indicator='keep' ,
+  #                  method="oneStepGaussian", trace=FALSE)$residual,
+  #   error=function(e) 'error')
+  # osa1.osg <- tryCatch(
+  #   oneStepPredict(obj1, observation.name="y",
+  #                  data.term.indicator='keep' ,
+  #                  method="oneStepGaussian", trace=FALSE)$residual,
+  #   error=function(e) 'error')
+  # if(is.character(osa0.osg) | is.character(osa1.osg)){
+  #   warning("OSA one Step Gaussian failed in rep=", ii)
+  #   next
+  # }
+
+  ## CDF method
+  osa0.cdf <- tryCatch(
     oneStepPredict(obj0, observation.name="y",
-                   data.term.indicator='keep' , range = c(0,Inf),
+                   data.term.indicator='keep' ,
+                   method="cdf", trace=FALSE)$residual,
+      error=function(e) 'error')
+  osa1.cdf <- tryCatch(
+    oneStepPredict(obj1, observation.name="y",
+                   data.term.indicator='keep' ,
                    method="cdf", trace=FALSE)$residual,
     error=function(e) 'error')
-  osa1 <- tryCatch(
+  if(is.character(osa0.cdf) | is.character(osa1.cdf)){
+      warning("OSA CDF failed in rep=", ii)
+      next
+    }
+  ## one step Generic method
+  osa0.gen <- tryCatch(
+  oneStepPredict(obj0, observation.name="y",
+                 data.term.indicator='keep' , range = c(0,Inf),
+                 method="oneStepGeneric", trace=FALSE)$residual,
+    error=function(e) 'error')
+  osa1.gen <- tryCatch(
     oneStepPredict(obj1, observation.name="y",
                    data.term.indicator='keep' , range = c(0,Inf),
-                   method="cdf", trace=FALSE)$residual,
+                   method="oneStepGeneric", trace=FALSE)$residual,
     error=function(e) 'error')
-  if(is.character(osa0) | is.character(osa1)){
-    warning("OSA failed in rep=", ii)
+  if(is.character(osa0.gen) | is.character(osa1.gen)){
+    warning("OSA Generic failed in rep=", ii)
     next
   }
 
 ### DHARMa resids, both conditional and unconditional
   tmp <- replicate(1000, {obj0$simulate()$y})
-  dharma0_cond <- createDHARMa(tmp, y, fittedPredictedResponse = rep(opt0$par['beta'],n))
+  dharma0_cond <- createDHARMa(tmp, y, fittedPredictedResponse = rep0$Xbeta)
   obj0$env$data$simRE <- 1 #turn on RE simulation
   tmp <- replicate(1000, {obj0$simulate()$y})
-  dharma0_uncond <- createDHARMa(tmp, y, fittedPredictedResponse = rep(opt0$par['beta'],n))
+  dharma0_uncond <- createDHARMa(tmp, y, fittedPredictedResponse = rep0$Xbeta)
   tmp <- replicate(1000, {obj1$simulate()$y})
-  dharma1_cond <- createDHARMa(tmp, y, fittedPredictedResponse = rep(opt1$par['beta'], n))
+  dharma1_cond <- createDHARMa(tmp, y, fittedPredictedResponse = rep1$Xbeta)
   obj1$env$data$simRE <- 1 #turn on RE simulation
   tmp <- replicate(1000, {obj1$simulate()$y})
-  dharma1_uncond <- createDHARMa(tmp, y, fittedPredictedResponse = rep(opt1$par['beta'], n))
+  dharma1_uncond <- createDHARMa(tmp, y, fittedPredictedResponse = rep1$Xbeta)
   ## warning("don't know the right way to calculate DHARMa resids")
   sim0_cond <- residuals(dharma0_cond, quantileFunction = qnorm, outlierValues = c(-7,7))
   sim0_uncond <- residuals(dharma0_uncond, quantileFunction = qnorm, outlierValues = c(-7,7))
@@ -221,8 +267,6 @@ run.spatial.iter <- function(ii){
   sim1_uncond <- residuals(dharma1_uncond, quantileFunction = qnorm, outlierValues = c(-7,7))
 
   ## Try adding residuals from the joint precisions matrix
-
-  ## Sample from joint distribution
   jp.sim0 <- function(){
     newpar <- rmvnorm_prec(mu=opt0$joint.mle, prec=sdr0$jointPrecision)
     obj0$env$data$simRE <- 0 # turn off RE simulation
@@ -244,14 +288,19 @@ run.spatial.iter <- function(ii){
   d0 <- data.frame(model='spatial', replicate=ii, ytrue=dat$y,
                    ypred=opt0$ypred,
                    x=Loc[,1], y=Loc[,2], version='m0',
-                   osa=osa0, sim_cond=sim0_cond,
+                   #osa=osa0, sim_cond=sim0_cond,
+                   #osa.fg = osa0.fg, osa.osg = osa0.osg,
+                   osa.cdf = osa0.cdf, osa.gen = osa0.gen,
+                   sim_cond=sim0_cond,
                    sim_uncond=sim0_uncond,
                    sim_parcond=sim0_parcond,
                    maxgrad=max(abs(obj0$gr(opt0$par))))
   d1 <- data.frame(model='spatial', replicate=ii, ytrue=dat$y,
                    ypred=opt1$ypred,
                    x=Loc[,1], y=Loc[,2], version='m1',
-                   osa=osa1, sim_cond=sim1_cond,
+                   #osa.fg = osa1.fg, osa.osg = osa1.osg,
+                   osa.cdf = osa1.cdf, osa.gen = osa1.gen,
+                   sim_cond=sim1_cond,
                    sim_uncond=sim1_uncond,
                    sim_parcond=sim0_parcond,
                    maxgrad=max(abs(obj1$gr(opt1$par))))
@@ -294,14 +343,26 @@ run.spatial.iter <- function(ii){
   sac1_parcond <- testSpatialAutocorrelation(dharma1_parcond, x=Loc[,1], y=Loc[,2], alternative = 'greater') #only test for positive correlation
   pval1_parcond <- suppressWarnings(ks.test(dharma1_parcond$scaledResiduals,'punif')$p.value)
   ## osa
-  pval0_osa <- suppressWarnings(ks.test(osa0,'pnorm')$p.value)
+  ## osa
+  # pval0_osa.fg <- suppressWarnings(ks.test(osa0.fg,'pnorm')$p.value)
+  # pval0_osa.osg <- suppressWarnings(ks.test(osa0.osg,'pnorm')$p.value)
+  pval0_osa.cdf <- suppressWarnings(ks.test(osa0.cdf,'pnorm')$p.value)
+  pval0_osa.gen <- suppressWarnings(ks.test(osa0.gen,'pnorm')$p.value)
   #calculate Moran's I by hand for osa
   w <- 1/dmat
   diag(w) <- 0
-  sac0_osa <- ape::Moran.I(osa0, w, alternative = 'greater') #only test for positive correlation
-  pval1_osa <- suppressWarnings(ks.test(osa1,'pnorm')$p.value)
-  sac1_osa <- ape::Moran.I(osa1, w, alternative = 'greater') #only test for positive correlation
-
+  # sac0_osa.fg <- ape::Moran.I(osa0.fg, w, alternative = 'greater') #only test for positive correlation
+  # sac0_osa.osg <- ape::Moran.I(osa0.osg, w, alternative = 'greater') #only test for positive correlation
+  sac0_osa.cdf <- ape::Moran.I(osa0.cdf, w, alternative = 'greater') #only test for positive correlation
+  sac0_osa.gen <- ape::Moran.I(osa0.gen, w, alternative = 'greater') #only test for positive correlation
+  # pval1_osa.fg <- suppressWarnings(ks.test(osa1.fg,'pnorm')$p.value)
+  # pval1_osa.osg <- suppressWarnings(ks.test(osa1.osg,'pnorm')$p.value)
+  pval1_osa.cdf <- suppressWarnings(ks.test(osa1.cdf,'pnorm')$p.value)
+  pval1_osa.gen <- suppressWarnings(ks.test(osa1.gen,'pnorm')$p.value)
+  # sac1_osa.fg <- ape::Moran.I(osa1.fg, w, alternative = 'greater') #only test for positive correlation
+  # sac1_osa.osg <- ape::Moran.I(osa1.osg, w, alternative = 'greater') #only test for positive correlation
+  sac1_osa.cdf <- ape::Moran.I(osa1.cdf, w, alternative = 'greater') #only test for positive correlation
+  sac1_osa.gen <- ape::Moran.I(osa1.gen, w, alternative = 'greater') #only test for positive correlation
   pvals <- rbind(
     data.frame(version='m0', RE='parcond', test='outlier', pvalue=outlier0_parcond$p.value),
     data.frame(version='m0', RE='cond', test='outlier', pvalue=outlier0_cond$p.value),
@@ -314,11 +375,17 @@ run.spatial.iter <- function(ii){
     data.frame(version='m0', RE='parcond', test='sac', pvalue=sac0_parcond$p.value),
     data.frame(version='m0', RE='cond', test='sac', pvalue=sac0_cond$p.value),
     data.frame(version='m0', RE='uncond', test='sac', pvalue=NA),
-    data.frame(version='m0', RE='osa', test='sac', pvalue=sac0_osa$p.value),
+    # data.frame(version='m0', RE='osa.fg', test='sac', pvalue=sac0_osa.fg$p.value),
+    # data.frame(version='m0', RE='osa.osg', test='sac', pvalue=sac0_osa.osg$p.value),
+    data.frame(version='m0', RE='osa.cdf', test='sac', pvalue=sac0_osa.cdf$p.value),
+    data.frame(version='m0', RE='osa.gen', test='sac', pvalue=sac0_osa.gen$p.value),
     data.frame(version='m0', RE='parcond', test='GOF', pvalue=pval0_parcond),
     data.frame(version='m0', RE='cond', test='GOF', pvalue=pval0_cond),
     data.frame(version='m0', RE='uncond', test='GOF', pvalue=pval0_uncond),
-    data.frame(version='m0', RE='osa', test='GOF', pvalue=pval0_osa),
+    # data.frame(version='m0', RE='osa.fg', test='GOF', pvalue=pval0_osa.fg),
+    # data.frame(version='m0', RE='osa.osg', test='GOF', pvalue=pval0_osa.osg),
+    data.frame(version='m0', RE='osa.cdf', test='GOF', pvalue=pval0_osa.cdf),
+    data.frame(version='m0', RE='osa.gen', test='GOF', pvalue=pval0_osa.gen),
     data.frame(version='m1', RE='parcond', test='outlier', pvalue=outlier1_parcond$p.value),
     data.frame(version='m1', RE='cond', test='outlier', pvalue=outlier1_cond$p.value),
     data.frame(version='m1', RE='uncond', test='outlier', pvalue=outlier1_uncond$p.value),
@@ -330,18 +397,24 @@ run.spatial.iter <- function(ii){
     data.frame(version='m1', RE='parcond', test='sac', pvalue=sac1_parcond$p.value),
     data.frame(version='m1', RE='cond', test='sac', pvalue=sac1_cond$p.value),
     data.frame(version='m1', RE='uncond', test='sac', pvalue=NA),
-    data.frame(version='m1', RE='osa', test='sac', pvalue=sac1_osa$p.value),
+    # data.frame(version='m1', RE='osa.fg', test='sac', pvalue=sac1_osa.fg$p.value),
+    # data.frame(version='m1', RE='osa.osg', test='sac', pvalue=sac1_osa.osg$p.value),
+    data.frame(version='m1', RE='osa.cdf', test='sac', pvalue=sac1_osa.cdf$p.value),
+    data.frame(version='m1', RE='osa.gen', test='sac', pvalue=sac1_osa.gen$p.value),
     data.frame(version='m1', RE='parcond', test='GOF', pvalue=pval1_parcond),
     data.frame(version='m1', RE='cond', test='GOF', pvalue=pval1_cond),
     data.frame(version='m1', RE='uncond', test='GOF', pvalue=pval1_uncond),
-    data.frame(version='m1', RE='osa', test='GOF', pvalue=pval1_osa))
+    # data.frame(version='m1', RE='osa.fg', test='GOF', pvalue=pval1_osa.fg),
+    # data.frame(version='m1', RE='osa.osg', test='GOF', pvalue=pval1_osa.osg),
+    data.frame(version='m1', RE='osa.cdf', test='GOF', pvalue=pval1_osa.cdf),
+    data.frame(version='m1', RE='osa.gen', test='GOF', pvalue=pval1_osa.gen))
   pvals$replicate <- ii; pvals$model <- 'spatial'
 
   ## Exploratory plots for first replicate
   if(ii==1){
     library(ggplot2)
     resids.long <- resids %>%
-      pivot_longer(c('osa', 'sim_cond', 'sim_uncond', 'sim_parcond'))
+      pivot_longer(c('osa.cdf', 'osa.gen', 'sim_cond', 'sim_uncond', 'sim_parcond'))
     theme_set(theme_bw())
     ## Plot of data
     g <- data.frame(x=Loc[,1], y=Loc[,2], z=y) %>%
