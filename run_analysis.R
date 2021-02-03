@@ -17,14 +17,15 @@ packageVersion('DHARMa')                # 0.3.3.0
 ### makes plots comparing residual types
 
 ### Naming conventions:
-## pearson = Pearson (naive) residuals
-## osa = one-step ahead residual
+## osa.cdf = one-step ahead (OSA) residual with CDF method
+## osa.gen = OSA with generic method
+## osa.osg = OSA with one-step Gaussian (failing)
+## osa.fg  = OSA with full Guassian (failing)
 ## sim_cond = simulation residuals (DHARMa) conditioned on RE
 ## sim_uncon= simulation residual (DHARMa) unconditioned on RE
 ## sim_parcond = simulation residuals (DHARMa) conditioned on
 ##   random draws from the joint precision matrix (fixed + RE,
 ##   conditioned on data)
-
 
 ## ## Basic random walk time series model
 ## Nreps <- 1000
