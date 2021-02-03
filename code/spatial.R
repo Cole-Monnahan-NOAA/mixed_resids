@@ -8,7 +8,7 @@ if(!exists('run.spatial.iter'))
 message("Preparing workspace to run ", Nreps, " iterations in parallel...")
 TMB::compile("models/spatial.cpp") # modified for simulation
 sfInit( parallel=TRUE, cpus=cpus )
-sfExport('run.spatial.iter', 'sim.omega', 'cMatern', 'sim.data')
+sfExport('run.spatial.iter', 'sim.omega', 'cMatern', 'sim.data', 'rmvnorm_prec')
 
 message("Starting parallel runs...")
 results <- sfLapply(1:Nreps, function(ii) run.spatial.iter(ii))
@@ -50,14 +50,20 @@ ggsave('plots/spatial_pvalues_disp.png', g, width=5, height=5)
 g <- ggplot(filter(pvals, test=='sac') , aes(pvalue, )) + geom_histogram() +
   facet_grid(version+RE~test, scales='free')
 ggsave('plots/spatial_pvalues_sac.png', g, width=5, height=5)
-g <- ggplot(filter(results, test=='GOF'& (RE=='cond' | RE=='uncond')) , aes(pvalue, )) + geom_histogram() +
-  facet_grid(version+RE~test, scales='free')
-ggsave('plots/spatial_pvalues_GOF_DHARMa.png', g, width=5, height=5)
-g <- ggplot(filter(results, test=='GOF'& RE!='cond' & RE!='uncond') , aes(pvalue, )) + geom_histogram() +
-  facet_grid(version+RE~test, scales='free')
 
-## resids.long <- pivot_longer(resids, c('osa', 'sim_cond', 'sim_uncond'),
-##                             names_to='type',
-##                             values_to='residual') %>% filter(replicate==1)
-## ggplot(resids.long, aes(ytrue, residual, color=maxgrad>.01)) + geom_point() +
-##   facet_grid(version~type) + scale_x_log10()
+g <- filter(pvals, test=='GOF' & grepl('osa', x=RE)) %>%
+  ggplot(aes(pvalue)) + geom_histogram() +
+         facet_grid(version+RE~test, scales='free')
+ggsave('plots/spatial_pvalues_GOF_osa.png', g, width=5, height=5)
+g <- filter(pvals, test=='GOF' & !grepl('osa', x=RE)) %>%
+  ggplot(aes(pvalue)) + geom_histogram() +
+         facet_grid(version+RE~test, scales='free')
+ggsave('plots/spatial_pvalues_GOF_DHARMa.png', g, width=5, height=5)
+
+g <- pivot_longer(resids, c('osa.cdf', 'osa.gen', 'sim_cond', 'sim_uncond', 'sim_parcond'),
+                  names_to='type', values_to='residual') %>%
+  filter(replicate<=5) %>%
+  ggplot(aes(ytrue, residual, color=version)) +
+  geom_point(alpha=.5) +
+  facet_grid(replicate~type) + scale_x_log10()
+ggsave('plots/spatial_residuals_examples.png', g, width=8, height=6)
