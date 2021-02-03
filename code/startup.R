@@ -324,23 +324,23 @@ run.spatial.iter <- function(ii){
   disp0_cond <- testDispersion(dharma0_cond, alternative = 'greater', plot=FALSE)
   outlier0_cond <- testOutliers(dharma0_cond, alternative = 'greater',
                                 margin = 'upper', type='binomial', plot=FALSE)
-  sac0_cond <- testSpatialAutocorrelation(dharma0_cond, x=Loc[,1], y=Loc[,2], alternative = 'greater') #only test for positive correlation
+  sac0_cond <- testSpatialAutocorrelation(dharma0_cond, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', ) #only test for positive correlation
   pval0_cond <- suppressWarnings(ks.test(dharma0_cond$scaledResiduals,'punif')$p.value)
   disp1_cond <- testDispersion(dharma1_cond, alternative = 'greater', plot=FALSE)
   outlier1_cond <- testOutliers(dharma1_cond, alternative = 'greater',
                                 margin = 'upper', type='binomial', plot=FALSE)
-  sac1_cond <- testSpatialAutocorrelation(dharma1_cond, x=Loc[,1], y=Loc[,2], alternative = 'greater') #only test for positive correlation
+  sac1_cond <- testSpatialAutocorrelation(dharma1_cond, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater') #only test for positive correlation
   pval1_cond <- suppressWarnings(ks.test(dharma1_cond$scaledResiduals,'punif')$p.value)
   ## The joint precision resids
   disp0_parcond <- testDispersion(dharma0_parcond, alternative = 'greater', plot=FALSE)
   outlier0_parcond <- testOutliers(dharma0_parcond, alternative = 'greater',
                                 margin = 'upper', type='binomial', plot=FALSE)
-  sac0_parcond <- testSpatialAutocorrelation(dharma0_parcond, x=Loc[,1], y=Loc[,2], alternative = 'greater') #only test for positive correlation
+  sac0_parcond <- testSpatialAutocorrelation(dharma0_parcond, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater') #only test for positive correlation
   pval0_parcond <- suppressWarnings(ks.test(dharma0_parcond$scaledResiduals,'punif')$p.value)
   disp1_parcond <- testDispersion(dharma1_parcond, alternative = 'greater', plot=FALSE)
   outlier1_parcond <- testOutliers(dharma1_parcond, alternative = 'greater',
                                 margin = 'upper', type='binomial', plot=FALSE)
-  sac1_parcond <- testSpatialAutocorrelation(dharma1_parcond, x=Loc[,1], y=Loc[,2], alternative = 'greater') #only test for positive correlation
+  sac1_parcond <- testSpatialAutocorrelation(dharma1_parcond, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater') #only test for positive correlation
   pval1_parcond <- suppressWarnings(ks.test(dharma1_parcond$scaledResiduals,'punif')$p.value)
   ## osa
   ## osa
