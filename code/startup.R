@@ -99,8 +99,8 @@ sim.data <- function(X, Beta, omega, parm, fam, link, Loc){
 
 
 
-## Wrapper function to use spatial model in parallel. Runs a
-## single simulation iteration. Called in spatial.R.
+## Wrapper function to run a single simulation iteration. Called
+## in spatial.R using parallel hence the extra stuff
 run.spatial.iter <- function(ii){
   library(TMB)
   library(DHARMa)
@@ -156,7 +156,6 @@ run.spatial.iter <- function(ii){
   obj0 <- TMB::MakeADFun(dat, par, random=c("omega", 'u'),
                          dll="spatial", map=map)
   trash <- obj0$env$beSilent()
-  str(obj0$report())
   opt0 <- nlminb(obj0$par, obj0$fn, obj0$gr)
   sdr0 <- sdreport(obj0)
   ##estOmega0 <- summary(sdr0,"random")
@@ -169,6 +168,9 @@ run.spatial.iter <- function(ii){
   opt1 <- nlminb(obj1$par, obj1$fn, obj1$gr)
   sdr1 <- sdreport(obj1)
   ## estOmega1 <- summary(sdr1,"random")
+  ## Make sure to get predicted Y while last par is the MLE
+  opt0$ypred <- obj0$report()$mu
+  opt1$ypred <- obj1$report()$mu
 
   message(ii, ": Calculating residuals..")
   ## OSA residuals
@@ -204,17 +206,23 @@ run.spatial.iter <- function(ii){
   sim1_cond <- residuals(dharma1_cond, quantileFunction = qnorm, outlierValues = c(-7,7))
   sim1_uncond <- residuals(dharma1_uncond, quantileFunction = qnorm, outlierValues = c(-7,7))
 
-### Combine together in tidy format for analysis and plotting
-  d0 <- data.frame(x=Loc[,1], y=Loc[,2], version='m0',# pearson=pearson0,
+  ## Combine together in tidy format for analysis and plotting later
+  d0 <- data.frame(model='spatial', replicate=ii, ytrue=dat$y,
+                   ypred=opt0$ypred,
+                   x=Loc[,1], y=Loc[,2], version='m0',
                    osa=osa0, sim_cond=sim0_cond,
-                   sim_uncond=sim0_uncond)
-  d1 <- data.frame(x=Loc[,1], y=Loc[,2], version='m1', #pearson=pearson1,
+                   sim_uncond=sim0_uncond,
+                   maxgrad=max(abs(obj0$gr(opt0$par))))
+  d1 <- data.frame(model='spatial', replicate=ii, ytrue=dat$y,
+                   ypred=opt1$ypred,
+                   x=Loc[,1], y=Loc[,2], version='m1',
                    osa=osa1, sim_cond=sim1_cond,
-                   sim_uncond=sim1_uncond)
+                   sim_uncond=sim1_uncond,
+                   maxgrad=max(abs(obj1$gr(opt1$par))))
   resids <- rbind(d0, d1)
-  resids.long <- resids %>% pivot_longer(-c(x, y, version))
 
-### Extract p-values calculated by DHARMa
+  ## Extract p-values calculated by DHARMa
+  ##
   ## Note: Type binomial for continuous, if integer be careful. Not
   ## sure if we want two-sided for dispersion? Using defaults for
   ## now.
@@ -272,11 +280,12 @@ run.spatial.iter <- function(ii){
     data.frame(version='m1', RE='cond', test='GOF', pvalue=pval1_cond),
     data.frame(version='m1', RE='uncond', test='GOF', pvalue=pval1_uncond),
     data.frame(version='m1', RE='osa', test='GOF', pvalue=pval1_osa))
-  pvals$replicate <- ii
+  pvals$replicate <- ii; pvals$model <- 'spatial'
 
   ## Exploratory plots for first replicate
   if(ii==1){
     library(ggplot2)
+    resids.long <- resids %>% pivot_longer(c('osa', 'sim_cond', 'sim_uncond'))
     theme_set(theme_bw())
     ## Plot of data
     g <- data.frame(x=Loc[,1], y=Loc[,2], z=y) %>%
@@ -302,6 +311,9 @@ run.spatial.iter <- function(ii){
     ggsave('plots/spatial_simdata.png', g, width=9, height=9)
   }
   ## save to file in case it crashes can recover what did run
+  dir.create('results/spatial_pvals', showWarnings=FALSE)
+  dir.create('results/spatial_resids', showWarnings=FALSE)
   saveRDS(pvals, file=paste0('results/spatial_pvals/pvals_', ii, '.RDS'))
-  return(pvals)
+  saveRDS(resids, file=paste0('results/spatial_resids/resids_', ii, '.RDS'))
+  return(invisible(pvals))
 }

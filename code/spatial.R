@@ -26,25 +26,36 @@ if(length(fs)<Nreps){
 bad <- which.failed(Nreps)
 if(length(bad)>0) warning(length(bad), " runs failed")
 
+
+
+
 message("Processing and saving final results...")
 ## Read results back in from file
-results <- lapply(fs, readRDS) %>% bind_rows  %>%
+pvals <- lapply(fs, readRDS) %>% bind_rows  %>%
   filter(!is.na(pvalue))
-saveRDS(results, file='results/spatial_pvals.RDS')
+saveRDS(pvals, file='results/spatial_pvals.RDS')
+## Read in residuals
+fs <- list.files('results/spatial_resids/', full.names=TRUE)
+resids <- lapply(fs, readRDS) %>% bind_rows
+saveRDS(resids, file='results/spatial_resids.RDS')
 
 
 message("Making spatial results plots...")
-g <- ggplot(filter(results, test=='outlier') , aes(pvalue, )) + geom_histogram() +
+g <- ggplot(filter(pvals, test=='outlier') , aes(pvalue, )) + geom_histogram() +
   facet_grid(version+RE~test, scales='free')
 ggsave('plots/spatial_pvalues_outlier.png', g, width=5, height=5)
-g <- ggplot(filter(results, test=='disp') , aes(pvalue, )) + geom_histogram() +
+g <- ggplot(filter(pvals, test=='disp') , aes(pvalue, )) + geom_histogram() +
   facet_grid(version+RE~test, scales='free')
 ggsave('plots/spatial_pvalues_disp.png', g, width=5, height=5)
-g <- ggplot(filter(results, test=='sac') , aes(pvalue, )) + geom_histogram() +
+g <- ggplot(filter(pvals, test=='sac') , aes(pvalue, )) + geom_histogram() +
   facet_grid(version+RE~test, scales='free')
 ggsave('plots/spatial_pvalues_sac.png', g, width=5, height=5)
-g <- ggplot(filter(results, test=='GOF') , aes(pvalue, )) + geom_histogram() +
+g <- ggplot(filter(pvals, test=='GOF') , aes(pvalue, )) + geom_histogram() +
   facet_grid(version+RE~test, scales='free')
 ggsave('plots/spatial_pvalues_GOF.png', g, width=5, height=5)
 
-
+## resids.long <- pivot_longer(resids, c('osa', 'sim_cond', 'sim_uncond'),
+##                             names_to='type',
+##                             values_to='residual') %>% filter(replicate==1)
+## ggplot(resids.long, aes(ytrue, residual, color=maxgrad>.01)) + geom_point() +
+##   facet_grid(version~type) + scale_x_log10()
