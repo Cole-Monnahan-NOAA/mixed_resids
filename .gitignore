@@ -1,3 +1,5 @@
 models/*.o
 models/*.dll
 .Rproj.user
+results/spatial_pvals
+results/spatial_resids
