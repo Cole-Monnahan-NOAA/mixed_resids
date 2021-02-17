@@ -17,6 +17,7 @@ ggwidth <- 7
 ggheight <- 5
 theme_set(theme_bw())
 
+message("Loading functions...")
 ## Function to simulate parameters from the joint precisions
 ## matrix (fixed + random effects). Modified from
 ## FishStatsUtils::simulate_data
@@ -166,6 +167,7 @@ run.spatial.iter <- function(ii){
                          dll="spatial", map=map)
   trash <- obj0$env$beSilent()
   opt0 <- nlminb(obj0$par, obj0$fn, obj0$gr)
+  opt0 <- add_aic(opt0)
   sdr0 <- sdreport(obj0, getJointPrecision=TRUE)
   rep0 <- obj0$report(obj0$env$last.par.best)
   ## estimate states and parameters under h1: spatial variance
@@ -177,6 +179,7 @@ run.spatial.iter <- function(ii){
                          dll="spatial", map=map)
   trash <- obj1$env$beSilent()
   opt1 <- nlminb(obj1$par, obj1$fn, obj1$gr)
+  opt1 <- add_aic(opt1)
   sdr1 <- sdreport(obj1, getJointPrecision=TRUE)
   rep1 <- obj1$report(obj1$env$last.par.best)
   opt0$ypred <- obj0$report()$mu
@@ -294,7 +297,8 @@ run.spatial.iter <- function(ii){
                    sim_cond=sim0_cond,
                    sim_uncond=sim0_uncond,
                    sim_parcond=sim0_parcond,
-                   maxgrad=max(abs(obj0$gr(opt0$par))))
+                   maxgrad=max(abs(obj0$gr(opt0$par))),
+                   AIC=opt0$AIC, AICc=opt0$AICc)
   d1 <- data.frame(model='spatial', replicate=ii, ytrue=dat$y,
                    ypred=opt1$ypred,
                    x=Loc[,1], y=Loc[,2], version='m1',
@@ -303,7 +307,8 @@ run.spatial.iter <- function(ii){
                    sim_cond=sim1_cond,
                    sim_uncond=sim1_uncond,
                    sim_parcond=sim0_parcond,
-                   maxgrad=max(abs(obj1$gr(opt1$par))))
+                   maxgrad=max(abs(obj1$gr(opt1$par))),
+                   AIC=opt1$AIC, AICc=opt1$AICc)
   resids <- rbind(d0, d1)
 
   ## Extract p-values calculated by DHARMa
@@ -447,4 +452,11 @@ run.spatial.iter <- function(ii){
   saveRDS(pvals, file=paste0('results/spatial_pvals/pvals_', ii, '.RDS'))
   saveRDS(resids, file=paste0('results/spatial_resids/resids_', ii, '.RDS'))
   return(invisible(pvals))
+}
+
+add_aic <- function(opt){
+  opt$AIC <- TMBhelper::TMBAIC(opt, n=Inf)
+  opt$AICc <- TMBhelper::TMBAIC(opt, n=length(opt$par))
+  opt$BIC <- TMBhelper::TMBAIC(opt, n=log(length(opt$par)))
+  opt
 }
