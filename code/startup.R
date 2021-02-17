@@ -167,7 +167,7 @@ run.spatial.iter <- function(ii){
                          dll="spatial", map=map)
   trash <- obj0$env$beSilent()
   opt0 <- nlminb(obj0$par, obj0$fn, obj0$gr)
-  opt0 <- add_aic(opt0)
+  opt0 <- add_aic(opt0, n=length(dat$y))
   sdr0 <- sdreport(obj0, getJointPrecision=TRUE)
   rep0 <- obj0$report(obj0$env$last.par.best)
   ## estimate states and parameters under h1: spatial variance
@@ -179,7 +179,7 @@ run.spatial.iter <- function(ii){
                          dll="spatial", map=map)
   trash <- obj1$env$beSilent()
   opt1 <- nlminb(obj1$par, obj1$fn, obj1$gr)
-  opt1 <- add_aic(opt1)
+  opt1 <- add_aic(opt1, n=length(dat$y))
   sdr1 <- sdreport(obj1, getJointPrecision=TRUE)
   rep1 <- obj1$report(obj1$env$last.par.best)
   opt0$ypred <- obj0$report()$mu
@@ -454,9 +454,9 @@ run.spatial.iter <- function(ii){
   return(invisible(pvals))
 }
 
-add_aic <- function(opt){
+add_aic <- function(opt,n){
   opt$AIC <- TMBhelper::TMBAIC(opt, n=Inf)
-  opt$AICc <- TMBhelper::TMBAIC(opt, n=length(opt$par))
-  opt$BIC <- TMBhelper::TMBAIC(opt, n=log(length(opt$par)))
+  opt$AICc <- TMBhelper::TMBAIC(opt, n=n)
+  opt$BIC <- TMBhelper::TMBAIC(opt, p=log(n))
   opt
 }
