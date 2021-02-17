@@ -149,20 +149,27 @@ run.spatial.iter <- function(ii){
   X1 <- rep(1, nrow(Loc))               # intercept
   X2 <- rnorm(n=nrow(Loc), 0, 1)        # random
   X <- as.matrix(cbind(X1, X2))
-  y <- sim.data(X=X, Beta=Beta, omega=Omega[mesh$idx$loc],
+  y0 <- sim.data(X=X, Beta=Beta, omega=Omega[mesh$idx$loc],
                 parm=CV, fam='Gamma', link='log')
-
+  ## Add overdispersion in form of lognormal
+  u <- rlnorm(n=n, meanlog=0, sdlog=2)
+  y <- y0*u
+  ## par(mfrow=c(1,2))
+  ## hist(log(y0), xlim=range(log(y)));
+  ## hist(log(y), xlim=range(log(y)))
   par <- list(beta = 0*Beta, theta = 0, log_tau = 0, log_kappa = 0,
               log_zeta=0, omega = rep(0,mesh$n), u=rep(0,n))
 
-  ## estimate states and parameters under h0: No space, instead overdispersion
   message(ii, ": Optimizing two competing models...")
   dummy.mesh <- INLA::inla.mesh.create(matrix(runif(4), ncol=2))
   dat <- list(y=y, X=X,
               dd=dmat, nu=1, v_i=(1:n)-1,
-              simRE=0, family=100, link=0, reStruct=20)
+              simRE=0, family=100, link=0, reStruct=10)
+    dat$spde <- INLA::inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
   dat$spde <- INLA::inla.spde2.matern(dummy.mesh)$param.inla[c('M0', 'M1', 'M2')]
-  map <- list(log_tau=factor(NA), log_kappa=factor(NA), omega=factor(NA*par$omega))
+
+  ## H0: Space but no overdispersion (underspecified)
+  map <- list(log_zeta=factor(NA), u=factor(NA*par$u))
   obj0 <- TMB::MakeADFun(dat, par, random=c("omega", 'u'),
                          dll="spatial", map=map)
   trash <- obj0$env$beSilent()
