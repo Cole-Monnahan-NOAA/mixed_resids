@@ -9,8 +9,6 @@ packageVersion('TMB')                   # 1.7.18
 packageVersion('VAST')                  # 3.6.0
 packageVersion('FishStatsUtils')        # 2.9.0
 packageVersion('DHARMa')                # 0.3.3.0
-
-
 ### Some specific scripts to run. Each script runs a separate
 ### model, computes different residual types, saves these
 ### results into the results folder for post-hoc analysis, and
@@ -33,8 +31,12 @@ packageVersion('DHARMa')                # 0.3.3.0
 
 ## Spatial model. For now this script does everything. We can
 ## restructure later.
+
+## ### Test a single iteration for debugging purposes
+## TMB::compile('models/spatial.cpp')
+## run.spatial.iter(1)
 cpus <- parallel::detectCores()-2
-Nreps <- 2000
+Nreps <- cpus*5
 source('code/spatial.R')
 
 ## ### Load results

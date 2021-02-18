@@ -1,23 +1,6 @@
 // Spatial poisson GLMM on a grid, with exponentially decaying correlation function
 #include <TMB.hpp>
 
-/* Simulate from tweedie distribution *///from glmmTMB 
-
-//// Cole commented out b/c newest version of TMB includes so this causes an error
-// template<class Type>
-// Type rtweedie(Type mu_, Type phi_, Type p_){
-//   double mu = asDouble(mu_);
-//   double Phi = asDouble(phi_);
-//   double p = asDouble(p_);
-//   // Copied from R function tweedie::rtweedie
-//   double lambda = pow(mu, 2. - p) / (Phi * (2. - p));
-//   double alpha  = (2. - p) / (1. - p);
-//   double gam = Phi * (p - 1.) * pow(mu, p - 1.);
-//   int N = (int) rpois(lambda);
-//   double ans = rgamma(N, -alpha /* shape */, gam /* scale */).sum();
-//   return ans;
-// }
-
 enum valid_family{
   gaussian_family = 000,
   Gamma_family = 100,
@@ -126,6 +109,17 @@ Type objective_function<Type>::operator() ()
     }
     REPORT(Q);
   }
+  // if(reStruct==20){
+  //   // Only overdispersion, no spatial
+  //   nll -= dnorm(u, 0, zeta, true).sum();
+  //   if(simRE == 1){
+  //     SIMULATE{
+  // 	for(int i=0; i<n; i++) u(i) = rnorm(Type(0.0), zeta);
+  //       REPORT(u);
+  //     }
+  //   }
+  // }
+
   // RE contribution for overdispersion. Need to include this
   // only when the parameter is being estimated, hence the
   // Variable thing below. See
@@ -135,13 +129,14 @@ Type objective_function<Type>::operator() ()
       // active parameter so calculate NLL and simulate
       nll -= dnorm(u(i), Type(0), zeta, true);
       if(simRE == 1){
-	SIMULATE{
-	  u(i) = rnorm(Type(0.0), zeta);
-	}
+  	SIMULATE{
+  	  u(i) = rnorm(Type(0.0), zeta);
+  	}
       }
     } // else it's mapped off so do nothing
   }
-    
+
+  
   vector<Type> Xbeta = X*beta;  
   vector<Type> eta(n);
   vector<Type> mu(n);
@@ -194,7 +189,6 @@ Type objective_function<Type>::operator() ()
 
   SIMULATE{
     REPORT(y);
-    REPORT(u);
   }
 
   REPORT(Range);
