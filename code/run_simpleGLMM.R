@@ -2,7 +2,7 @@ library(TMB)
 library(magrittr)
 library(dplyr)
 library(DHARMa)
-compile('models/simpleGLMM.cpp')
+TMB::compile('models/simpleGLMM.cpp')
 dyn.load(dynlib('models/simpleGLMM'))
 
 n.j <- 3 #number of subjects
@@ -30,7 +30,7 @@ c(sd(u), sqrt(sig2.y)); exp(opt$par[2:3])
 
 osa.fg <- oneStepPredict(obj, observation.name = 'y', data.term.indicator = 'keep',
                           method = 'fullGaussian')
-osa.osg <- oneStepPredict(obj, observation.name = 'y', data.term.indicator = 'keep', 
+osa.osg <- oneStepPredict(obj, observation.name = 'y', data.term.indicator = 'keep',
                            method = "oneStepGaussian")
 osa.cdf <- oneStepPredict(obj, observation.name = 'y', data.term.indicator = 'keep',
                            method = 'cdf')
