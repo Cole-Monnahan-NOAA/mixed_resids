@@ -36,7 +36,7 @@ packageVersion('DHARMa')                # 0.3.3.0
 ## TMB::compile('models/spatial.cpp')
 ## run.spatial.iter(1)
 cpus <- parallel::detectCores()-2
-Nreps <- cpus*5
+Nreps <- cpus*20
 source('code/spatial.R')
 
 ## ### Load results

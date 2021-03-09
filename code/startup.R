@@ -140,7 +140,7 @@ run.spatial.iter <- function(ii){
   if(is.character(mesh)){
     system("Taskkill /IM fmesher.exe /F")
     warning("mesh failed in rep=", ii)
-    next
+    return(NULL)
   }
   Omega <- sim.omega(Range,sp.var,dmat,method="TMB.spde",mesh=mesh)
   ## simulate random measurements
@@ -204,7 +204,7 @@ run.spatial.iter <- function(ii){
   #
   # if(is.character(osa0.fg) | is.character(osa1.fg)){
   #   warning("OSA Full Gaussian failed in rep=", ii)
-  #   next
+  #   return(NULL)
   # }
 
   ## one step Gaussian method
@@ -220,7 +220,7 @@ run.spatial.iter <- function(ii){
   #   error=function(e) 'error')
   # if(is.character(osa0.osg) | is.character(osa1.osg)){
   #   warning("OSA one Step Gaussian failed in rep=", ii)
-  #   next
+  #   return(NULL)
   # }
 
   ## CDF method
@@ -236,8 +236,12 @@ run.spatial.iter <- function(ii){
     error=function(e) 'error')
   if(is.character(osa0.cdf) | is.character(osa1.cdf)){
       warning("OSA CDF failed in rep=", ii)
-      next
+      return(NULL)
     }
+  if(any(is.infinite(osa0.cdf) | any(is.infinite(osa1.cdf)))){
+    warning("OSA failed some residuals are infinite in rep=",ii)
+    return(NULL)
+  }
   ## one step Generic method
   osa0.gen <- tryCatch(
   oneStepPredict(obj0, observation.name="y",
@@ -251,7 +255,7 @@ run.spatial.iter <- function(ii){
     error=function(e) 'error')
   if(is.character(osa0.gen) | is.character(osa1.gen)){
     warning("OSA Generic failed in rep=", ii)
-    next
+    return(NULL)
   }
 
 ### DHARMa resids, both conditional and unconditional
@@ -270,8 +274,15 @@ run.spatial.iter <- function(ii){
   sim0_uncond <- residuals(dharma0_uncond, quantileFunction = qnorm, outlierValues = c(-7,7))
   sim1_cond <- residuals(dharma1_cond, quantileFunction = qnorm, outlierValues = c(-7,7))
   sim1_uncond <- residuals(dharma1_uncond, quantileFunction = qnorm, outlierValues = c(-7,7))
-
   ## Try adding residuals from the joint precisions matrix
+  test0 <- tryCatch(Matrix::Cholesky(sdr0$jointPrecision, super=TRUE),
+                    error=function(e) 'error')
+  test1 <- tryCatch(Matrix::Cholesky(sdr1$jointPrecision, super=TRUE),
+                    error=function(e) 'error')
+  if(is.character(test0) | is.character(test1)){
+    warning("Joint-Precision approach failed b/c Chol factor failed for rep=",ii)
+    return(NULL)
+  }
   jp.sim0 <- function(){
     newpar <- rmvnorm_prec(mu=opt0$joint.mle, prec=sdr0$jointPrecision)
     obj0$env$data$simRE <- 0 # turn off RE simulation
