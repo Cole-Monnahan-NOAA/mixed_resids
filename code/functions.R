@@ -1,4 +1,31 @@
 message("Loading global functions...")
+
+calc.osa.pvals <- function(osa){
+  fg <- osg <- cdf <- gen <- NA
+  if(!is.null(osa$fg)) fg <- suppressWarnings(ks.test(osa.fg,'pnorm')$p.value)
+  if(!is.null(osa$osg)) osg <- suppressWarnings(ks.test(osa.osg,'pnorm')$p.value)
+  if(!is.null(osa$cdf)) cdf <- suppressWarnings(ks.test(osa.cdf,'pnorm')$p.value)
+  if(!is.null(osa$gen)) gen <- suppressWarnings(ks.test(osa.gen,'pnorm')$p.value)
+  return(list(fg=fg, osg=osg, cdf=cdf, gen=gen))
+}
+
+calc.dharma.pvals <- function(dharma){
+  ## Extract p-values calculated by DHARMa
+  ##
+  ## Note: Type binomial for continuous, if integer be careful. Not
+  ## sure if we want two-sided for dispersion? Using defaults for
+  ## now.
+  ## AMH: change to alternative = 'greater' when testing for overdispersion in positive only distributions
+  ## AMH: Add significance tests
+  disp0_uncond <- testDispersion(dharma0_uncond, alternative = 'greater', plot=FALSE)
+  outlier0_uncond <- testOutliers(dharma0_uncond, alternative = 'greater',
+                                  margin = 'upper', type='binomial', plot=FALSE)
+  pval0_uncond <-
+    suppressWarnings(ks.test(dharma0_uncond$scaledResiduals,'punif')$p.value)
+}
+
+
+
 ## Function to simulate parameters from the joint precisions
 ## matrix (fixed + random effects). Modified from
 ## FishStatsUtils::simulate_data
@@ -60,55 +87,55 @@ calculate.osa <- function(obj, methods, ii, observation.name,
                           data.term.indicator='keep'){
 
   ## OSA residuals
-  FG <- OSG <- CDF <- GEN <- NULL
+  fg <- osg <- cdf <- gen <- NULL
 
-  if('FG' %in% methods){
-    FG <- tryCatch(
+  if('fg' %in% methods){
+    fg <- tryCatch(
       oneStepPredict(obj, observation.name=observation.name,
                      method="fullGaussian", trace=FALSE)$residual,
       error=function(e) 'error')
-    if(is.character(FG)){
+    if(is.character(fg)){
       warning("OSA Full Gaussian failed in rep=", ii)
-      FG <- NULL
+      fg <- NULL
     }
   }
   ## one step Gaussian method
-  if('OSG' %in% methods){
-    OSG <- tryCatch(
+  if('osg' %in% methods){
+    osg <- tryCatch(
       oneStepPredict(obj, observation.name=observation.name,
                      data.term.indicator='keep' ,
                      method="oneStepGaussian", trace=FALSE)$residual,
       error=function(e) 'error')
-    if(is.character(OSG)){
+    if(is.character(osg)){
       warning("OSA one Step Gaussian failed in rep=", ii)
-      OSG <- NULL
+      osg <- NULL
     }
   }
-  ## CDF method
-  if('CDF' %in% methods){
-    CDF <- tryCatch(
+  ## cdf method
+  if('cdf' %in% methods){
+    cdf <- tryCatch(
       oneStepPredict(obj, observation.name=observation.name,
                      data.term.indicator='keep' ,
                      method="cdf", trace=FALSE)$residual,
       error=function(e) 'error')
-    if(is.character(CDF) | any(is.infinite(CDF))){
-      warning("OSA CDF failed in rep=", ii)
-      CDF <- NULL
+    if(is.character(cdf) | any(is.infinite(cdf))){
+      warning("OSA cdf failed in rep=", ii)
+      cdf <- NULL
     }
   }
   ## one step Generic method
-  if('GEN' %in% methods){
-    GEN <- tryCatch(
+  if('gen' %in% methods){
+    gen <- tryCatch(
       oneStepPredict(obj, observation.name=observation.name,
                      data.term.indicator='keep' , range = c(0,Inf),
                      method="oneStepGeneric", trace=FALSE)$residual,
       error=function(e) 'error')
-    if(is.character(GEN)){
+    if(is.character(gen)){
       warning("OSA Generic failed in rep=", ii)
-      GEN <- NULL
+      gen <- NULL
     }
   }
-  return(list(GEN=GEN, FG=FG, OSG=OSG, CDF=CDF))
+  return(list(gen=gen, fg=fg, osg=osg, cdf=cdf))
 }
 
-}
+

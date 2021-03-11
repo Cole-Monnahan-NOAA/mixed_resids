@@ -185,63 +185,32 @@ run.spatial.iter <- function(ii){
                    AIC=opt1$AIC, AICc=opt1$AICc)
   resids <- rbind(r0, r1)
 
-  ## Extract p-values calculated by DHARMa
-  ##
-  ## Note: Type binomial for continuous, if integer be careful. Not
-  ## sure if we want two-sided for dispersion? Using defaults for
-  ## now.
-  ## AMH: change to alternative = 'greater' when testing for overdispersion in positive only distributions
-  ## AMH: Add significance tests
-  disp0_uncond <- testDispersion(dharma0_uncond, alternative = 'greater', plot=FALSE)
-  outlier0_uncond <- testOutliers(dharma0_uncond, alternative = 'greater',
-                                  margin = 'upper', type='binomial', plot=FALSE)
-  pval0_uncond <- suppressWarnings(ks.test(dharma0_uncond$scaledResiduals,'punif')$p.value)
-  disp1_uncond <- testDispersion(dharma1_uncond, alternative = 'greater', plot=FALSE)
-  outlier1_uncond <- testOutliers(dharma1_uncond, alternative = 'greater',
-                                  margin = 'upper', type='binomial', plot=FALSE)
-  pval1_uncond <- suppressWarnings(ks.test(dharma1_uncond$scaledResiduals,'punif')$p.value)
-  disp0_cond <- testDispersion(dharma0_cond, alternative = 'greater', plot=FALSE)
-  outlier0_cond <- testOutliers(dharma0_cond, alternative = 'greater',
-                                margin = 'upper', type='binomial', plot=FALSE)
-  sac0_cond <- testSpatialAutocorrelation(dharma0_cond, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', ) #only test for positive correlation
-  pval0_cond <- suppressWarnings(ks.test(dharma0_cond$scaledResiduals,'punif')$p.value)
-  disp1_cond <- testDispersion(dharma1_cond, alternative = 'greater', plot=FALSE)
-  outlier1_cond <- testOutliers(dharma1_cond, alternative = 'greater',
-                                margin = 'upper', type='binomial', plot=FALSE)
-  sac1_cond <- testSpatialAutocorrelation(dharma1_cond, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater') #only test for positive correlation
-  pval1_cond <- suppressWarnings(ks.test(dharma1_cond$scaledResiduals,'punif')$p.value)
-  ## The joint precision resids
-  disp0_parcond <- testDispersion(dharma0_parcond, alternative = 'greater', plot=FALSE)
-  outlier0_parcond <- testOutliers(dharma0_parcond, alternative = 'greater',
-                                margin = 'upper', type='binomial', plot=FALSE)
-  sac0_parcond <- testSpatialAutocorrelation(dharma0_parcond, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater') #only test for positive correlation
-  pval0_parcond <- suppressWarnings(ks.test(dharma0_parcond$scaledResiduals,'punif')$p.value)
-  disp1_parcond <- testDispersion(dharma1_parcond, alternative = 'greater', plot=FALSE)
-  outlier1_parcond <- testOutliers(dharma1_parcond, alternative = 'greater',
-                                margin = 'upper', type='binomial', plot=FALSE)
-  sac1_parcond <- testSpatialAutocorrelation(dharma1_parcond, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater') #only test for positive correlation
-  pval1_parcond <- suppressWarnings(ks.test(dharma1_parcond$scaledResiduals,'punif')$p.value)
-  ## osa
-  ## osa
-  # pval0_osa.fg <- suppressWarnings(ks.test(osa0.fg,'pnorm')$p.value)
-  # pval0_osa.osg <- suppressWarnings(ks.test(osa0.osg,'pnorm')$p.value)
-  pval0_osa.cdf <- suppressWarnings(ks.test(osa0.cdf,'pnorm')$p.value)
-  pval0_osa.gen <- suppressWarnings(ks.test(osa0.gen,'pnorm')$p.value)
-  #calculate Moran's I by hand for osa
+  ## Calculate p-values
+  pvals0_uncond <- calc.dharma.pvals(dharma0_uncond)
+  pvals0_cond <- calc.dharma.pvals(dharma0_cond)
+  pvals0_parcond <- calc.dharma.pvals(dharma0_parcond)
+  osa.pvals0 <- calc.osa.pvals(osa0)
+  osa.pvals1 <- calc.osa.pvals(osa1)
+
+  ## Extra ones for spatial model. Only test for positive correlation
+  sac0_cond <- testSpatialAutocorrelation(dharma0_cond, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )
+  sac0_uncond <- testSpatialAutocorrelation(dharma0_uncond, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )
+  sac0_parcond <- testSpatialAutocorrelation(dharma0_parcond, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )
+  sac1_cond <- testSpatialAutocorrelation(dharma1_cond, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )
+  sac1_uncond <- testSpatialAutocorrelation(dharma1_uncond, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )
+  sac1_parcond <- testSpatialAutocorrelation(dharma1_parcond, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )
+  ## calculate Moran's I by hand for osa
   w <- 1/dmat
   diag(w) <- 0
   # sac0_osa.fg <- ape::Moran.I(osa0.fg, w, alternative = 'greater') #only test for positive correlation
   # sac0_osa.osg <- ape::Moran.I(osa0.osg, w, alternative = 'greater') #only test for positive correlation
   sac0_osa.cdf <- ape::Moran.I(osa0.cdf, w, alternative = 'greater') #only test for positive correlation
   sac0_osa.gen <- ape::Moran.I(osa0.gen, w, alternative = 'greater') #only test for positive correlation
-  # pval1_osa.fg <- suppressWarnings(ks.test(osa1.fg,'pnorm')$p.value)
-  # pval1_osa.osg <- suppressWarnings(ks.test(osa1.osg,'pnorm')$p.value)
-  pval1_osa.cdf <- suppressWarnings(ks.test(osa1.cdf,'pnorm')$p.value)
-  pval1_osa.gen <- suppressWarnings(ks.test(osa1.gen,'pnorm')$p.value)
   # sac1_osa.fg <- ape::Moran.I(osa1.fg, w, alternative = 'greater') #only test for positive correlation
   # sac1_osa.osg <- ape::Moran.I(osa1.osg, w, alternative = 'greater') #only test for positive correlation
   sac1_osa.cdf <- ape::Moran.I(osa1.cdf, w, alternative = 'greater') #only test for positive correlation
   sac1_osa.gen <- ape::Moran.I(osa1.gen, w, alternative = 'greater') #only test for positive correlation
+
   pvals <- rbind(
     data.frame(version='m0', RE='parcond', test='outlier', pvalue=outlier0_parcond$p.value),
     data.frame(version='m0', RE='cond', test='outlier', pvalue=outlier0_cond$p.value),
