@@ -2,8 +2,9 @@
 ### spatial model.
 
 ## run.spatial.iter and other files are in startup.R
+source("functions_spatial.R")
 if(!exists('run.spatial.iter'))
-  stop("Source code/startup.R before running this")
+  stop("Problem loading spatial functions")
 
 message("Preparing workspace to run ", Nreps, " iterations in parallel...")
 TMB::compile("models/spatial.cpp") # modified for simulation
