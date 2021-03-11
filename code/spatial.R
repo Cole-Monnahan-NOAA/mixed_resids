@@ -28,8 +28,6 @@ bad <- which.failed(Nreps)
 if(length(bad)>0) warning(length(bad), " runs failed")
 
 
-
-
 message("Processing and saving final results...")
 ## Read results back in from file
 pvals <- lapply(fs, readRDS) %>% bind_rows  %>%
