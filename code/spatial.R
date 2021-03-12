@@ -2,7 +2,7 @@
 ### spatial model.
 
 ## run.spatial.iter and other files are in startup.R
-source("functions_spatial.R")
+source("code/functions_spatial.R")
 if(!exists('run.spatial.iter'))
   stop("Problem loading spatial functions")
 

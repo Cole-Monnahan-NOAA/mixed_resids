@@ -16,4 +16,5 @@ library(Matrix)
 ggwidth <- 7
 ggheight <- 5
 theme_set(theme_bw())
-source("functions.R")
+source("code/functions.R")
+source("code/functions_spatial.R")

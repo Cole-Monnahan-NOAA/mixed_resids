@@ -1,11 +1,40 @@
 message("Loading global functions...")
 
+make.pval.df <- function(osa, sim_cond, sim_uncond, sim_parcond){
+  pvals <- rbind(
+    data.frame(RE='parcond', test='outlier', pvalue=sim_parcond$outlier),
+    data.frame(RE='cond', test='outlier', pvalue=sim_cond$outlier),
+    data.frame(RE='uncond', test='outlier', pvalue=sim_uncond$outlier),
+    data.frame(RE='parcond', test='disp', pvalue=sim_parcond$disp),
+    data.frame(RE='cond', test='disp', pvalue=sim_cond$disp),
+    data.frame(RE='uncond', test='disp', pvalue=sim_uncond$disp),
+    data.frame(RE='parcond', test='pval', pvalue=sim_parcond$pval),
+    data.frame(RE='cond', test='pval', pvalue=sim_cond$pval),
+    data.frame(RE='uncond', test='pval', pvalue=sim_uncond$pval),
+    data.frame(RE='osa.fg', test='GOF', pvalue=osa$fg),
+    data.frame(RE='osa.osg', test='GOF', pvalue=osa$osg),
+    data.frame(RE='osa.cdf', test='GOF', pvalue=osa$cdf),
+    data.frame(RE='osa.gen', test='GOF', pvalue=osa$gen))
+  return(pvals)
+}
+
+
+calc.sac <- function(x, w){
+  y <- NA
+  if(is.numeric(x)){
+    ## only test for positive correlationa
+    y <- ape::Moran.I(x, w, alternative = 'greater')$p.value
+  }
+  return(y)
+}
+
+
 calc.osa.pvals <- function(osa){
   fg <- osg <- cdf <- gen <- NA
-  if(!is.null(osa$fg)) fg <- suppressWarnings(ks.test(osa.fg,'pnorm')$p.value)
-  if(!is.null(osa$osg)) osg <- suppressWarnings(ks.test(osa.osg,'pnorm')$p.value)
-  if(!is.null(osa$cdf)) cdf <- suppressWarnings(ks.test(osa.cdf,'pnorm')$p.value)
-  if(!is.null(osa$gen)) gen <- suppressWarnings(ks.test(osa.gen,'pnorm')$p.value)
+  if(is.numeric(osa$fg)) fg <- suppressWarnings(ks.test(osa$fg,'pnorm')$p.value)
+  if(is.numeric(osa$osg)) osg <- suppressWarnings(ks.test(osa$osg,'pnorm')$p.value)
+  if(is.numeric(osa$cdf)) cdf <- suppressWarnings(ks.test(osa$cdf,'pnorm')$p.value)
+  if(is.numeric(osa$gen)) gen <- suppressWarnings(ks.test(osa$gen,'pnorm')$p.value)
   return(list(fg=fg, osg=osg, cdf=cdf, gen=gen))
 }
 
@@ -17,11 +46,12 @@ calc.dharma.pvals <- function(dharma){
   ## now.
   ## AMH: change to alternative = 'greater' when testing for overdispersion in positive only distributions
   ## AMH: Add significance tests
-  disp0_uncond <- testDispersion(dharma0_uncond, alternative = 'greater', plot=FALSE)
-  outlier0_uncond <- testOutliers(dharma0_uncond, alternative = 'greater',
-                                  margin = 'upper', type='binomial', plot=FALSE)
-  pval0_uncond <-
-    suppressWarnings(ks.test(dharma0_uncond$scaledResiduals,'punif')$p.value)
+  disp <- testDispersion(dharma, alternative = 'greater', plot=FALSE)
+  outlier <- testOutliers(dharma, alternative = 'greater',
+                          margin = 'upper', type='binomial', plot=FALSE)
+  pval <-
+    suppressWarnings(ks.test(dharma$scaledResiduals,'punif')$p.value)
+  return(list(disp=disp, outlier=outlier, pval=pval))
 }
 
 
@@ -56,7 +86,7 @@ add_aic <- function(opt,n){
   opt
 }
 
-calculate.jp <- function(sdr, opt, N=1000){
+calculate.jp <- function(obj, sdr, opt, obs, data.name, N=1000){
   joint.mle <- obj$env$last.par.best
   test <- tryCatch(Matrix::Cholesky(sdr$jointPrecision, super=TRUE),
                    error=function(e) 'error')
@@ -66,28 +96,46 @@ calculate.jp <- function(sdr, opt, N=1000){
   }
   jp.sim <- function(){
     newpar <- rmvnorm_prec(mu=joint.mle, prec=sdr$jointPrecision)
-    obj$env$data$simRE <-  # turn off RE simulation
-      obj$simulate(par=newpar)$y
+    obj$env$data$simRE <- 0 # turn off RE simulation
+    obj$simulate(par=newpar)[[data.name]]
   }
   tmp <- replicate(N, {jp.sim()})
-  dharma_parcond <- createDHARMa(tmp, y, fittedPredictedResponse=NULL)
-  resids <- residuals(dharma1_parcond, quantileFunction = qnorm, outlierValues = c(-7,7))
-  return(resids)
+  dharma <- createDHARMa(tmp, obs, fittedPredictedResponse=NULL)
+  resids <- residuals(dharma, quantileFunction = qnorm, outlierValues = c(-7,7))
+  disp <- testDispersion(dharma, alternative = 'greater', plot=FALSE)
+  outlier <- testOutliers(dharma, alternative = 'greater',
+                          margin = 'upper', type='binomial', plot=FALSE)
+  pval <-
+    suppressWarnings(ks.test(dharma$scaledResiduals,'punif')$p.value)
+  return(list(resids=resids, disp=disp$p.value, outlier=outlier$p.value, pval=pval))
 }
 
-calculate.dharma <- function(obj, expr, N=1000, fpr){
-  tmp <- replicate(N, {expr})
-  dharma <- createDHARMa(tmp, y, fittedPredictedResponse = fpr)
+calculate.dharma <- function(obj, expr, N=1000, obs, fpr){
+  tmp <- replicate(N, eval(expr))
+  dharma <- createDHARMa(tmp, obs, fittedPredictedResponse = fpr)
   resids <- residuals(dharma, quantileFunction = qnorm,
                       outlierValues = c(-7,7))
-  return(resids)
+
+  ## Extract p-values calculated by DHARMa
+  ##
+  ## Note: Type binomial for continuous, if integer be careful. Not
+  ## sure if we want two-sided for dispersion? Using defaults for
+  ## now.
+  ## AMH: change to alternative = 'greater' when testing for overdispersion in positive only distributions
+  ## AMH: Add significance tests
+  disp <- testDispersion(dharma, alternative = 'greater', plot=FALSE)
+  outlier <- testOutliers(dharma, alternative = 'greater',
+                          margin = 'upper', type='binomial', plot=FALSE)
+  pval <-
+    suppressWarnings(ks.test(dharma$scaledResiduals,'punif')$p.value)
+  return(list(resids=resids, disp=disp$p.value, outlier=outlier$p.value, pval=pval))
 }
 
-calculate.osa <- function(obj, methods, ii, observation.name,
+calculate.osa <- function(obj, methods, observation.name,
                           data.term.indicator='keep'){
 
   ## OSA residuals
-  fg <- osg <- cdf <- gen <- NULL
+  fg <- osg <- cdf <- gen <- NA
 
   if('fg' %in% methods){
     fg <- tryCatch(
@@ -95,7 +143,7 @@ calculate.osa <- function(obj, methods, ii, observation.name,
                      method="fullGaussian", trace=FALSE)$residual,
       error=function(e) 'error')
     if(is.character(fg)){
-      warning("OSA Full Gaussian failed in rep=", ii)
+      warning("OSA Full Gaussian failed")
       fg <- NULL
     }
   }
@@ -107,7 +155,7 @@ calculate.osa <- function(obj, methods, ii, observation.name,
                      method="oneStepGaussian", trace=FALSE)$residual,
       error=function(e) 'error')
     if(is.character(osg)){
-      warning("OSA one Step Gaussian failed in rep=", ii)
+      warning("OSA one Step Gaussian failed")
       osg <- NULL
     }
   }
@@ -119,7 +167,7 @@ calculate.osa <- function(obj, methods, ii, observation.name,
                      method="cdf", trace=FALSE)$residual,
       error=function(e) 'error')
     if(is.character(cdf) | any(is.infinite(cdf))){
-      warning("OSA cdf failed in rep=", ii)
+      warning("OSA cdf failed")
       cdf <- NULL
     }
   }
@@ -131,7 +179,7 @@ calculate.osa <- function(obj, methods, ii, observation.name,
                      method="oneStepGeneric", trace=FALSE)$residual,
       error=function(e) 'error')
     if(is.character(gen)){
-      warning("OSA Generic failed in rep=", ii)
+      warning("OSA Generic failed")
       gen <- NULL
     }
   }
