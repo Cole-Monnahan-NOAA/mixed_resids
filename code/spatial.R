@@ -9,8 +9,9 @@ if(!exists('run.spatial.iter'))
 message("Preparing workspace to run ", Nreps, " iterations in parallel...")
 TMB::compile("models/spatial.cpp") # modified for simulation
 sfInit( parallel=TRUE, cpus=cpus )
-sfExport('run.spatial.iter', 'sim.omega', 'cMatern', 'sim.data',
-         'rmvnorm_prec', 'add_aic')
+## sfExport('run.spatial.iter', 'sim.omega', 'cMatern', 'sim.data',
+##          'rmvnorm_prec', 'add_aic')
+sfExportAll()
 
 message("Starting parallel runs...")
 results <- sfLapply(1:Nreps, function(ii) run.spatial.iter(ii))

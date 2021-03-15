@@ -193,12 +193,12 @@ run.spatial.iter <- function(ii){
   osa.pvals1 <- calc.osa.pvals(osa1)
 
   ## Extra ones for spatial model. Only test for positive correlation
-  sac0_cond <- testSpatialAutocorrelation(sim0_cond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
-  sac0_uncond <- testSpatialAutocorrelation(sim0_uncond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
-  sac0_parcond <- testSpatialAutocorrelation(sim0_parcond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
-  sac1_cond <- testSpatialAutocorrelation(sim1_cond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
-  sac1_uncond <- testSpatialAutocorrelation(sim1_uncond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
-  sac1_parcond <- testSpatialAutocorrelation(sim1_parcond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
+  if(!is.na(sim0_cond$resids))  sac0_cond <- testSpatialAutocorrelation(sim0_cond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
+  if(!is.na(sim0_uncond$resids))  sac0_uncond <- testSpatialAutocorrelation(sim0_uncond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
+  if(!is.na(sim0_parcond$resids))  sac0_parcond <- testSpatialAutocorrelation(sim0_parcond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
+  if(!is.na(sim1_cond$resids))  sac1_cond <- testSpatialAutocorrelation(sim1_cond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
+  if(!is.na(sim1_uncond$resids))  sac1_uncond <- testSpatialAutocorrelation(sim1_uncond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
+  if(!is.na(sim1_parcond$resids))  sac1_parcond <- testSpatialAutocorrelation(sim1_parcond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
 
   ## calculate Moran's I by hand for osa
   w <- 1/dmat;  diag(w) <- 0
@@ -212,7 +212,7 @@ run.spatial.iter <- function(ii){
                   data.frame(RE='osa.osg', test='sac', pvalue=sac0$osg),
                   data.frame(RE='osa.cdf', test='sac', pvalue=sac0$cdf),
                   data.frame(RE='osa.gen', test='sac', pvalue=sac0$gen))
-  pvals0$verison <- 'm0'
+  pvals0$version <- 'm0'
   pvals1 <- make.pval.df(osa.pvals1, sim1_cond, sim1_uncond, sim1_parcond)
   ## Add on the SAC ones
   pvals1 <- rbind( pvals1,
@@ -220,7 +220,7 @@ run.spatial.iter <- function(ii){
                   data.frame(RE='osa.osg', test='sac', pvalue=sac1$osg),
                   data.frame(RE='osa.cdf', test='sac', pvalue=sac1$cdf),
                   data.frame(RE='osa.gen', test='sac', pvalue=sac1$gen))
-  pvals1$verison <- 'm1'
+  pvals1$version <- 'm1'
 
   pvals <- rbind(pvals0, pvals1)
   pvals$replicate <- ii; pvals$model <- 'spatial'
@@ -264,6 +264,6 @@ run.spatial.iter <- function(ii){
   dir.create('results/spatial_resids', showWarnings=FALSE)
   saveRDS(pvals, file=paste0('results/spatial_pvals/pvals_', ii, '.RDS'))
   saveRDS(resids, file=paste0('results/spatial_resids/resids_', ii, '.RDS'))
-  return(invisible(pvals))
+  return(invisible(list(pvals=pvals, resids=resids)))
 }
 

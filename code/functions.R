@@ -8,9 +8,9 @@ make.pval.df <- function(osa, sim_cond, sim_uncond, sim_parcond){
     data.frame(RE='parcond', test='disp', pvalue=sim_parcond$disp),
     data.frame(RE='cond', test='disp', pvalue=sim_cond$disp),
     data.frame(RE='uncond', test='disp', pvalue=sim_uncond$disp),
-    data.frame(RE='parcond', test='pval', pvalue=sim_parcond$pval),
-    data.frame(RE='cond', test='pval', pvalue=sim_cond$pval),
-    data.frame(RE='uncond', test='pval', pvalue=sim_uncond$pval),
+    data.frame(RE='parcond', test='GOF', pvalue=sim_parcond$pval),
+    data.frame(RE='cond', test='GOF', pvalue=sim_cond$pval),
+    data.frame(RE='uncond', test='GOF', pvalue=sim_uncond$pval),
     data.frame(RE='osa.fg', test='GOF', pvalue=osa$fg),
     data.frame(RE='osa.osg', test='GOF', pvalue=osa$osg),
     data.frame(RE='osa.cdf', test='GOF', pvalue=osa$cdf),
@@ -92,7 +92,7 @@ calculate.jp <- function(obj, sdr, opt, obs, data.name, N=1000){
                    error=function(e) 'error')
   if(is.character(test)){
     warning("Joint-Precision approach failed b/c Chol factor failed")
-    return(NULL)
+    return(list(resids=NA, disp=NA, outlier=NA, pval=NA))
   }
   jp.sim <- function(){
     newpar <- rmvnorm_prec(mu=joint.mle, prec=sdr$jointPrecision)
@@ -144,7 +144,7 @@ calculate.osa <- function(obj, methods, observation.name,
       error=function(e) 'error')
     if(is.character(fg)){
       warning("OSA Full Gaussian failed")
-      fg <- NULL
+      fg <- NA
     }
   }
   ## one step Gaussian method
@@ -156,7 +156,7 @@ calculate.osa <- function(obj, methods, observation.name,
       error=function(e) 'error')
     if(is.character(osg)){
       warning("OSA one Step Gaussian failed")
-      osg <- NULL
+      osg <- NA
     }
   }
   ## cdf method
@@ -168,7 +168,7 @@ calculate.osa <- function(obj, methods, observation.name,
       error=function(e) 'error')
     if(is.character(cdf) | any(is.infinite(cdf))){
       warning("OSA cdf failed")
-      cdf <- NULL
+      cdf <- NA
     }
   }
   ## one step Generic method
@@ -180,7 +180,7 @@ calculate.osa <- function(obj, methods, observation.name,
       error=function(e) 'error')
     if(is.character(gen)){
       warning("OSA Generic failed")
-      gen <- NULL
+      gen <- NA
     }
   }
   return(list(gen=gen, fg=fg, osg=osg, cdf=cdf))
