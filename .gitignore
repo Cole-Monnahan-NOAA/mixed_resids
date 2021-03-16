@@ -3,3 +3,4 @@ models/*.dll
 .Rproj.user
 results/spatial_pvals
 results/spatial_resids
+results/spatial_mles

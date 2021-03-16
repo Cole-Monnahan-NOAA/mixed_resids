@@ -152,10 +152,8 @@ run.spatial.iter <- function(ii){
   saveRDS(mles, file=paste0('results/spatial_mles/mles_', ii, '.RDS'))
 
   message(ii, ": Calculating residuals..")
-  osa0 <- calculate.osa(obj0, methods=c('fg, osg, cdf'), observation.name='y')
-  osa1 <- calculate.osa(obj1, methods=c('fg, osg, cdf'), observation.name='y')
-
-
+  osa0 <- calculate.osa(obj0, methods=c('fg', 'osg', 'cdf'), observation.name='y')
+  osa1 <- calculate.osa(obj1, methods=c('fg', 'osg', 'cdf'), observation.name='y')
 
   ## DHARMa resids, both conditional and unconditional
   ## hack to get this to evaluate in a function
@@ -210,6 +208,7 @@ run.spatial.iter <- function(ii){
 
   ## calculate Moran's I by hand for osa
   w <- 1/dmat;  diag(w) <- 0
+  browser()
   sac0 <- lapply(osa0, function(x) calc.sac(x, w))
   sac1 <- lapply(osa1, function(x) calc.sac(x, w))
 
