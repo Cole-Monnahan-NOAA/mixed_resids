@@ -1,6 +1,11 @@
 ### Run simulation testing of spatial residuals for a simple
 ### spatial model.
 
+## Clean up the old runs
+unlink('results/spatial_resids', TRUE)
+unlink('results/spatial_pvals', TRUE)
+unlink('results/spatial_mles', TRUE)
+
 ## run.spatial.iter and other files are in startup.R
 source("code/functions_spatial.R")
 if(!exists('run.spatial.iter'))
@@ -29,8 +34,7 @@ if(length(fs)<Nreps){
 bad <- which.failed(Nreps)
 if(length(bad)>0) warning(length(bad), " runs failed")
 
-
-message("Processing and saving final results...")
+message("Spatial: processing and saving final results...")
 ## Read results back in from file
 fs <- list.files('results/spatial_pvals/', full.names=TRUE)
 pvals <- lapply(fs, readRDS) %>% bind_rows %>% filter(!is.na(pvalue))
@@ -39,31 +43,7 @@ saveRDS(pvals, file='results/spatial_pvals.RDS')
 fs <- list.files('results/spatial_resids/', full.names=TRUE)
 resids <- lapply(fs, readRDS) %>% bind_rows
 saveRDS(resids, file='results/spatial_resids.RDS')
+fs <- list.files('results/spatial_mles/', full.names=TRUE)
+mles <- lapply(fs, readRDS) %>% bind_rows
+saveRDS(mles, file='results/spatial_mles.RDS')
 
-
-message("Making spatial results plots...")
-g <- ggplot(filter(pvals, test=='outlier') , aes(pvalue, )) + geom_histogram() +
-  facet_grid(RE~test+version, scales='free')
-ggsave('plots/spatial_pvalues_outlier.png', g, width=5, height=5)
-g <- ggplot(filter(pvals, test=='disp') , aes(pvalue, )) + geom_histogram() +
-  facet_grid(RE~test+version, scales='free')
-ggsave('plots/spatial_pvalues_disp.png', g, width=5, height=5)
-g <- ggplot(filter(pvals, test=='sac') , aes(pvalue, )) + geom_histogram() +
-  facet_grid(RE~test+version, scales='free')
-ggsave('plots/spatial_pvalues_sac.png', g, width=5, height=5)
-g <- filter(pvals, test=='GOF' & grepl('osa', x=RE)) %>%
-  ggplot(aes(pvalue)) + geom_histogram() +
-  facet_grid(RE~test+version, scales='free')
-ggsave('plots/spatial_pvalues_GOF_osa.png', g, width=5, height=5)
-g <- filter(pvals, test=='GOF' & !grepl('osa', x=RE)) %>%
-  ggplot(aes(pvalue)) + geom_histogram() +
-  facet_grid(RE~test+version, scales='free')
-ggsave('plots/spatial_pvalues_GOF_DHARMa.png', g, width=5, height=5)
-
-## g <- pivot_longer(resids, c('osa.cdf', 'osa.gen', 'sim_cond', 'sim_uncond', 'sim_parcond'),
-##                   names_to='type', values_to='residual') %>%
-##   filter(replicate<=5) %>%
-##   ggplot(aes(ytrue, residual, color=version)) +
-##   geom_point(alpha=.5) +
-##   facet_grid(replicate~type) + scale_x_log10()
-## ggsave('plots/spatial_residuals_examples.png', g, width=8, height=6)

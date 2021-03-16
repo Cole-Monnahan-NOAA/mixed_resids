@@ -36,11 +36,12 @@ packageVersion('DHARMa')                # 0.3.3.0
 ## TMB::compile('models/spatial.cpp')
 ## run.spatial.iter(1)
 cpus <- parallel::detectCores()-2
-Nreps <- cpus*20
-source('code/spatial.R')
+Nreps <- cpus*50
+source('code/run_spatial.R')
 
-## ### Load results
-## source('code/load_results.R')
-## ### Make plots of results
-## source("code/plot_results.R")
+
+### Load results into workspace
+source('code/load_results.R')
+### Make quick plots of results
+source("code/make_plots.R")
 

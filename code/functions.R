@@ -2,19 +2,19 @@ message("Loading global functions...")
 
 make.pval.df <- function(osa, sim_cond, sim_uncond, sim_parcond){
   pvals <- rbind(
-    data.frame(RE='parcond', test='outlier', pvalue=sim_parcond$outlier),
-    data.frame(RE='cond', test='outlier', pvalue=sim_cond$outlier),
-    data.frame(RE='uncond', test='outlier', pvalue=sim_uncond$outlier),
-    data.frame(RE='parcond', test='disp', pvalue=sim_parcond$disp),
-    data.frame(RE='cond', test='disp', pvalue=sim_cond$disp),
-    data.frame(RE='uncond', test='disp', pvalue=sim_uncond$disp),
-    data.frame(RE='parcond', test='GOF', pvalue=sim_parcond$pval),
-    data.frame(RE='cond', test='GOF', pvalue=sim_cond$pval),
-    data.frame(RE='uncond', test='GOF', pvalue=sim_uncond$pval),
-    data.frame(RE='osa.fg', test='GOF', pvalue=osa$fg),
-    data.frame(RE='osa.osg', test='GOF', pvalue=osa$osg),
-    data.frame(RE='osa.cdf', test='GOF', pvalue=osa$cdf),
-    data.frame(RE='osa.gen', test='GOF', pvalue=osa$gen))
+    data.frame(method='parcond', test='outlier', pvalue=sim_parcond$outlier),
+    data.frame(method='cond', test='outlier', pvalue=sim_cond$outlier),
+    data.frame(method='uncond', test='outlier', pvalue=sim_uncond$outlier),
+    data.frame(method='parcond', test='disp', pvalue=sim_parcond$disp),
+    data.frame(method='cond', test='disp', pvalue=sim_cond$disp),
+    data.frame(method='uncond', test='disp', pvalue=sim_uncond$disp),
+    data.frame(method='parcond', test='GOF', pvalue=sim_parcond$pval),
+    data.frame(method='cond', test='GOF', pvalue=sim_cond$pval),
+    data.frame(method='uncond', test='GOF', pvalue=sim_uncond$pval),
+    data.frame(method='osa.fg', test='GOF', pvalue=osa$fg),
+    data.frame(method='osa.osg', test='GOF', pvalue=osa$osg),
+    data.frame(method='osa.cdf', test='GOF', pvalue=osa$cdf),
+    data.frame(method='osa.gen', test='GOF', pvalue=osa$gen))
   return(pvals)
 }
 

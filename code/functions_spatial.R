@@ -85,8 +85,7 @@ run.spatial.iter <- function(ii){
   library(dplyr)
   library(tidyr)
   library(R.utils)
-  dyn.load(TMB::dynlib("models/spatial"))
-  ## simulate data with these parameters
+  dyn.load(TMB::dynlib("models/spatial")) ## simulate data with these parameters
 
   message(ii, ": Simulating data...")
   set.seed(ii)
@@ -145,9 +144,16 @@ run.spatial.iter <- function(ii){
   rep1 <- obj1$report(obj1$env$last.par.best)
   opt0$ypred <- obj0$report()$mu
   opt1$ypred <- obj1$report()$mu
-  ## Save MLEs to test for properties
-  mles <- list(opt0=data.frame(version='m0', rep=ii, mle=opt0$par, par=names(obj0$par)),
-               opt1=data.frame(version='m1', rep=ii, mle=opt1$par, par=names(obj1$par)))
+  ## Save MLEs to test for properties. These are the true pars as
+  ## parameterized in the TMB model
+  logkappa_true <- log(sqrt(8)/Range)
+  logtau_true <- log(sqrt(1/(4*pi*(sqrt(8/Range)^2*sp.var))))
+  truepars <- c(Beta, log(sd.obs), logtau_true, logkappa_true)
+  mles <- rbind(
+    data.frame(version='m0', rep=ii, mle=opt0$par,
+               par=names(obj0$par), true=truepars),
+    data.frame(version='m1', rep=ii, mle=opt1$par,
+               par=names(obj1$par), true=truepars))
   dir.create('results/spatial_mles', showWarnings=FALSE)
   saveRDS(mles, file=paste0('results/spatial_mles/mles_', ii, '.RDS'))
 
@@ -214,24 +220,24 @@ run.spatial.iter <- function(ii){
   pvals0 <- make.pval.df(osa.pvals0, sim0_cond, sim0_uncond, sim0_parcond)
   ## Add on the SAC ones
   pvals0 <- rbind( pvals0,
-                  data.frame(RE='osa.fg', test='sac', pvalue=sac0$fg),
-                  data.frame(RE='osa.osg', test='sac', pvalue=sac0$osg),
-                  data.frame(RE='osa.cdf', test='sac', pvalue=sac0$cdf),
-                  data.frame(RE='osa.gen', test='sac', pvalue=sac0$gen),
-                  data.frame(RE='cond', test='sac', pvalue=sac0_cond),
-                  data.frame(RE='uncond', test='sac', pvalue=sac0_uncond),
-                  data.frame(RE='parcond', test='sac', pvalue=sac0_parcond))
+                  data.frame(method='osa.fg', test='sac', pvalue=sac0$fg),
+                  data.frame(method='osa.osg', test='sac', pvalue=sac0$osg),
+                  data.frame(method='osa.cdf', test='sac', pvalue=sac0$cdf),
+                  data.frame(method='osa.gen', test='sac', pvalue=sac0$gen),
+                  data.frame(method='cond', test='sac', pvalue=sac0_cond),
+                  data.frame(method='uncond', test='sac', pvalue=sac0_uncond),
+                  data.frame(method='parcond', test='sac', pvalue=sac0_parcond))
   pvals0$version <- 'm0'
   pvals1 <- make.pval.df(osa.pvals1, sim1_cond, sim1_uncond, sim1_parcond)
   ## Add on the SAC ones
   pvals1 <- rbind( pvals1,
-                  data.frame(RE='osa.fg', test='sac', pvalue=sac1$fg),
-                  data.frame(RE='osa.osg', test='sac', pvalue=sac1$osg),
-                  data.frame(RE='osa.cdf', test='sac', pvalue=sac1$cdf),
-                  data.frame(RE='osa.gen', test='sac', pvalue=sac1$gen),
-                  data.frame(RE='cond', test='sac', pvalue=sac1_cond),
-                  data.frame(RE='uncond', test='sac', pvalue=sac1_uncond),
-                  data.frame(RE='parcond', test='sac', pvalue=sac1_parcond))
+                  data.frame(method='osa.fg', test='sac', pvalue=sac1$fg),
+                  data.frame(method='osa.osg', test='sac', pvalue=sac1$osg),
+                  data.frame(method='osa.cdf', test='sac', pvalue=sac1$cdf),
+                  data.frame(method='osa.gen', test='sac', pvalue=sac1$gen),
+                  data.frame(method='cond', test='sac', pvalue=sac1_cond),
+                  data.frame(method='uncond', test='sac', pvalue=sac1_uncond),
+                  data.frame(method='parcond', test='sac', pvalue=sac1_parcond))
   pvals1$version <- 'm1'
   pvals <- rbind(pvals0, pvals1)
   pvals$replicate <- ii; pvals$model <- 'spatial'
@@ -263,18 +269,18 @@ run.spatial.iter <- function(ii){
     g <- GGally::ggpairs(resids, columns=9:15, mapping=aes(color=version), title='Random Walk')
     ggsave('plots/spatial_resids_pairs.png', g, width=7, height=5)
     ## ## Plot of  DHARMa simulated data look like
-    ## ff <- function(x, v, re) data.frame(x=Loc[,1], y=Loc[,2], version=v, RE=re, x$simulatedResponse[,1:4])
+    ## ff <- function(x, v, re) data.frame(x=Loc[,1], y=Loc[,2], version=v, method=re, x$simulatedResponse[,1:4])
     ## g <- rbind(ff(sim0_cond$resids, 'm0', 'cond'),
     ##            ff(sim0_parcond$resids, 'm0', 'parcond'),
     ##            ff(sim0_uncond$resids, 'm0', 'uncond'),
     ##            ff(sim1_cond$resids, 'm1', 'cond'),
     ##            ff(sim1_parcond$resids, 'm1', 'parcond'),
     ##            ff(sim1_uncond$resids, 'm1', 'uncond')) %>%
-    ##   pivot_longer(cols=c(-x,-y, -version, -RE), names_prefix="X",
+    ##   pivot_longer(cols=c(-x,-y, -version, -method), names_prefix="X",
     ##                names_to='replicate', values_to='z') %>%
     ##   mutate(replicate=as.numeric(replicate))  %>%
     ##   ggplot(aes(x, y, size=log(z))) + geom_point(alpha=.2) +
-    ##   facet_grid(version+RE~replicate)
+    ##   facet_grid(version+method~replicate)
     ## ggsave('plots/spatial_simdata.png', g, width=9, height=9)
   }
   ## save to file in case it crashes can recover what did run
