@@ -190,9 +190,10 @@ run.spatial.iter <- function(ii){
   ## Calculate p-values. Dharma and JPdone already above
   osa.pvals0 <- calc.osa.pvals(osa0)
   osa.pvals1 <- calc.osa.pvals(osa1)
-
-  ## Extra ones for spatial model. Only test for positive correlation
-  if(!is.na(sim0_cond$resids[1]))  sac0_cond <- testSpatialAutocorrelation(sim0_cond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
+  ## Extra ones for spatial model. Only test for positive
+  ## correlation
+  sac0_cond <- sac0_uncond  <- sac0_parcond <-   sac1_cond <- sac1_uncond  <- sac1_parcond <- NA
+  if(!is.na(sim0_cond$resids[1])) sac0_cond <- testSpatialAutocorrelation(sim0_cond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
   if(!is.na(sim0_uncond$resids[1]))  sac0_uncond <- testSpatialAutocorrelation(sim0_uncond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
   if(!is.na(sim0_parcond$resids[1]))  sac0_parcond <- testSpatialAutocorrelation(sim0_parcond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
   if(!is.na(sim1_cond$resids[1]))  sac1_cond <- testSpatialAutocorrelation(sim1_cond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
@@ -210,7 +211,10 @@ run.spatial.iter <- function(ii){
                   data.frame(RE='osa.fg', test='sac', pvalue=sac0$fg),
                   data.frame(RE='osa.osg', test='sac', pvalue=sac0$osg),
                   data.frame(RE='osa.cdf', test='sac', pvalue=sac0$cdf),
-                  data.frame(RE='osa.gen', test='sac', pvalue=sac0$gen))
+                  data.frame(RE='osa.gen', test='sac', pvalue=sac0$gen),
+                  data.frame(RE='cond', test='sac', pvalue=sac0_cond),
+                  data.frame(RE='uncond', test='sac', pvalue=sac0_uncond),
+                  data.frame(RE='parcond', test='sac', pvalue=sac0_parcond))
   pvals0$version <- 'm0'
   pvals1 <- make.pval.df(osa.pvals1, sim1_cond, sim1_uncond, sim1_parcond)
   ## Add on the SAC ones
@@ -218,7 +222,10 @@ run.spatial.iter <- function(ii){
                   data.frame(RE='osa.fg', test='sac', pvalue=sac1$fg),
                   data.frame(RE='osa.osg', test='sac', pvalue=sac1$osg),
                   data.frame(RE='osa.cdf', test='sac', pvalue=sac1$cdf),
-                  data.frame(RE='osa.gen', test='sac', pvalue=sac1$gen))
+                  data.frame(RE='osa.gen', test='sac', pvalue=sac1$gen),
+                  data.frame(RE='cond', test='sac', pvalue=sac1_cond),
+                  data.frame(RE='uncond', test='sac', pvalue=sac1_uncond),
+                  data.frame(RE='parcond', test='sac', pvalue=sac1_parcond))
   pvals1$version <- 'm1'
   pvals <- rbind(pvals0, pvals1)
   pvals$replicate <- ii; pvals$model <- 'spatial'

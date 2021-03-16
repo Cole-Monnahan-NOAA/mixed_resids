@@ -32,8 +32,8 @@ if(length(bad)>0) warning(length(bad), " runs failed")
 
 message("Processing and saving final results...")
 ## Read results back in from file
-pvals <- lapply(fs, readRDS) %>% bind_rows  %>%
-  filter(!is.na(pvalue))
+fs <- list.files('results/spatial_pvals/', full.names=TRUE)
+pvals <- lapply(fs, readRDS) %>% bind_rows %>% filter(!is.na(pvalue))
 saveRDS(pvals, file='results/spatial_pvals.RDS')
 ## Read in residuals
 fs <- list.files('results/spatial_resids/', full.names=TRUE)
