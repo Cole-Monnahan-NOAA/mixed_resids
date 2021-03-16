@@ -62,15 +62,15 @@ Type objective_function<Type>::operator() ()
   PARAMETER(theta);      
   PARAMETER(log_tau);
   PARAMETER(log_kappa);
-  PARAMETER(log_zeta);  	// overdispersion SD
+  //PARAMETER(log_zeta);  	// overdispersion SD
   PARAMETER_VECTOR(omega);
-  PARAMETER_VECTOR(u);		// overdispersion REs
+  //PARAMETER_VECTOR(u);		// overdispersion REs
   DATA_VECTOR_INDICATOR( keep, y );
 
   int i,j; 
   int n = y.size();
 
-  Type zeta=exp(log_zeta);
+  //Type zeta=exp(log_zeta);
   Type tau = exp(log_tau);
   Type kappa = exp(log_kappa);
   Type marg_sp_sd = 1/(2*sqrt(M_PI)*kappa*tau);
@@ -120,21 +120,21 @@ Type objective_function<Type>::operator() ()
   //   }
   // }
 
-  // RE contribution for overdispersion. Need to include this
-  // only when the parameter is being estimated, hence the
-  // Variable thing below. See
-  // https://github.com/kaskr/adcomp/issues/154
-  for(int i=0; i<n; i++){
-    if (CppAD::Variable(u(i))){
-      // active parameter so calculate NLL and simulate
-      nll -= dnorm(u(i), Type(0), zeta, true);
-      if(simRE == 1){
-  	SIMULATE{
-  	  u(i) = rnorm(Type(0.0), zeta);
-  	}
-      }
-    } // else it's mapped off so do nothing
-  }
+  // // RE contribution for overdispersion. Need to include this
+  // // only when the parameter is being estimated, hence the
+  // // Variable thing below. See
+  // // https://github.com/kaskr/adcomp/issues/154
+  // for(int i=0; i<n; i++){
+  //   if (CppAD::Variable(u(i))){
+  //     // active parameter so calculate NLL and simulate
+  //     nll -= dnorm(u(i), Type(0), zeta, true);
+  //     if(simRE == 1){
+  // 	SIMULATE{
+  // 	  u(i) = rnorm(Type(0.0), zeta);
+  // 	}
+  //     }
+  //   } // else it's mapped off so do nothing
+  // }
 
   
   vector<Type> Xbeta = X*beta;  
@@ -143,8 +143,7 @@ Type objective_function<Type>::operator() ()
   Type cdf;
   //Data Likelihood
   for(int i=0; i<n; i++){    
-    eta(i) = Xbeta(i) + omega(v_i(i)) + u(i);
-
+    eta(i) = Xbeta(i) + omega(v_i(i));
     mu(i) = inverse_linkfun(eta(i), link);
 
     switch(family){
@@ -194,7 +193,7 @@ Type objective_function<Type>::operator() ()
   REPORT(Range);
   REPORT(marg_sp_sd);
   REPORT(eta);
-  REPORT(zeta);
+  // REPORT(zeta);
   REPORT(mu);
   REPORT(Xbeta);
   REPORT(nll);

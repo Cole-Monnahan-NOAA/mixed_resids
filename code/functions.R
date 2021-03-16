@@ -86,7 +86,7 @@ add_aic <- function(opt,n){
   opt
 }
 
-calculate.jp <- function(obj, sdr, opt, obs, data.name, N=1000){
+calculate.jp <- function(obj, sdr, opt, obs, data.name, fpr, N=1000){
   joint.mle <- obj$env$last.par.best
   test <- tryCatch(Matrix::Cholesky(sdr$jointPrecision, super=TRUE),
                    error=function(e) 'error')
@@ -100,7 +100,11 @@ calculate.jp <- function(obj, sdr, opt, obs, data.name, N=1000){
     obj$simulate(par=newpar)[[data.name]]
   }
   tmp <- replicate(N, {jp.sim()})
-  dharma <- createDHARMa(tmp, obs, fittedPredictedResponse=NULL)
+  if(any(is.nan(tmp))){
+    warning("NaN values in JP simulated data")
+    return(list(resids=NA, disp=NA, outlier=NA, pval=NA))
+  }
+  dharma <- createDHARMa(tmp, obs, fittedPredictedResponse=fpr)
   resids <- residuals(dharma, quantileFunction = qnorm, outlierValues = c(-7,7))
   disp <- testDispersion(dharma, alternative = 'greater', plot=FALSE)
   outlier <- testOutliers(dharma, alternative = 'greater',

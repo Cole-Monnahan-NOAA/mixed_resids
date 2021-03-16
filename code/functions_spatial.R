@@ -19,8 +19,8 @@ sim.omega <- function(Range, sig2, Dmat, Nu = 1, method, mesh){
     dat$spde <- INLA::inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
     obj <- TMB::MakeADFun(data =  dat,
                      parameters = list(beta = 0, theta = 0, log_tau = log(Tau),
-                                       log_kappa = log(Kappa), log_zeta=0,
-                                       omega = rep(0,n), u=rep(0,n)),
+                                       log_kappa = log(Kappa),
+                                       omega = rep(0,n)),
                      random = 'omega',
                      DLL = 'spatial')
     sim <- obj$simulate()
@@ -35,8 +35,8 @@ sim.omega <- function(Range, sig2, Dmat, Nu = 1, method, mesh){
     dat$spde <- INLA::inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
     obj <- TMB::MakeADFun(data =  dat,
                      parameters = list(beta = 0, theta = 0, log_tau = log(Tau),
-                                       log_kappa = log(Kappa), log_zeta=0,
-                                       omega = rep(0,mesh$n), u=rep(0,n)),
+                                       log_kappa = log(Kappa),
+                                       omega = rep(0,mesh$n)),
                      random = 'omega',
                      DLL = 'spatial')
     sim <- obj$simulate()
@@ -114,30 +114,30 @@ run.spatial.iter <- function(ii){
   X <- as.matrix(cbind(X1, X2))
   y0 <- sim.data(X=X, Beta=Beta, omega=Omega[mesh$idx$loc],
                 parm=sd.obs, fam='Normal', link='identity')
-  ## Add outliers to 5%
-  y1 <- y0+rbinom(n,1, .05) * rnorm(n, 0, sd.obs*5)
+  ## Add outliers to 5 random values to create second data set
+  noutlier <- 5
+  y1 <- y0
+  ind <- sample(1:n, size=noutlier)
+  y1[ind] <- y0[ind]+rnorm(noutlier, 0, sd.obs*4)
   par <- list(beta = 0*Beta, theta = 0, log_tau = 0, log_kappa = 0,
-              log_zeta=0, omega = rep(0,mesh$n), u=rep(0,n))
-  dat <- list(y=y, X=X,
+              omega = rep(0,mesh$n))
+  dat <- list(y=y0, X=X,
               dd=dmat, nu=1,
               v_i=mesh$idx$loc-1,
-              simRE=0, family=100, link=0, reStruct=10)
+              simRE=0, family=000, link=2, reStruct=10)
   dat$spde <- INLA::inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
 
   message(ii, ": Optimizing two competing models...")
-  ## H0: Space but no overdispersion (underspecified)
-  map <- list(log_zeta=factor(NA), u=factor(NA*par$u))
-  obj0 <- TMB::MakeADFun(dat, par, random=c('omega', 'u'),
-                         dll="spatial", map=map)
+  ## H0: Space w/ normal; properly specified
+  obj0 <- TMB::MakeADFun(dat, par, random=c('omega'), dll="spatial")
   trash <- obj0$env$beSilent()
   opt0 <- nlminb(obj0$par, obj0$fn, obj0$gr)
   opt0 <- add_aic(opt0, n=length(dat$y))
   sdr0 <- sdreport(obj0, getJointPrecision=TRUE)
   rep0 <- obj0$report(obj0$env$last.par.best)
-  ## estimate states and parameters under h1: spatial variance
-  map <- list()
-  obj1 <- TMB::MakeADFun(dat, par, random=c("omega", 'u'),
-                         dll="spatial", map=map)
+  ## H1: Space w/ normal and unmodeled outliers (underspecified)
+  dat$y <- y1
+  obj1 <- TMB::MakeADFun(dat, par, random=c("omega"), dll="spatial")
   trash <- obj1$env$beSilent()
   opt1 <- nlminb(obj1$par, obj1$fn, obj1$gr)
   opt1 <- add_aic(opt1, n=length(dat$y))
@@ -145,7 +145,6 @@ run.spatial.iter <- function(ii){
   rep1 <- obj1$report(obj1$env$last.par.best)
   opt0$ypred <- obj0$report()$mu
   opt1$ypred <- obj1$report()$mu
-
   message(ii, ": Calculating residuals..")
   osa0 <- calculate.osa(obj0, methods=c('cdf'), observation.name='y')
   osa1 <- calculate.osa(obj1, methods=c('cdf'), observation.name='y')
@@ -154,22 +153,22 @@ run.spatial.iter <- function(ii){
   ## hack to get this to evaluate in a function
   expr <- expression(obj$simulate()$y)
   sim0_cond <-
-    calculate.dharma(obj0, expr, obs=y, fpr=rep0$Xbeta)
+    calculate.dharma(obj0, expr, obs=y0, fpr=rep0$Xbeta)
   obj0$env$data$simRE <- 1 #turn on RE simulation
   sim0_uncond <-
-    calculate.dharma(obj0, expr, obs=y, fpr=rep0$Xbeta)
+    calculate.dharma(obj0, expr, obs=y0, fpr=rep0$Xbeta)
   sim1_cond <-
-    calculate.dharma(obj1, expr, obs=y, fpr=rep1$Xbeta)
+    calculate.dharma(obj1, expr, obs=y1, fpr=rep1$Xbeta)
   obj1$env$data$simRE <- 1 #turn on RE simulation
   sim1_uncond <-
-    calculate.dharma(obj1, expr, obs=y, fpr=rep1$Xbeta)
+    calculate.dharma(obj1, expr, obs=y1, fpr=rep1$Xbeta)
 
   ## Try adding residuals from the joint precisions matrix
-  sim0_parcond <- calculate.jp(obj0, sdr0, opt0, dat$y, 'y')
-  sim1_parcond <- calculate.jp(obj1, sdr1, opt1, dat$y, 'y')
+  sim0_parcond <- calculate.jp(obj0, sdr0, opt0, y0, 'y', fpr=rep0$Xbeta)
+  sim1_parcond <- calculate.jp(obj1, sdr1, opt1, y1, 'y', fpr=rep1$Xbeta)
 
   ## Combine together in tidy format for analysis and plotting later
-  r0 <- data.frame(model='spatial', replicate=ii, ytrue=dat$y,
+  r0 <- data.frame(model='spatial', replicate=ii, y0=y0, y1=y1,
                    ypred=opt0$ypred, x=Loc[,1], y=Loc[,2], version='m0',
                    osa.cdf = osa0$cdf, osa.gen = osa0$gen,
                    osa.fg=osa0$fg, osa.osg=osa0$osg,
@@ -178,7 +177,7 @@ run.spatial.iter <- function(ii){
                    sim_parcond=sim0_parcond$resids,
                    maxgrad=max(abs(obj0$gr(opt0$par))),
                    AIC=opt0$AIC, AICc=opt0$AICc)
-  r1 <- data.frame(model='spatial', replicate=ii, ytrue=dat$y,
+  r1 <- data.frame(model='spatial', replicate=ii, y0=y0, y1=y1,
                    ypred=opt1$ypred, x=Loc[,1], y=Loc[,2], version='m1',
                    osa.cdf = osa1$cdf, osa.gen = osa1$gen,
                    osa.fg=osa1$fg, osa.osg=osa1$osg,
@@ -193,12 +192,12 @@ run.spatial.iter <- function(ii){
   osa.pvals1 <- calc.osa.pvals(osa1)
 
   ## Extra ones for spatial model. Only test for positive correlation
-  if(!is.na(sim0_cond$resids))  sac0_cond <- testSpatialAutocorrelation(sim0_cond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
-  if(!is.na(sim0_uncond$resids))  sac0_uncond <- testSpatialAutocorrelation(sim0_uncond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
-  if(!is.na(sim0_parcond$resids))  sac0_parcond <- testSpatialAutocorrelation(sim0_parcond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
-  if(!is.na(sim1_cond$resids))  sac1_cond <- testSpatialAutocorrelation(sim1_cond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
-  if(!is.na(sim1_uncond$resids))  sac1_uncond <- testSpatialAutocorrelation(sim1_uncond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
-  if(!is.na(sim1_parcond$resids))  sac1_parcond <- testSpatialAutocorrelation(sim1_parcond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
+  if(!is.na(sim0_cond$resids[1]))  sac0_cond <- testSpatialAutocorrelation(sim0_cond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
+  if(!is.na(sim0_uncond$resids[1]))  sac0_uncond <- testSpatialAutocorrelation(sim0_uncond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
+  if(!is.na(sim0_parcond$resids[1]))  sac0_parcond <- testSpatialAutocorrelation(sim0_parcond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
+  if(!is.na(sim1_cond$resids[1]))  sac1_cond <- testSpatialAutocorrelation(sim1_cond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
+  if(!is.na(sim1_uncond$resids[1]))  sac1_uncond <- testSpatialAutocorrelation(sim1_uncond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
+  if(!is.na(sim1_parcond$resids[1]))  sac1_parcond <- testSpatialAutocorrelation(sim1_parcond$resids, x=Loc[,1], y=Loc[,2], plot=FALSE, alternative='greater', )$p.value
 
   ## calculate Moran's I by hand for osa
   w <- 1/dmat;  diag(w) <- 0
@@ -221,7 +220,6 @@ run.spatial.iter <- function(ii){
                   data.frame(RE='osa.cdf', test='sac', pvalue=sac1$cdf),
                   data.frame(RE='osa.gen', test='sac', pvalue=sac1$gen))
   pvals1$version <- 'm1'
-
   pvals <- rbind(pvals0, pvals1)
   pvals$replicate <- ii; pvals$model <- 'spatial'
 
@@ -241,8 +239,9 @@ run.spatial.iter <- function(ii){
     hist(y1, xlim=range(c(y0,y1)))
     plot(y0, y1)
     dev.off()
-    g <- data.frame(x=Loc[,1], y=Loc[,2], z=dat$y) %>%
-      ggplot(aes(x,y, size=z)) + geom_point(alpha=.5)
+    g <- rbind(data.frame(x=Loc[,1], y=Loc[,2], z=y0, version='m0'),
+               data.frame(x=Loc[,1], y=Loc[,2], z=y1, version='m1')) %>%
+      ggplot(aes(x,y, size=abs(z), color=z>0)) + geom_point(alpha=.5) + facet_wrap('version')
     ggsave('plots/spatial_data_example.png', g, width=7, height=5)
     ## plot of resids
     g <- ggplot(resids.long, aes(x, y, size=abs(value), color=value<0)) +
