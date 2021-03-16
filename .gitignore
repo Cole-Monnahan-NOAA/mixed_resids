@@ -4,3 +4,6 @@ models/*.dll
 results/spatial_pvals
 results/spatial_resids
 results/spatial_mles
+results/randomwalk_pvals
+results/randomwalk_resids
+results/randomwalk_mles

@@ -40,6 +40,12 @@ Nreps <- cpus*50
 source('code/run_spatial.R')
 
 
+## Random walk from the paper
+cpus <- parallel::detectCores()-2
+Nreps <- cpus*20
+source('code/run_randomwalk.R')
+
+
 ### Load results into workspace
 source('code/load_results.R')
 ### Make quick plots of results
