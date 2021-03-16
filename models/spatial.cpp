@@ -148,7 +148,10 @@ Type objective_function<Type>::operator() ()
 
     switch(family){
       case gaussian_family:
-        nll -= dnorm(y(i), mu(i), exp(theta), true);
+        nll -= keep(i) * dnorm(y(i), mu(i), exp(theta), true);
+        cdf = squeeze( pnorm(y(i), mu(i), exp(theta)) );
+        nll -= keep.cdf_lower(i) * log( cdf );
+        nll -= keep.cdf_upper(i) * log( 1.0 - cdf );
         SIMULATE{
           y(i) = rnorm(mu(i), exp(theta));
         }
