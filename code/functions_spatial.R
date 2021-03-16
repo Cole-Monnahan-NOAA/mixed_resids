@@ -145,9 +145,17 @@ run.spatial.iter <- function(ii){
   rep1 <- obj1$report(obj1$env$last.par.best)
   opt0$ypred <- obj0$report()$mu
   opt1$ypred <- obj1$report()$mu
+  ## Save MLEs to test for properties
+  mles <- list(opt0=data.frame(version='m0', rep=ii, mle=opt0$par, par=names(obj0$par)),
+               opt1=data.frame(version='m1', rep=ii, mle=opt1$par, par=names(obj1$par)))
+  dir.create('results/spatial_mles', showWarnings=FALSE)
+  saveRDS(mles, file=paste0('results/spatial_mles/mles_', ii, '.RDS'))
+
   message(ii, ": Calculating residuals..")
-  osa0 <- calculate.osa(obj0, methods=c('cdf'), observation.name='y')
-  osa1 <- calculate.osa(obj1, methods=c('cdf'), observation.name='y')
+  osa0 <- calculate.osa(obj0, methods=c('fg, osg, cdf'), observation.name='y')
+  osa1 <- calculate.osa(obj1, methods=c('fg, osg, cdf'), observation.name='y')
+
+
 
   ## DHARMa resids, both conditional and unconditional
   ## hack to get this to evaluate in a function
