@@ -261,7 +261,7 @@ run.spatial.iter <- function(ii){
     g <- ggplot(resids.long, aes(x, y, size=abs(value), color=value<0)) +
       geom_point(alpha=.5) + facet_grid(version~name)
     ggsave('plots/spatial_resids_by_space.png', g, width=9, height=6)
-    g <- GGally::ggpairs(resids, columns=8:14, mapping=aes(color=version), title='Random Walk')
+    g <- GGally::ggpairs(resids, columns=9:15, mapping=aes(color=version), title='Random Walk')
     ggsave('plots/spatial_resids_pairs.png', g, width=7, height=5)
     ## ## Plot of  DHARMa simulated data look like
     ## ff <- function(x, v, re) data.frame(x=Loc[,1], y=Loc[,2], version=v, RE=re, x$simulatedResponse[,1:4])

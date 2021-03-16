@@ -137,7 +137,6 @@ calculate.dharma <- function(obj, expr, N=1000, obs, fpr){
 
 calculate.osa <- function(obj, methods, observation.name,
                           data.term.indicator='keep'){
-
   ## OSA residuals
   fg <- osg <- cdf <- gen <- NA
 

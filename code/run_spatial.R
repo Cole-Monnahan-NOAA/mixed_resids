@@ -43,28 +43,27 @@ saveRDS(resids, file='results/spatial_resids.RDS')
 
 message("Making spatial results plots...")
 g <- ggplot(filter(pvals, test=='outlier') , aes(pvalue, )) + geom_histogram() +
-  facet_grid(version+RE~test, scales='free')
+  facet_grid(RE~test+version, scales='free')
 ggsave('plots/spatial_pvalues_outlier.png', g, width=5, height=5)
 g <- ggplot(filter(pvals, test=='disp') , aes(pvalue, )) + geom_histogram() +
-  facet_grid(version+RE~test, scales='free')
+  facet_grid(RE~test+version, scales='free')
 ggsave('plots/spatial_pvalues_disp.png', g, width=5, height=5)
 g <- ggplot(filter(pvals, test=='sac') , aes(pvalue, )) + geom_histogram() +
-  facet_grid(version+RE~test, scales='free')
+  facet_grid(RE~test+version, scales='free')
 ggsave('plots/spatial_pvalues_sac.png', g, width=5, height=5)
-
 g <- filter(pvals, test=='GOF' & grepl('osa', x=RE)) %>%
   ggplot(aes(pvalue)) + geom_histogram() +
-         facet_grid(version+RE~test, scales='free')
+  facet_grid(RE~test+version, scales='free')
 ggsave('plots/spatial_pvalues_GOF_osa.png', g, width=5, height=5)
 g <- filter(pvals, test=='GOF' & !grepl('osa', x=RE)) %>%
   ggplot(aes(pvalue)) + geom_histogram() +
-         facet_grid(version+RE~test, scales='free')
+  facet_grid(RE~test+version, scales='free')
 ggsave('plots/spatial_pvalues_GOF_DHARMa.png', g, width=5, height=5)
 
-g <- pivot_longer(resids, c('osa.cdf', 'osa.gen', 'sim_cond', 'sim_uncond', 'sim_parcond'),
-                  names_to='type', values_to='residual') %>%
-  filter(replicate<=5) %>%
-  ggplot(aes(ytrue, residual, color=version)) +
-  geom_point(alpha=.5) +
-  facet_grid(replicate~type) + scale_x_log10()
-ggsave('plots/spatial_residuals_examples.png', g, width=8, height=6)
+## g <- pivot_longer(resids, c('osa.cdf', 'osa.gen', 'sim_cond', 'sim_uncond', 'sim_parcond'),
+##                   names_to='type', values_to='residual') %>%
+##   filter(replicate<=5) %>%
+##   ggplot(aes(ytrue, residual, color=version)) +
+##   geom_point(alpha=.5) +
+##   facet_grid(replicate~type) + scale_x_log10()
+## ggsave('plots/spatial_residuals_examples.png', g, width=8, height=6)
