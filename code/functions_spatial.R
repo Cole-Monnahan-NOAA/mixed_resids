@@ -67,6 +67,10 @@ sim.data <- function(X, Beta, omega, parm, fam, link, Loc){
   if(fam == 'Tweedie'){
     Y <- tweedie::rtweedie(N, mean, parm[1], parm[2])
   }
+  if(fam == 'Normal'){
+    ## assuming parm[1] is SD of sampling process
+    Y <- rnorm(N, mu, parm[1])
+  }
   return(Y)
 }
 
@@ -88,7 +92,7 @@ run.spatial.iter <- function(ii){
   set.seed(ii)
   n <- 100
   sp.var <- 0.5
-  CV <- 1
+  sd.obs <- .5
   Range <- 20
   ## Simulate spatial random effects
   Loc <- matrix(runif(n*2,0,100),ncol=2)
@@ -103,19 +107,15 @@ run.spatial.iter <- function(ii){
   }
   Omega <- sim.omega(Range,sp.var,dmat,method="TMB.spde",mesh=mesh)
   ## simulate random measurements
-  ## True beta, an interecept and single covariate
+  ## True beta: an interecept and single covariate
   Beta <- c(1,2)
   X1 <- rep(1, nrow(Loc))               # intercept
   X2 <- rnorm(n=nrow(Loc), 0, 1)        # random
   X <- as.matrix(cbind(X1, X2))
   y0 <- sim.data(X=X, Beta=Beta, omega=Omega[mesh$idx$loc],
-                parm=CV, fam='Gamma', link='log')
-  ## Add overdispersion in form of lognormal
-  u <- rlnorm(n=n, meanlog=0, sdlog=1)
-  y <- y0*u
-  ## par(mfrow=c(1,2))
-  ## hist(log(y0), xlim=range(log(y)));
-  ## hist(log(y), xlim=range(log(y)))
+                parm=sd.obs, fam='Normal', link='identity')
+  ## Add outliers to 5%
+  y1 <- y0+rbinom(n,1, .05) * rnorm(n, 0, sd.obs*5)
   par <- list(beta = 0*Beta, theta = 0, log_tau = 0, log_kappa = 0,
               log_zeta=0, omega = rep(0,mesh$n), u=rep(0,n))
   dat <- list(y=y, X=X,
@@ -235,6 +235,12 @@ run.spatial.iter <- function(ii){
       filter(!is.na(value))
     theme_set(theme_bw())
     ## Plot of data
+    png('plots/spatial_simdata.png', width=7, height=4, units='in', res=200)
+    par(mfrow=c(1,3))
+    hist(y0, xlim=range(c(y0,y1)))
+    hist(y1, xlim=range(c(y0,y1)))
+    plot(y0, y1)
+    dev.off()
     g <- data.frame(x=Loc[,1], y=Loc[,2], z=dat$y) %>%
       ggplot(aes(x,y, size=z)) + geom_point(alpha=.5)
     ggsave('plots/spatial_data_example.png', g, width=7, height=5)
