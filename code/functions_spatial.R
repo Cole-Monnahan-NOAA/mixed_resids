@@ -208,7 +208,6 @@ run.spatial.iter <- function(ii){
 
   ## calculate Moran's I by hand for osa
   w <- 1/dmat;  diag(w) <- 0
-  browser()
   sac0 <- lapply(osa0, function(x) calc.sac(x, w))
   sac1 <- lapply(osa1, function(x) calc.sac(x, w))
 
