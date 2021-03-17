@@ -7,3 +7,6 @@ results/spatial_mles
 results/randomwalk_pvals
 results/randomwalk_resids
 results/randomwalk_mles
+results/simpleGLMM_pvals
+results/simpleGLMM_resids
+results/simpleGLMM_mles
