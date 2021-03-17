@@ -186,7 +186,7 @@ extractOSA <- function(obj, observation.name=NULL,
     ## Cole added this bit
     LLcurves <- LLpoints <- list()
     for(k in 1:length(obs)){
-      yy <- seq(obs[k]-.5, obs[k]+.5, len=100)
+      yy <- seq(obs[k]-2, obs[k]+2, len=500)
       ff <- function(y) newobj$fn(observation(k, y))
       LLcurves[[k]] <- data.frame(k=k, x=yy, y=sapply(yy, ff) )
       LLpoints[[k]] <- data.frame(k=k, x=pred$mean[k], y=ff(pred$mean[k]))

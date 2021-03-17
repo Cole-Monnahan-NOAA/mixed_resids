@@ -4,10 +4,13 @@
 ## copy of oneStepPredict modified to return the information we
 ## need to visualize.
 rm(list=ls())
-source('code/run_simpleGLMM.R')
+source('code/functions_simpleGLMM.R')
 source('code/extractOSA.R')
-## Rebuild obj just in case
-obj <- MakeADFun(Data, Par, random = 'u', DLL = 'simpleGLMM')
+## Build object and optimize
+TMB::compile('models/simpleGLMM.cpp')
+dyn.load(dynlib('models/simpleGLMM'))
+out <- simulate.simpleGLMM(seed=123, n.j=3, n.i=10)
+obj <- MakeADFun(out$Data, out$Par, random = 'u', DLL = 'simpleGLMM')
 opt <- nlminb(obj$par, obj$fn, obj$gr)
 
 ### ------------------------------------------------------------
@@ -44,17 +47,34 @@ dev.off()
 ### ------------------------------------------------------------
 ## oneStepGaussian (OSG)
 OSG <- extractOSA(obj, 'y', 'keep', method='oneStepGaussian')
-png('plots/glmm_oneStepGauss_marginals.png', width=7, height=7,
+png('plots/glmm_oneStepGauss_marginals.png', width=7, height=5,
     units='in', res=400)
-par(mfrow=c(3,3), mgp=c(1.5, .5, 0), tck=-.02, mar=c(3,3,1,1))
-ind <- c(1,2,3, 11,12,13, 21,22,23)
+par(mfrow=c(2,1), mgp=c(1.5, .5, 0), tck=-.02, mar=c(3,3,1,1))
+ind <-  c(1,11,21)#c(1,2,3, 11,12,13, 21,22,23)
+plot(0,0, type='n', xlab='Y',
+     ylab='Probability', xlim=c(2,8), ylim=c(0,1e-12))
+mycols <- 1:3
 for(k in ind){
-  ll <- OSG$LLcurve[OSG$LLcurve$k==k,]
+  g <- out$Data$group[k]+1
   pp <- OSG$LLpoints[OSG$LLpoints$k==k,]
-  plot(ll$x, ll$y , type='l', xlab='Residual',
-       ylab='NLL', main=paste('Obs=',k))
-  abline(v=OSG$pred$obs[k])
-  points(pp$x, pp$y, cex=1.5, col=2, pch=16)
+  ll <- OSG$LLcurve[OSG$LLcurve$k==k,]
+  lines(ll$x, exp(-ll$y), col=mycols[g])
+  ## abline(v=OSG$pred$obs[k], col=mycols[g])
+  rug(x=OSG$pred$obs[k], col=mycols[g])
+  points(pp$x, exp(-pp$y), cex=1.5, col=mycols[g], pch=16)
+}
+ind <-  1:23# c(1,2,3, 11,12,13, 21,22,23)
+plot(0,0, type='n', xlab='Y',
+     ylab='Scaled Probability', xlim=c(2,8), ylim=c(0,1))
+mycols <- 1:3
+for(k in ind){
+  g <- out$Data$group[k]+1
+  pp <- OSG$LLpoints[OSG$LLpoints$k==k,]
+  ll <- OSG$LLcurve[OSG$LLcurve$k==k,]
+  lines(ll$x, exp(-ll$y+pp$y), col=mycols[g])
+  ## abline(v=OSG$pred$obs[k], col=mycols[g])
+  rug(x=OSG$pred$obs[k], col=mycols[g])
+  points(pp$x, exp(-pp$y+pp$y), cex=1.5, col=mycols[g], pch=16)
 }
 dev.off()
 
