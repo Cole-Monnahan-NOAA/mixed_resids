@@ -25,13 +25,6 @@ packageVersion('DHARMa')                # 0.3.3.0
 ##   random draws from the joint precision matrix (fixed + RE,
 ##   conditioned on data)
 
-## ## Basic random walk time series model
-## Nreps <- 1000
-## source('code/randomwalk.R')
-
-## Spatial model. For now this script does everything. We can
-## restructure later.
-
 ## ### Test a single iteration for debugging purposes
 ## TMB::compile('models/spatial.cpp')
 ## run.spatial.iter(1)
@@ -44,6 +37,11 @@ source('code/run_spatial.R')
 cpus <- parallel::detectCores()-2
 Nreps <- cpus*20
 source('code/run_randomwalk.R')
+
+## Andrea's simple GLMM with 3 groups
+cpus <- parallel::detectCores()-2
+Nreps <- cpus*30
+source('code/run_simpleGLMM.R')
 
 
 ### Load results into workspace

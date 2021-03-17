@@ -1,6 +1,7 @@
 
 
 
+if(exists("spatial_pvals")){
 message("Spatial: making results plots...")
 g <- ggplot(filter(spatial_pvals, test=='outlier') , aes(pvalue, )) + geom_histogram() +
   facet_grid(method~test+version, scales='free')
@@ -32,9 +33,9 @@ g <- ggplot(spatial_mles, aes(x=version, abserror)) + geom_violin() +
   facet_wrap('par', scales='free') + geom_hline(yintercept=0,
   color='red') + labs(y='absolute error (MLE-truth)')
 ggsave('plots/spatial_mles.png', g, width=ggwidth, height=ggheight)
+}
 
-
-
+if(exists('randomwalk_pvals')){
 message("Randomwalk: making results plots...")
 g <- ggplot(filter(randomwalk_pvals, test=='outlier') , aes(pvalue, )) + geom_histogram() +
   facet_grid(method~test+version, scales='free')
@@ -63,3 +64,35 @@ g <- ggplot(randomwalk_mles, aes(x=version, abserror)) + geom_violin() +
   facet_wrap('par', scales='free') + geom_hline(yintercept=0,
   color='red') + labs(y='absolute error (MLE-truth)')
 ggsave('plots/randomwalk_mles.png', g, width=ggwidth, height=ggheight)
+}
+
+if(exists('simpleGLMM_pvals')){
+message("SimpleGLMM: making results plots...")
+g <- ggplot(filter(simpleGLMM_pvals, test=='outlier') , aes(pvalue, )) + geom_histogram() +
+  facet_grid(method~test+version, scales='free')
+ggsave('plots/simpleGLMM_pvalues_outlier.png', g, width=5, height=5)
+g <- ggplot(filter(simpleGLMM_pvals, test=='disp') , aes(pvalue, )) + geom_histogram() +
+  facet_grid(method~test+version, scales='free')
+ggsave('plots/simpleGLMM_pvalues_disp.png', g, width=5, height=5)
+g <- filter(simpleGLMM_pvals, test=='GOF' & grepl('osa', x=method)) %>%
+  ggplot(aes(pvalue)) + geom_histogram() +
+  facet_grid(method~test+version, scales='free')
+ggsave('plots/simpleGLMM_pvalues_GOF_osa.png', g, width=5, height=5)
+g <- filter(simpleGLMM_pvals, test=='GOF' & !grepl('osa', x=method)) %>%
+  ggplot(aes(pvalue)) + geom_histogram() +
+  facet_grid(method~test+version, scales='free')
+ggsave('plots/simpleGLMM_pvalues_GOF_DHARMa.png', g, width=5, height=5)
+## g <- pivot_longer(resids, c('osa.cdf', 'osa.gen', 'sim_cond', 'sim_uncond', 'sim_parcond'),
+##                   names_to='type', values_to='residual') %>%
+##   filter(replicate<=5) %>%
+##   ggplot(aes(ytrue, residual, color=version)) +
+##   geom_point(alpha=.5) +
+##   facet_grid(replicate~type) + scale_x_log10()
+## ggsave('plots/simpleGLMM_residuals_examples.png', g, width=8, height=6)
+simpleGLMM_mles <- simpleGLMM_mles %>% mutate(abserror=true-mle,
+                                        relerror=abserror/true)
+g <- ggplot(simpleGLMM_mles, aes(x=version, abserror)) + geom_violin() +
+  facet_wrap('par', scales='free') + geom_hline(yintercept=0,
+  color='red') + labs(y='absolute error (MLE-truth)')
+ggsave('plots/simpleGLMM_mles.png', g, width=ggwidth, height=ggheight)
+}

@@ -1,50 +1,45 @@
-library(TMB)
-library(magrittr)
-library(dplyr)
-library(DHARMa)
-TMB::compile('models/simpleGLMM.cpp')
-dyn.load(dynlib('models/simpleGLMM'))
 
-n.j <- 3 #number of subjects
-n.i <- 10 #number of observations
-b0 <- 4
-sig2.y <- .1 #obs variance
-sig2.u <- 3 # between group variance
-set.seed(123)
-u <- c(-2.75, -.3, 3.25)
-y <- matrix(0, n.i, n.j)
 
-for(j in 1:n.j){
-  y[,j] <- rnorm(n.i, b0 + u[j], sqrt(sig2.y))
-}
 
-Dat <- data.frame(y = as.vector(y), group = rep(1:3, each = n.i))
+## Clean up the old runs
+unlink('results/simpleGLMM_resids', TRUE)
+unlink('results/simpleGLMM_pvals', TRUE)
+unlink('results/simpleGLMM_mles', TRUE)
 
-Data <- list(y = Dat[,1], group = Dat[,2]-1, sim_re = 0)
-Par <- list(b0 = 0, ln_sig_u = 0,# ln_sig_v = c(0,0,0),
-            ln_sig_y = 0, u = rep(0, n.j))#, v = rep(0, nrow(Dat)))
-obj <- MakeADFun(Data, Par, random = 'u', DLL = 'simpleGLMM')
-opt <- nlminb(obj$par, obj$fn, obj$gr)
-b0; opt$par[1]
-c(sd(u), sqrt(sig2.y)); exp(opt$par[2:3])
+message("Preparing workspace to run ", Nreps, " iterations in parallel...")
+TMB::compile("models/simpleGLMM.cpp") # modified for simulation
+sfInit( parallel=TRUE, cpus=cpus )
+## sfExport('run.simpleGLMM.iter', 'sim.omega', 'cMatern', 'sim.data',
+##          'rmvnorm_prec', 'add_aic')
+sfExportAll()
 
-osa.fg <- oneStepPredict(obj, observation.name = 'y', data.term.indicator = 'keep',
-                          method = 'fullGaussian')
-osa.osg <- oneStepPredict(obj, observation.name = 'y', data.term.indicator = 'keep',
-                           method = "oneStepGaussian")
-osa.cdf <- oneStepPredict(obj, observation.name = 'y', data.term.indicator = 'keep',
-                           method = 'cdf')
-osa.gen <- oneStepPredict(obj, observation.name = 'y', data.term.indicator = 'keep',
-                           method = 'oneStepGeneric')
-sim.c <- replicate(1000, {obj$simulate()$y})
-obj$env$data$sim_re <- 1
-sim.u <- replicate(1000, {obj$simulate()$y})
-res.c <- createDHARMa(sim.c, y)
-res.u <- createDHARMa(sim.u, y)
+message("Starting parallel runs...")
+results <- sfLapply(1:Nreps, function(ii) run.simpleGLMM.iter(ii))
 
-ks.test(osa.fg$residual, 'pnorm')$p.value
-ks.test(osa.osg$residual, 'pnorm')$p.value
-ks.test(osa.cdf$residual, 'pnorm')$p.value
-ks.test(osa.gen$residual, 'pnorm')$p.value
-ks.test(res.c$scaledResiduals, 'punif')$p.value
-ks.test(res.u$scaledResiduals, 'punif')$p.value
+## ## Read results back in from file
+## fs <- list.files('results/simpleGLMM_pvals/', full.names=TRUE)
+## ## Sometimes they fail to run for some unkonwn reason so try
+## ## rerunning those ones once
+## if(length(fs)<Nreps){
+##   message("Rerunning some failed runs...")
+##   bad <- which.failed(Nreps)
+##   results <- sfLapply(bad, function(ii) run.simpleGLMM.iter(ii))
+##   fs <- list.files('results/simpleGLMM_pvals/', full.names=TRUE)
+## }
+## bad <- which.failed(Nreps)
+## if(length(bad)>0) warning(length(bad), " runs failed")
+
+message("SimpleGLMM: processing and saving final results...")
+## Read results back in from file
+fs <- list.files('results/simpleGLMM_pvals/', full.names=TRUE)
+pvals <- lapply(fs, readRDS) %>% bind_rows %>% filter(!is.na(pvalue))
+saveRDS(pvals, file='results/simpleGLMM_pvals.RDS')
+## Read in residuals
+fs <- list.files('results/simpleGLMM_resids/', full.names=TRUE)
+resids <- lapply(fs, readRDS) %>% bind_rows
+saveRDS(resids, file='results/simpleGLMM_resids.RDS')
+fs <- list.files('results/simpleGLMM_mles/', full.names=TRUE)
+mles <- lapply(fs, readRDS) %>% bind_rows
+saveRDS(mles, file='results/simpleGLMM_mles.RDS')
+
+

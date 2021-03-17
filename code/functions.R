@@ -92,17 +92,20 @@ calculate.jp <- function(obj, sdr, opt, obs, data.name, fpr, N=1000){
                    error=function(e) 'error')
   if(is.character(test)){
     warning("Joint-Precision approach failed b/c Chol factor failed")
-    return(list(resids=NA, disp=NA, outlier=NA, pval=NA))
+    return(list(sims=NA, resids=NA, disp=NA, outlier=NA, pval=NA))
   }
   jp.sim <- function(){
     newpar <- rmvnorm_prec(mu=joint.mle, prec=sdr$jointPrecision)
     obj$env$data$simRE <- 0 # turn off RE simulation
     obj$simulate(par=newpar)[[data.name]]
   }
+  ## newpars <- replicate(1000, {rmvnorm_prec(mu=joint.mle, prec=sdr$jointPrecision)})
+  ## pairs(t(newpars))
+  newpar <- rmvnorm_prec(mu=joint.mle, prec=sdr$jointPrecision)
   tmp <- replicate(N, {jp.sim()})
   if(any(is.nan(tmp))){
     warning("NaN values in JP simulated data")
-    return(list(resids=NA, disp=NA, outlier=NA, pval=NA))
+    return(list(sims=NA, resids=NA, disp=NA, outlier=NA, pval=NA))
   }
   dharma <- createDHARMa(tmp, obs, fittedPredictedResponse=fpr)
   resids <- residuals(dharma, quantileFunction = qnorm, outlierValues = c(-7,7))
@@ -111,7 +114,7 @@ calculate.jp <- function(obj, sdr, opt, obs, data.name, fpr, N=1000){
                           margin = 'upper', type='binomial', plot=FALSE)
   pval <-
     suppressWarnings(ks.test(dharma$scaledResiduals,'punif')$p.value)
-  return(list(resids=resids, disp=disp$p.value, outlier=outlier$p.value, pval=pval))
+  return(list(sims=tmp, resids=resids, disp=disp$p.value, outlier=outlier$p.value, pval=pval))
 }
 
 calculate.dharma <- function(obj, expr, N=1000, obs, fpr){
@@ -132,7 +135,7 @@ calculate.dharma <- function(obj, expr, N=1000, obs, fpr){
                           margin = 'upper', type='binomial', plot=FALSE)
   pval <-
     suppressWarnings(ks.test(dharma$scaledResiduals,'punif')$p.value)
-  return(list(resids=resids, disp=disp$p.value, outlier=outlier$p.value, pval=pval))
+  return(list(sims=tmp, resids=resids, disp=disp$p.value, outlier=outlier$p.value, pval=pval))
 }
 
 calculate.osa <- function(obj, methods, observation.name,

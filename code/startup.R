@@ -18,3 +18,4 @@ ggheight <- 5
 theme_set(theme_bw())
 source("code/functions.R")
 source("code/functions_spatial.R")
+source("code/functions_simpleGLMM.R")
