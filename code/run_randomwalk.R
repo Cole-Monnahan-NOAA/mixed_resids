@@ -4,6 +4,13 @@
 ## randomwalkvalidation.r.
 
 ## modified starting 11/2020 by cole
+TMB::compile("models/randomwalk.cpp")
+
+## Clean up the old runs
+unlink('results/randomwalk_resids', TRUE)
+unlink('results/randomwalk_pvals', TRUE)
+unlink('results/randomwalk_mles', TRUE)
+
 
 ## randomwalk is conditional, randomwalk2 is unconditional
 run.randomwalk.iter <- function(ii){
@@ -18,23 +25,31 @@ run.randomwalk.iter <- function(ii){
   ## simulate data with these parameters
   message(ii, ": Simulating data...")
   set.seed(ii)
-  mu <- 0.75
+  mu <- .75
   sigma <- 1
-  s <- 1
+  tau <- 1
   huge <- 1e3
   ## simulate random track
   nt <- 50
-  X <- c(0,cumsum(rnorm(nt-1,mean=mu,sd=sigma)))
+  X <- rnorm(nt,mean=0,sd=tau)
+  Ypred <- rep(NA, nt)
+  Ypred[1] <- X[1]
+  for(t in 2:nt) Ypred[t] <- Ypred[t-1]+X[t]+mu
   ## simulate random measurements
-  Y <- X + rnorm(nt,sd=s)
-  data <- list(y=Y,huge=huge)
-  parameters <- list(x=X, mu=0, logsigma=log(sigma), logs=log(s))
+  Y <- rnorm(nt, Ypred, sd=sigma)
+  data <- list(y=Y, simRE=0, huge=huge)
+  parameters <- list(x=X, mu=0, logsigma=log(sigma), logtau=log(tau))
 
   ## H0: mu=0 so no drift, underspecified model
   message(ii, ": Optimizing two competing models...")
   obj0 <- MakeADFun(data, parameters, random=c("x"),
                     dll="randomwalk", map=list(mu=factor(NA)))
   trash <- obj0$env$beSilent()
+  ## obj0$fn()
+  ## plot(1:nt, Ypred, type='l')
+  ## points(1:nt, Y, col=2)
+  ## lines(1:nt, obj0$report()$ypred, col=3)
+  ## plot(1:nt, obj0$report()$x)
   opt0 <- nlminb(obj0$par, obj0$fn, obj0$gr)
   opt0 <- add_aic(opt0, n=length(Y))
   sdr0 <- sdreport(obj0, getJointPrecision=TRUE)
@@ -51,7 +66,7 @@ run.randomwalk.iter <- function(ii){
 
   ## Save MLEs to test for properties. These are the true pars as
   ## parameterized in the TMB model
-  truepars <- c(log(sigma), log(s))
+  truepars <- c(log(sigma), log(tau))
   mles <- rbind(
     data.frame(version='m0', rep=ii, mle=opt0$par,
                par=names(obj0$par), true=truepars),
@@ -67,25 +82,24 @@ run.randomwalk.iter <- function(ii){
 
   ## DHARMa resids, both conditional and unconditional
   ## hack to get this to evaluate in a function
-  expr <- expression(obj$simulate()$x2)
+  expr <- expression(obj$simulate()$y)
   sim0_cond <-
-    calculate.dharma(obj0, expr, obs=Y, fpr=rep0$xpred)
+    calculate.dharma(obj0, expr, obs=Y, fpr=rep0$ypred)
   obj0$env$data$simRE <- 1 #turn on RE simulation
   sim0_uncond <-
-    calculate.dharma(obj0, expr, obs=Y, fpr=rep0$xpred)
+    calculate.dharma(obj0, expr, obs=Y, fpr=rep0$ypred)
   sim1_cond <-
-    calculate.dharma(obj1, expr, obs=Y, fpr=rep1$xpred)
+    calculate.dharma(obj1, expr, obs=Y, fpr=rep1$ypred)
   obj1$env$data$simRE <- 1 #turn on RE simulation
   sim1_uncond <-
-    calculate.dharma(obj1, expr, obs=Y, fpr=rep1$xpred)
+    calculate.dharma(obj1, expr, obs=Y, fpr=rep1$ypred)
 
   ## Try adding residuals from the joint precisions matrix
-  sim0_parcond <- calculate.jp(obj0, sdr0, opt0, Y, 'y', fpr=rep0$xpred)
-  sim1_parcond <- calculate.jp(obj1, sdr1, opt1, Y, 'y', fpr=rep1$xpred)
-
+  sim0_parcond <- calculate.jp(obj0, sdr0, opt0, Y, 'y', fpr=rep0$ypred)
+  sim1_parcond <- calculate.jp(obj1, sdr1, opt1, Y, 'y', fpr=rep1$ypred)
   ## Combine together in tidy format for analysis and plotting later
   r0 <- data.frame(model='randomwalk', replicate=ii, y=Y,
-                   ypred=opt0$xpred, version='m0',
+                   ypred=rep0$ypred, version='m0',
                    osa.cdf = osa0$cdf, osa.gen = osa0$gen,
                    osa.fg=osa0$fg, osa.osg=osa0$osg,
                    sim_cond=sim0_cond$resids,
@@ -94,7 +108,7 @@ run.randomwalk.iter <- function(ii){
                    maxgrad=max(abs(obj0$gr(opt0$par))),
                    AIC=opt0$AIC, AICc=opt0$AICc)
   r1 <- data.frame(model='randomwalk', replicate=ii, y=Y,
-                   ypred=opt1$xpred, version='m1',
+                   ypred=rep1$ypred, version='m1',
                    osa.cdf = osa1$cdf, osa.gen = osa1$gen,
                    osa.fg=osa1$fg, osa.osg=osa1$osg,
                    sim_cond=sim1_cond$resids, sim_uncond=sim1_uncond$resids,
