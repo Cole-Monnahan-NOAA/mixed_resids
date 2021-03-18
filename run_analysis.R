@@ -35,7 +35,7 @@ source('code/run_spatial.R')
 
 ## Random walk from the paper
 cpus <- parallel::detectCores()-2
-Nreps <- cpus*20
+Nreps <- cpus*100
 source('code/run_randomwalk.R')
 
 ## Andrea's simple GLMM with 3 groups

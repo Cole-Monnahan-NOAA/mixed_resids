@@ -30,7 +30,7 @@ run.randomwalk.iter <- function(ii){
   tau <- 1
   huge <- 1e3
   ## simulate random track
-  nt <- 50
+  nt <- 100
   X <- rnorm(nt,mean=0,sd=tau)
   Ypred <- rep(NA, nt)
   Ypred[1] <- X[1]
@@ -77,8 +77,8 @@ run.randomwalk.iter <- function(ii){
 
 
   message(ii, ": Calculating residuals..")
-  osa0 <- calculate.osa(obj0, methods=c('fg', 'osg', 'cdf'), observation.name='y')
-  osa1 <- calculate.osa(obj1, methods=c('fg', 'osg', 'cdf'), observation.name='y')
+  osa0 <- calculate.osa(obj0, methods=c('gen','fg', 'osg', 'cdf'), observation.name='y')
+  osa1 <- calculate.osa(obj1, methods=c('gen','fg', 'osg', 'cdf'), observation.name='y')
 
   ## DHARMa resids, both conditional and unconditional
   ## hack to get this to evaluate in a function
