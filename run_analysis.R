@@ -40,7 +40,7 @@ source('code/run_randomwalk.R')
 
 ## Andrea's simple GLMM with 3 groups
 cpus <- parallel::detectCores()-2
-Nreps <- cpus*50
+Nreps <- cpus*20
 source('code/run_simpleGLMM.R')
 
 

@@ -29,7 +29,7 @@ run.simpleGLMM.iter <- function(ii){
 
   ## simulate data with these parameters
   message(ii, ": Simulating data...")
-  out <- simulate.simpleGLMM(ii, 5, 8)
+  out <- simulate.simpleGLMM(ii, 10, 50)
   dat0 <- out$Data
   ## Add an outlier to each group
   dat1 <- dat0
