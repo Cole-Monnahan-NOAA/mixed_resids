@@ -43,6 +43,12 @@ cpus <- parallel::detectCores()-2
 Nreps <- cpus*20
 source('code/run_simpleGLMM.R')
 
+## Simple linear model as sanity check. Some resid methods not
+## applicable b/c no random effects
+cpus <- parallel::detectCores()-2
+Nreps <- cpus*200
+source('code/run_linmod.R')
+
 
 ### Load results into workspace
 source('code/load_results.R')

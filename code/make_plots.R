@@ -96,3 +96,30 @@ g <- ggplot(simpleGLMM_mles, aes(x=version, abserror)) + geom_violin() +
   color='red') + labs(y='absolute error (MLE-truth)')
 ggsave('plots/simpleGLMM_mles.png', g, width=ggwidth, height=ggheight)
 }
+
+if(exists('linmod_pvals')){
+message("SimpleGLMM: making results plots...")
+g <- ggplot(filter(linmod_pvals, test=='outlier') , aes(pvalue, )) + geom_histogram() +
+  facet_grid(method~test+version, scales='free')
+ggsave('plots/linmod_pvalues_outlier.png', g, width=5, height=5)
+g <- ggplot(filter(linmod_pvals, test=='disp') , aes(pvalue, )) + geom_histogram() +
+  facet_grid(method~test+version, scales='free')
+ggsave('plots/linmod_pvalues_disp.png', g, width=5, height=5)
+g <- filter(linmod_pvals, test=='GOF') %>%
+  ggplot(aes(pvalue)) + geom_histogram() +
+  facet_grid(method~test+version, scales='free')
+ggsave('plots/linmod_pvalues_GOF.png', g, width=5, height=7)
+g <- pivot_longer(resids, c('osa.cdf', 'sim_cond'),
+                  names_to='type', values_to='residual') %>%
+  filter(replicate<=5) %>%
+  ggplot(aes(x, residual, color=version)) +
+  geom_point(alpha=.5) +
+  facet_grid(replicate~type)
+ggsave('plots/linmod_residuals_examples.png', g, width=8, height=6)
+linmod_mles <- linmod_mles %>% mutate(abserror=true-mle,
+                                        relerror=abserror/true)
+g <- filter(linmod_mles, !is.na(mle)) %>% ggplot(aes(x=version, abserror)) + geom_violin() +
+  facet_wrap('par', scales='free') + geom_hline(yintercept=0,
+  color='red') + labs(y='absolute error (MLE-truth)')
+ggsave('plots/linmod_mles.png', g, width=ggwidth, height=ggheight)
+}

@@ -10,3 +10,6 @@ results/randomwalk_mles
 results/simpleGLMM_pvals
 results/simpleGLMM_resids
 results/simpleGLMM_mles
+results/linmod_pvals
+results/linmod_resids
+results/linmod_mles

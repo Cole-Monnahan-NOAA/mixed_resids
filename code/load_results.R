@@ -20,3 +20,10 @@ if(file.exists('results/simpleGLMM_resids.RDS')){
   simpleGLMM_pvals <- readRDS('results/simpleGLMM_pvals.RDS')
 }
 
+if(file.exists('results/linmod_resids.RDS')){
+  message("Loading linmod results")
+  linmod_mles <- readRDS('results/linmod_mles.RDS')
+  linmod_resids <- readRDS('results/linmod_resids.RDS')
+  linmod_pvals <- readRDS('results/linmod_pvals.RDS')
+}
+
