@@ -2,19 +2,25 @@ simulate.simpleGLMM <- function(seed, n.j=3, n.i=10){
   ## n.j <- 3 #number of subjects
   ## n.i <- 10 #number of observations
   b0 <- 4
-  sig2.y <- .1 #obs variance
-
+  sig2.y <- .5 #obs variance
   #groups are being simulated with high overlap - hard for model to differentiate
   #need to implement sum-to-zero constraint in u
   sig2.u <- 10 # between group variance
   set.seed(seed)
-  U <- rnorm(1000, mean=0, sd=sqrt(sig2.u))
-  quant.u <- quantile(U, probs = seq(0,1,length=n.j))
-  u <- as.vector(c(quant.u[1:(n.j-1)], 0-sum(quant.u[1:(n.j-1)])))
+
+  ## ## This is Andrea's way of forcing some separation in the group
+  ## ## means
+  ## U <- rnorm(1000, mean=0, sd=sqrt(sig2.u))
+  ## quant.u <- quantile(U, probs = seq(0,1,length=n.j))
+  ## u <- as.vector(c(quant.u[1:(n.j-1)], 0-sum(quant.u[1:(n.j-1)])))
+
+  ## This way just randomly generates them from rnorm.
+  u <- rnorm(n.j, 0, sqrt(sig2.u))
   y <- matrix(0, n.i, n.j)
   for(j in 1:n.j){
     y[,j] <- rnorm(n.i, b0 + u[j], sqrt(sig2.y))
   }
+  ## boxplot(y)
   Dat <- data.frame(y = as.vector(y), group = rep(1:n.j, each = n.i))
   Data <- list(y = Dat[,1], group = Dat[,2]-1, sim_re = 0)
   Par <- list(b0=0, ln_sig_u=0, ln_sig_y=0, u=rep(0, n.j))
