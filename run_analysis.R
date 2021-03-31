@@ -55,3 +55,36 @@ source('code/load_results.R')
 ### Make quick plots of results
 source("code/make_plots.R")
 
+
+
+## Compare GOF across models
+pvals <- bind_rows(randomwalk_pvals,
+          linmod_pvals,
+          spatial_pvals)
+pvals <- pvals %>% filter(test=='GOF' )
+pvals <- filter(pvals, (version=='m1' & model=='randomwalk') | version=='m0')
+g <- ggplot(pvals, aes(pvalue)) + geom_histogram() +
+  facet_grid(method~model, scales='free_y')
+ggsave("plots/GOF_by_model.png", g, width=7, height=5)
+
+## Quick test of nonparameteric tests on real normal samples
+library(goftest)
+Nsim <- 15000
+Nreps <- c(10,100,1000)
+mu <- 0; sigma <- 1
+results <- list(); k <- 1
+for(j in Nreps){
+  for(i in 1:Nsim){
+    x <- rnorm(j, mu, sigma)
+    p.ks <- ks.test(x,'pnorm')$p.value
+    p.ad <- ad.test(x, 'pnorm', estimated = TRUE)$p.value
+    results[[k]] <- data.frame(Nreps=j, ks=p.ks, ad=p.ad)
+    k <- k+1
+  }
+}
+results.long <- bind_rows(results) %>%
+  pivot_longer(-c(Nreps), names_to='test', values_to='pvalue')
+
+g <- ggplot(results.long, aes(pvalue)) + geom_histogram() +
+  facet_grid(Nreps~test, scales='free_y')
+ggsave('plots/ks_vs_ad.png', g, width=7, height=5)
