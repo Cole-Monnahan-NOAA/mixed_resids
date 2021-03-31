@@ -40,10 +40,10 @@ calc.osa.pvals.ks <- function(osa){
 
 calc.osa.pvals <- function(osa){
   fg <- osg <- cdf <- gen <- NA
-  if(is.numeric(osa$fg)) fg <- ad.test(osa$fg,'pnorm', estimated = TRUE)$p.value
-  if(is.numeric(osa$osg)) osg <- ad.test(osa$osg,'pnorm', estimated = TRUE)$p.value
-  if(is.numeric(osa$cdf)) cdf <- ad.test(osa$cdf,'pnorm', estimated = TRUE)$p.value
-  if(is.numeric(osa$gen)) gen <- ad.test(osa$gen,'pnorm', estimated = TRUE)$p.value
+  if(is.numeric(osa$fg)) fg <- goftest::ad.test(osa$fg,'pnorm', estimated = TRUE)$p.value
+  if(is.numeric(osa$osg)) osg <- goftest::ad.test(osa$osg,'pnorm', estimated = TRUE)$p.value
+  if(is.numeric(osa$cdf)) cdf <- goftest::ad.test(osa$cdf,'pnorm', estimated = TRUE)$p.value
+  if(is.numeric(osa$gen)) gen <- goftest::ad.test(osa$gen,'pnorm', estimated = TRUE)$p.value
   return(list(fg=fg, osg=osg, cdf=cdf, gen=gen))
 }
 
@@ -79,7 +79,7 @@ calc.dharma.pvals <- function(dharma, alternative = c("two.sided", "greater",
   outlier <- testOutliers(dharma, alternative,
                           margin = 'upper', type='binomial', plot=FALSE)
   resids <- residuals(dharma, quantileFunction = qnorm, outlierValues = c(-7,7))
-  pval <- ad.test(resids,'pnorm', estimated = TRUE)$p.value
+  pval <- goftest::ad.test(resids,'pnorm', estimated = TRUE)$p.value
   return(list(disp=disp, outlier=outlier, pval=pval))
 }
 
@@ -151,7 +151,7 @@ calculate.jp <- function(obj, sdr, opt, obs, data.name, fpr, N=1000, random = TR
   disp <- testDispersion(dharma, alternative = alternative, plot=FALSE)
   outlier <- testOutliers(dharma, alternative = alternative,
                           margin = 'upper', type='binomial', plot=FALSE)
-  pval <- ad.test(resids,'pnorm', estimated = TRUE)$p.value
+  pval <- goftest::ad.test(resids,'pnorm', estimated = TRUE)$p.value
   return(list(sims=tmp, resids=resids, disp=disp$p.value, outlier=outlier$p.value, pval=pval))
 }
 
@@ -176,7 +176,7 @@ calculate.dharma <- function(obj, expr, N=1000, obs, fpr,
   disp <- testDispersion(dharma, alternative = alternative, plot=FALSE)
   outlier <- testOutliers(dharma, alternative = alternative,
                           margin = 'upper', type='binomial', plot=FALSE)
-  pval <- ad.test(resids,'pnorm', estimated = TRUE)$p.value
+  pval <- goftest::ad.test(resids,'pnorm', estimated = TRUE)$p.value
   return(list(sims=tmp, resids=resids, disp=disp$p.value, outlier=outlier$p.value, pval=pval))
 }
 
@@ -215,7 +215,7 @@ calculate.osa <- function(obj, methods, observation.name,
                      data.term.indicator='keep' ,
                      method="cdf", trace=FALSE)$residual,
       error=function(e) 'error')
-    if(is.character(cdf) | any(is.infinite(cdf))){
+    if(is.character(cdf) | any(!is.finite(cdf))){
       warning("OSA cdf failed")
       cdf <- NA
     }

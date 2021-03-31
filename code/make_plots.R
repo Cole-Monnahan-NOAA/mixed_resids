@@ -1,6 +1,7 @@
 
 
 
+
 if(exists("spatial_pvals")){
 message("Spatial: making results plots...")
 g <- ggplot(filter(spatial_pvals, test=='outlier') , aes(pvalue, )) + geom_histogram() +
@@ -98,7 +99,7 @@ ggsave('plots/simpleGLMM_mles.png', g, width=ggwidth, height=ggheight)
 }
 
 if(exists('linmod_pvals')){
-message("SimpleGLMM: making results plots...")
+message("linmod: making results plots...")
 g <- ggplot(filter(linmod_pvals, test=='outlier') , aes(pvalue, )) + geom_histogram() +
   facet_grid(method~test+version, scales='free')
 ggsave('plots/linmod_pvalues_outlier.png', g, width=5, height=5)

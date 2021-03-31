@@ -25,10 +25,8 @@ packageVersion('DHARMa')                # 0.3.3.0
 ##   random draws from the joint precision matrix (fixed + RE,
 ##   conditioned on data)
 
-
-cpus <- parallel::detectCores()-2
+(cpus <- parallel::detectCores()-2)
 Nreps <- 1000
-
 
 ## Simple linear model as sanity check. Some resid methods not
 ## applicable b/c no random effects

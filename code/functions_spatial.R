@@ -1,3 +1,4 @@
+
 ## functions for simulating data
 cMatern <- function(H, Nu, Kap) {
   ifelse(H > 0, besselK(H*Kap, Nu) * (H*Kap)^Nu, 1) / gamma(Nu) * 2^(1-Nu)

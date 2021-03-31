@@ -74,7 +74,7 @@ run.simpleGLMM.iter <- function(ii){
 
   ## Save MLEs to test for properties. These are the true pars as
   ## parameterized in the TMB model
-  truepars <- c(4, log(sqrt(10)), log(sqrt(.1)))
+  truepars <- c(4, log(sqrt(10)), log(sqrt(.5)))
   mles <- rbind(
     data.frame(version='m1', rep=ii, mle=c(opt1$par,NA),
                par=c(names(obj1$par),'ln_sig_u'), true=truepars),
