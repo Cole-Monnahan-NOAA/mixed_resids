@@ -129,7 +129,7 @@ run.spatial.iter <- function(ii){
 
   message(ii, ": Optimizing two competing models...")
   ## H0: Space w/ normal; properly specified
-  obj0 <- TMB::MakeADFun(dat, par, random=c('omega'), dll="spatial")
+  obj0 <- TMB::MakeADFun(dat, par, random=c('omega'), DLL="spatial")
   trash <- obj0$env$beSilent()
   opt0 <- nlminb(obj0$par, obj0$fn, obj0$gr)
   opt0 <- add_aic(opt0, n=length(dat$y))
@@ -137,7 +137,7 @@ run.spatial.iter <- function(ii){
   rep0 <- obj0$report(obj0$env$last.par.best)
   ## H1: Space w/ normal and unmodeled outliers (underspecified)
   dat$y <- y1
-  obj1 <- TMB::MakeADFun(dat, par, random=c("omega"), dll="spatial")
+  obj1 <- TMB::MakeADFun(dat, par, random=c("omega"), DLL="spatial")
   trash <- obj1$env$beSilent()
   opt1 <- nlminb(obj1$par, obj1$fn, obj1$gr)
   opt1 <- add_aic(opt1, n=length(dat$y))

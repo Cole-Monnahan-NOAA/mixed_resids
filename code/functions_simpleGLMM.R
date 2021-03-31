@@ -3,10 +3,10 @@ simulate.simpleGLMM <- function(seed, n.j=3, n.i=10){
   ## n.i <- 10 #number of observations
   b0 <- 4
   sig2.y <- .1 #obs variance
-  
+
   #groups are being simulated with high overlap - hard for model to differentiate
   #need to implement sum-to-zero constraint in u
-  sig2.u <- 5 # between group variance
+  sig2.u <- 10 # between group variance
   set.seed(seed)
   U <- rnorm(1000, mean=0, sd=sqrt(sig2.u))
   quant.u <- quantile(U, probs = seq(0,1,length=n.j))
@@ -34,8 +34,8 @@ run.simpleGLMM.iter <- function(ii){
   dyn.load(dynlib("models/simpleGLMM"))
 
   ## simulate data with these parameters
-  nobs <- 50
-  nj <- 3
+  nobs <- 20
+  nj <- 5
   message(ii, ": Simulating data...")
   out <- simulate.simpleGLMM(ii, nj, nobs)
   dat0 <- out$Data
@@ -46,19 +46,20 @@ run.simpleGLMM.iter <- function(ii){
   # dat1$y[ind] <- dat1$y[ind]+sample(c(-2,2), size=length(ind), replace=TRUE)
 
   message(ii, ": Optimizing two competing models...")
-  ## H0: b0 fixed at zero, underspecified model - change to u=0 (no random effect)
-  par0 <- out$Par
-  par0$ln_sig_u <- log(1/sqrt(2*pi)) #need to fix so log(dnorm(0,0,sig_u)) = 0
-  obj0 <- MakeADFun(dat0, par0, 
-                    map = list(ln_sig_u = factor(NA), u = rep(factor(NA),nj) ), 
-                    DLL = 'simpleGLMM')
+  ## H0: correctly specified model
+  obj0 <- MakeADFun(dat0, out$Par, random = 'u', DLL = 'simpleGLMM')
   trash <- obj0$env$beSilent()
   opt0 <- nlminb(obj0$par, obj0$fn, obj0$gr)
   opt0 <- add_aic(opt0, n=length(dat0$y))
   sdr0 <- sdreport(obj0, getJointPrecision=TRUE)
   rep0 <- obj0$report(obj0$env$last.par.best)
-  ## H1: mu estimated, correctly specified model
-  obj1 <- MakeADFun(dat1, out$Par, random = 'u', DLL = 'simpleGLMM')
+
+  ## H1: no random effects, underspecified model
+  par1 <- out$Par
+  par1$ln_sig_u <- log(1/sqrt(2*pi)) #need to fix so log(dnorm(0,0,sig_u)) = 0
+  obj1 <- MakeADFun(dat1, par1,
+                    map = list(ln_sig_u = factor(NA), u = rep(factor(NA),nj) ),
+                    DLL = 'simpleGLMM')
   trash <- obj1$env$beSilent()
   opt1 <- nlminb(obj1$par, obj1$fn, obj1$gr)
   opt1 <- add_aic(opt1, n=length(dat1$y))
@@ -67,12 +68,12 @@ run.simpleGLMM.iter <- function(ii){
 
   ## Save MLEs to test for properties. These are the true pars as
   ## parameterized in the TMB model
-  truepars <- c(4, log(sqrt(5)), log(sqrt(.1)))
+  truepars <- c(4, log(sqrt(10)), log(sqrt(.1)))
   mles <- rbind(
-    data.frame(version='m0', rep=ii, mle=c(opt0$par,NA),
-               par=c(names(obj0$par),'ln_sig_u'), true=truepars),
-    data.frame(version='m1', rep=ii, mle=opt1$par,
-               par=names(obj1$par), true=truepars))
+    data.frame(version='m1', rep=ii, mle=c(opt1$par,NA),
+               par=c(names(obj1$par),'ln_sig_u'), true=truepars),
+    data.frame(version='m0', rep=ii, mle=opt0$par,
+               par=names(obj0$par), true=truepars))
   dir.create('results/simpleGLMM_mles', showWarnings=FALSE)
   saveRDS(mles, file=paste0('results/simpleGLMM_mles/mles_', ii, '.RDS'))
 
@@ -96,8 +97,8 @@ run.simpleGLMM.iter <- function(ii){
     calculate.dharma(obj1, expr, obs=dat1$y, fpr=rep1$mu)
 
   ## Try adding residuals from the joint precisions matrix
-  sim0_parcond <- calculate.jp(obj0, sdr0, opt0, dat0$y, 'y', fpr=rep0$mu, random = FALSE)
-  sim1_parcond <- calculate.jp(obj1, sdr1, opt1, dat1$y, 'y', fpr=rep1$mu)
+  sim1_parcond <- calculate.jp(obj1, sdr1, opt1, dat1$y, 'y', fpr=rep1$mu, random = FALSE)
+  sim0_parcond <- calculate.jp(obj0, sdr0, opt0, dat0$y, 'y', fpr=rep0$mu)
 
   ## Combine together in tidy format for analysis and plotting later
   r0 <- data.frame(model='simpleGLMM', replicate=ii, y=dat0$y,

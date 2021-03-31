@@ -158,7 +158,7 @@ calculate.jp <- function(obj, sdr, opt, obs, data.name, fpr, N=1000, random = TR
 
 
 #AMH: repetitive with calc.dharma.pvals...can we condense?
-calculate.dharma <- function(obj, expr, N=1000, obs, fpr, 
+calculate.dharma <- function(obj, expr, N=1000, obs, fpr,
                              alternative = c("two.sided", "greater","less")){
   alternative = match.arg(alternative)
   tmp <- replicate(N, eval(expr))
@@ -181,7 +181,8 @@ calculate.dharma <- function(obj, expr, N=1000, obs, fpr,
 }
 
 calculate.osa <- function(obj, methods, observation.name,
-                          data.term.indicator='keep', Range = c(-Inf,Inf)){
+                          data.term.indicator='keep',
+                          Range = c(-Inf,Inf)){
   ## OSA residuals
   fg <- osg <- cdf <- gen <- NA
 
@@ -223,10 +224,12 @@ calculate.osa <- function(obj, methods, observation.name,
   if('gen' %in% methods){
     gen <- tryCatch(
       oneStepPredict(obj, observation.name=observation.name,
-                     data.term.indicator='keep' , range = Range, ##! range = c(0,Inf) only when obs>0 ,
+                     data.term.indicator='keep' ,
+                     range = Range,
+                     ##! range = c(0,Inf) only when obs>0 ,
                      method="oneStepGeneric", trace=FALSE)$residual,
       error=function(e) 'error')
-    if(is.character(gen)){
+    if(is.character(gen) | (!is.character(gen) & any(!is.finite(gen)))){
       warning("OSA Generic failed")
       gen <- NA
     }

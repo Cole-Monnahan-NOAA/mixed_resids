@@ -28,24 +28,25 @@ run.linmod.iter <- function(ii){
   message(ii, ": Simulating data...")
   out <- simulate.linmod(ii, nobs)
   dat0 <- out$Data
-  ## Add an outlier to each group 
+  ## Add an outlier to each group
   dat1 <- dat0
   #ind <- which(!duplicated(dat0$group))
   set.seed(ii)
   #dat1$y[ind] <- dat1$y[ind]+sample(c(-2,2), size=length(ind), replace=TRUE)
   #add lognormal error
-  dat0$y <- dat0$y * exp(rnorm(nobs,0,1))
+  dat1$y <- dat1$y * exp(rnorm(nobs,0,1))
 
   message(ii, ": Optimizing two competing models...")
-  ## H0: b1 fixed at zero, underspecified model
-  obj0 <- MakeADFun(dat0, out$Par, DLL = 'linmod')#, map=list(b1=factor(NA)))
+  ## H0: correctly specified
+  obj0 <- MakeADFun(dat0, out$Par, DLL = 'linmod')
   trash <- obj0$env$beSilent()
   opt0 <- nlminb(obj0$par, obj0$fn, obj0$gr)
   opt0 <- add_aic(opt0, n=length(dat0$y))
   sdr0 <- sdreport(obj0, getJointPrecision=TRUE)
   rep0 <- obj0$report(obj0$env$last.par.best)
-  ## H1: b1 estimated, correctly specified model
-  obj1 <- MakeADFun(dat1, out$Par, DLL = 'linmod')
+
+  ## H1: lognormal error added
+  obj1 <- MakeADFun(dat1, out$Par, DLL = 'linmod')#, map=list(b1=factor(NA)))
   trash <- obj1$env$beSilent()
   opt1 <- nlminb(obj1$par, obj1$fn, obj1$gr)
   opt1 <- add_aic(opt1, n=length(dat1$y))
@@ -56,8 +57,8 @@ run.linmod.iter <- function(ii){
   ## parameterized in the TMB model
   truepars <- c(4,-5, log(1))
   mles <- rbind(
-    data.frame(version='m0', rep=ii, mle=c(opt0$par[1],NA, opt0$par[2]),
-               par=names(obj1$par), true=truepars),
+    data.frame(version='m0', rep=ii, mle=opt0$par,
+               par=names(obj0$par), true=truepars),
     data.frame(version='m1', rep=ii, mle=opt1$par,
                par=names(obj1$par), true=truepars))
   dir.create('results/linmod_mles', showWarnings=FALSE)
