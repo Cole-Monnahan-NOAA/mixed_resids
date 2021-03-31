@@ -29,7 +29,7 @@ calc.sac <- function(x, w){
 }
 
 
-calc.osa.pvals <- function(osa){
+calc.osa.pvals.ks <- function(osa){
   fg <- osg <- cdf <- gen <- NA
   if(is.numeric(osa$fg)) fg <- suppressWarnings(ks.test(osa$fg,'pnorm')$p.value)
   if(is.numeric(osa$osg)) osg <- suppressWarnings(ks.test(osa$osg,'pnorm')$p.value)
@@ -38,7 +38,17 @@ calc.osa.pvals <- function(osa){
   return(list(fg=fg, osg=osg, cdf=cdf, gen=gen))
 }
 
-calc.dharma.pvals <- function(dharma){
+calc.osa.pvals <- function(osa){
+  fg <- osg <- cdf <- gen <- NA
+  if(is.numeric(osa$fg)) fg <- ad.test(osa$fg,'pnorm', estimated = TRUE)$p.value
+  if(is.numeric(osa$osg)) osg <- ad.test(osa$osg,'pnorm', estimated = TRUE)$p.value
+  if(is.numeric(osa$cdf)) cdf <- ad.test(osa$cdf,'pnorm', estimated = TRUE)$p.value
+  if(is.numeric(osa$gen)) gen <- ad.test(osa$gen,'pnorm', estimated = TRUE)$p.value
+  return(list(fg=fg, osg=osg, cdf=cdf, gen=gen))
+}
+
+calc.dharma.pvals.ks <- function(dharma, alternative = c("two.sided", "greater",
+                                                      "less")){
   ## Extract p-values calculated by DHARMa
   ##
   ## Note: Type binomial for continuous, if integer be careful. Not
@@ -46,11 +56,30 @@ calc.dharma.pvals <- function(dharma){
   ## now.
   ## AMH: change to alternative = 'greater' when testing for overdispersion in positive only distributions
   ## AMH: Add significance tests
-  disp <- testDispersion(dharma, alternative = 'greater', plot=FALSE)
-  outlier <- testOutliers(dharma, alternative = 'greater',
+  alternative <- match.arg(alternative)
+  disp <- testDispersion(dharma, alternative, plot=FALSE)
+  outlier <- testOutliers(dharma, alternative,
                           margin = 'upper', type='binomial', plot=FALSE)
   pval <-
     suppressWarnings(ks.test(dharma$scaledResiduals,'punif')$p.value)
+  return(list(disp=disp, outlier=outlier, pval=pval))
+}
+
+calc.dharma.pvals <- function(dharma, alternative = c("two.sided", "greater",
+                                                      "less")){
+  ## Extract p-values calculated by DHARMa
+  ##
+  ## Note: Type binomial for continuous, if integer be careful. Not
+  ## sure if we want two-sided for dispersion? Using defaults for
+  ## now.
+  ## AMH: change to alternative = 'greater' when testing for overdispersion in positive only distributions
+  ## AMH: Add significance tests
+  alternative <- match.arg(alternative)
+  disp <- testDispersion(dharma, alternative, plot=FALSE)
+  outlier <- testOutliers(dharma, alternative,
+                          margin = 'upper', type='binomial', plot=FALSE)
+  resids <- residuals(dharma, quantileFunction = qnorm, outlierValues = c(-7,7))
+  pval <- ad.test(resids,'pnorm', estimated = TRUE)$p.value
   return(list(disp=disp, outlier=outlier, pval=pval))
 }
 
@@ -86,8 +115,11 @@ add_aic <- function(opt,n){
   opt
 }
 
-calculate.jp <- function(obj, sdr, opt, obs, data.name, fpr, N=1000){
+calculate.jp <- function(obj, sdr, opt, obs, data.name, fpr, N=1000, random = TRUE,
+                         alternative = c("two.sided", "greater","less")){
+  alternative = match.arg(alternative)
   joint.mle <- obj$env$last.par.best
+  if(random){
   test <- tryCatch(Matrix::Cholesky(sdr$jointPrecision, super=TRUE),
                    error=function(e) 'error')
   if(is.character(test)){
@@ -102,6 +134,13 @@ calculate.jp <- function(obj, sdr, opt, obs, data.name, fpr, N=1000){
   ## newpars <- replicate(1000, {rmvnorm_prec(mu=joint.mle, prec=sdr$jointPrecision)})
   ## pairs(t(newpars))
   newpar <- rmvnorm_prec(mu=joint.mle, prec=sdr$jointPrecision)
+  } else {
+    jp.sim <- function(){
+      newpar <- mvtnorm::rmvnorm(1, sdr$par.fixed, sdr$cov.fixed)
+      obj$env$data$simRE <- 0 # turn off RE simulation
+      obj$simulate(par=newpar)[[data.name]]
+    }
+  }
   tmp <- replicate(N, {jp.sim()})
   if(any(is.nan(tmp))){
     warning("NaN values in JP simulated data")
@@ -109,15 +148,19 @@ calculate.jp <- function(obj, sdr, opt, obs, data.name, fpr, N=1000){
   }
   dharma <- createDHARMa(tmp, obs, fittedPredictedResponse=fpr)
   resids <- residuals(dharma, quantileFunction = qnorm, outlierValues = c(-7,7))
-  disp <- testDispersion(dharma, alternative = 'greater', plot=FALSE)
-  outlier <- testOutliers(dharma, alternative = 'greater',
+  disp <- testDispersion(dharma, alternative = alternative, plot=FALSE)
+  outlier <- testOutliers(dharma, alternative = alternative,
                           margin = 'upper', type='binomial', plot=FALSE)
-  pval <-
-    suppressWarnings(ks.test(dharma$scaledResiduals,'punif')$p.value)
+  pval <- ad.test(resids,'pnorm', estimated = TRUE)$p.value
   return(list(sims=tmp, resids=resids, disp=disp$p.value, outlier=outlier$p.value, pval=pval))
 }
 
-calculate.dharma <- function(obj, expr, N=1000, obs, fpr){
+
+
+#AMH: repetitive with calc.dharma.pvals...can we condense?
+calculate.dharma <- function(obj, expr, N=1000, obs, fpr, 
+                             alternative = c("two.sided", "greater","less")){
+  alternative = match.arg(alternative)
   tmp <- replicate(N, eval(expr))
   dharma <- createDHARMa(tmp, obs, fittedPredictedResponse = fpr)
   resids <- residuals(dharma, quantileFunction = qnorm,
@@ -130,16 +173,15 @@ calculate.dharma <- function(obj, expr, N=1000, obs, fpr){
   ## now.
   ## AMH: change to alternative = 'greater' when testing for overdispersion in positive only distributions
   ## AMH: Add significance tests
-  disp <- testDispersion(dharma, alternative = 'greater', plot=FALSE)
-  outlier <- testOutliers(dharma, alternative = 'greater',
+  disp <- testDispersion(dharma, alternative = alternative, plot=FALSE)
+  outlier <- testOutliers(dharma, alternative = alternative,
                           margin = 'upper', type='binomial', plot=FALSE)
-  pval <-
-    suppressWarnings(ks.test(dharma$scaledResiduals,'punif')$p.value)
+  pval <- ad.test(resids,'pnorm', estimated = TRUE)$p.value
   return(list(sims=tmp, resids=resids, disp=disp$p.value, outlier=outlier$p.value, pval=pval))
 }
 
 calculate.osa <- function(obj, methods, observation.name,
-                          data.term.indicator='keep'){
+                          data.term.indicator='keep', Range = c(-Inf,Inf)){
   ## OSA residuals
   fg <- osg <- cdf <- gen <- NA
 
@@ -181,7 +223,7 @@ calculate.osa <- function(obj, methods, observation.name,
   if('gen' %in% methods){
     gen <- tryCatch(
       oneStepPredict(obj, observation.name=observation.name,
-                     data.term.indicator='keep' , range = c(0,Inf),
+                     data.term.indicator='keep' , range = Range, ##! range = c(0,Inf) only when obs>0 ,
                      method="oneStepGeneric", trace=FALSE)$residual,
       error=function(e) 'error')
     if(is.character(gen)){
