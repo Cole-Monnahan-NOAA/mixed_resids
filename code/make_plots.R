@@ -109,7 +109,8 @@ g <- filter(linmod_pvals, test=='GOF') %>%
   ggplot(aes(pvalue)) + geom_histogram() +
   facet_grid(method~test+version, scales='free')
 ggsave('plots/linmod_pvalues_GOF.png', g, width=5, height=7)
-g <- pivot_longer(resids, c('osa.cdf', 'sim_cond'),
+g <- #pivot_longer(resids, c('osa.cdf', 'sim_cond'),
+      pivot_longer(resids, c('pearsons', 'sim_cond', 'sim_parcond'),
                   names_to='type', values_to='residual') %>%
   filter(replicate<=5) %>%
   ggplot(aes(x, residual, color=version)) +

@@ -20,21 +20,25 @@ run.linmod.iter <- function(ii){
   library(dplyr)
   library(tidyr)
   library(R.utils)
+  library(goftest)
   dyn.load(dynlib("models/linmod"))
+  nobs <- 100
 
   ## simulate data with these parameters
   message(ii, ": Simulating data...")
-  out <- simulate.linmod(ii, 50)
+  out <- simulate.linmod(ii, nobs)
   dat0 <- out$Data
-  ## Add an outlier to each group
+  ## Add an outlier to each group 
   dat1 <- dat0
-  ind <- which(!duplicated(dat0$group))
+  #ind <- which(!duplicated(dat0$group))
   set.seed(ii)
-  dat1$y[ind] <- dat1$y[ind]+sample(c(-2,2), size=length(ind), replace=TRUE)
+  #dat1$y[ind] <- dat1$y[ind]+sample(c(-2,2), size=length(ind), replace=TRUE)
+  #add lognormal error
+  dat0$y <- dat0$y * exp(rnorm(nobs,0,1))
 
   message(ii, ": Optimizing two competing models...")
   ## H0: b1 fixed at zero, underspecified model
-  obj0 <- MakeADFun(dat0, out$Par, DLL = 'linmod', map=list(b1=factor(NA)))
+  obj0 <- MakeADFun(dat0, out$Par, DLL = 'linmod')#, map=list(b1=factor(NA)))
   trash <- obj0$env$beSilent()
   opt0 <- nlminb(obj0$par, obj0$fn, obj0$gr)
   opt0 <- add_aic(opt0, n=length(dat0$y))
@@ -61,8 +65,9 @@ run.linmod.iter <- function(ii){
 
 
   message(ii, ": Calculating residuals..")
-  osa0 <- calculate.osa(obj0, methods=c('gen','fg', 'osg', 'cdf'), observation.name='y')
-  osa1 <- calculate.osa(obj1, methods=c('gen','fg', 'osg', 'cdf'), observation.name='y')
+  #all but generic defaults to pearson's residuals
+  osa0 <- (dat0$y-rep0$mu)/exp(opt0$par['logsigma'])#calculate.osa(obj0, methods=c('gen','fg', 'osg', 'cdf'), observation.name='y')
+  osa1 <- (dat1$y-rep1$mu)/exp(opt1$par['logsigma'])#calculate.osa(obj1, methods=c('gen','fg', 'osg', 'cdf'), observation.name='y')
 
   ## DHARMa resids, both conditional and unconditional
   ## hack to get this to evaluate in a function
@@ -74,33 +79,38 @@ run.linmod.iter <- function(ii){
     calculate.dharma(obj1, expr, obs=dat1$y, fpr=rep1$mu)
   sim1_uncond <- sim1_cond
 
-  ## Add dummy values for parcond
-  sim0_parcond <- sim0_uncond
-  sim1_parcond <- sim1_uncond
+  sim0_parcond <- calculate.jp(obj0, sdr0, opt0, dat0$y, 'y', fpr=rep0$mu, random = FALSE)
+  sim1_parcond <- calculate.jp(obj1, sdr1, opt1, dat1$y, 'y', fpr=rep1$mu, random = FALSE)
 
   ## Combine together in tidy format for analysis and plotting later
   r0 <- data.frame(model='linmod', replicate=ii, y=dat0$y, x=dat0$x,
                    ypred=rep0$mu, version='m0',
-                   osa.cdf = osa0$cdf, osa.gen = osa0$gen,
-                   osa.fg=osa0$fg, osa.osg=osa0$osg,
+                   pearsons = osa0,
+                   # osa.cdf = osa0$cdf, osa.gen = osa0$gen,
+                   # osa.fg=osa0$fg, osa.osg=osa0$osg,
                    sim_cond=sim0_cond$resids,
-                   sim_uncond=sim0_uncond$resids,
+                  # sim_uncond=sim0_uncond$resids,
                    sim_parcond=sim0_parcond$resids,
                    maxgrad=max(abs(obj0$gr(opt0$par))),
                    AIC=opt0$AIC, AICc=opt0$AICc)
-  r1 <- data.frame(model='linmod', replicate=ii, y=dat0$y, x=dat1$x,
+  r1 <- data.frame(model='linmod', replicate=ii, y=dat1$y, x=dat1$x, ##AMH: changed from dat0$y to dat1$y
                    ypred=rep1$mu, version='m1',
-                   osa.cdf = osa1$cdf, osa.gen = osa1$gen,
-                   osa.fg=osa1$fg, osa.osg=osa1$osg,
-                   sim_cond=sim1_cond$resids, sim_uncond=sim1_uncond$resids,
+                   pearsons = osa1,
+                   # osa.cdf = osa1$cdf, osa.gen = osa1$gen,
+                   # osa.fg=osa1$fg, osa.osg=osa1$osg,
+                   sim_cond=sim1_cond$resids, #sim_uncond=sim1_uncond$resids,
                    sim_parcond=sim1_parcond$resids,
                    maxgrad=max(abs(obj1$gr(opt1$par))),
                    AIC=opt1$AIC, AICc=opt1$AICc)
   resids <- rbind(r0, r1)
 
   ## Calculate p-values. Dharma and JPdone already above
-  osa.pvals0 <- calc.osa.pvals(osa0)
-  osa.pvals1 <- calc.osa.pvals(osa1)
+  osa.pvals0 <- ad.test(osa0, 'pnorm', estimated = TRUE)$p.value #calc.osa.pvals(osa0)
+  osa.pvals0 <- list(fg = osa.pvals0, osg = osa.pvals0,
+                     cdf = osa.pvals0, gen = osa.pvals0)
+  osa.pvals1 <- ad.test(osa1, 'pnorm', estimated = TRUE)$p.value #calc.osa.pvals(osa1)
+  osa.pvals1 <- list(fg = osa.pvals1, osg = osa.pvals1,
+                     cdf = osa.pvals1, gen = osa.pvals1)
 
   pvals0 <- make.pval.df(osa.pvals0, sim0_cond, sim0_uncond, sim0_parcond)
   pvals0$version <- 'm0'
@@ -111,8 +121,9 @@ run.linmod.iter <- function(ii){
 
   ## No random effects so drop the parcond and uncond ones,
   ## dummies added above
-  pvals <- pvals %>% filter(!method %in% c('parcond', 'uncond'))
-  resids <- resids %>% select(-c('sim_parcond', 'sim_uncond'))
+  #pvals <- pvals %>% filter(!method %in% c('parcond', 'uncond'))
+  pvals <- pvals %>% filter(!method %in% c('uncond', 'osa.osg', 'osa.cdf', 'osa.gen'))
+  #resids <- resids %>% dplyr::select(-c('sim_parcond', 'sim_uncond'))
 
   ## save to file in case it crashes can recover what did run
   dir.create('results/linmod_pvals', showWarnings=FALSE)
@@ -123,8 +134,9 @@ run.linmod.iter <- function(ii){
     message("Making plots for replicate 1...")
     library(ggplot2)
     resids.long <- resids %>%
-      pivot_longer(c('osa.cdf', 'osa.gen', 'osa.fg', 'osa.osg',
-                     'sim_cond')) %>%
+      pivot_longer(c('pearsons', 'sim_cond', 'sim_parcond')) %>%
+      # pivot_longer(c('osa.cdf', 'osa.gen', 'osa.fg', 'osa.osg',
+      #                'sim_cond')) %>%
       filter(!is.na(value))
     theme_set(theme_bw())
     ## Plot of data

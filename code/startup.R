@@ -11,6 +11,7 @@ library(GGally)
 library(snowfall)
 library(R.utils)
 library(Matrix)
+library(goftest)
 
 ## Some global settings
 ggwidth <- 7
