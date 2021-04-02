@@ -40,7 +40,8 @@ calc.osa.pvals.ks <- function(osa){
 
 calc.osa.pvals <- function(osa){
   fg <- osg <- cdf <- gen <- NA
-  if(is.numeric(osa$fg)) fg <- goftest::ad.test(osa$fg,'pnorm', estimated = TRUE)$p.value
+  if(is.numeric(osa$fg))
+    fg <- goftest::ad.test(osa$fg,'pnorm', estimated = TRUE)$p.value
   if(is.numeric(osa$osg)) osg <- goftest::ad.test(osa$osg,'pnorm', estimated = TRUE)$p.value
   if(is.numeric(osa$cdf)) cdf <- goftest::ad.test(osa$cdf,'pnorm', estimated = TRUE)$p.value
   if(is.numeric(osa$gen)) gen <- goftest::ad.test(osa$gen,'pnorm', estimated = TRUE)$p.value
