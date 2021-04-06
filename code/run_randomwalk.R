@@ -1,3 +1,4 @@
+
 ## estimate and validate a random walk model with and without
 ## drift. based on code example provided by uffe h?gsbro thygesen
 ## and kasper kristensen, 2016, in the tmb package examples:
@@ -20,7 +21,6 @@ sfExportAll()
 
 message("Starting parallel runs...")
 results <- sfLapply(1:Nreps, function(ii) run.randomwalk.iter(ii))
-
 ## ## Read results back in from file
 ## fs <- list.files('results/randomwalk_pvals/', full.names=TRUE)
 ## ## Sometimes they fail to run for some unkonwn reason so try
