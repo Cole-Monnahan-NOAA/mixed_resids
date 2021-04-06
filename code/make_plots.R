@@ -11,13 +11,15 @@ message("Spatial: making results plots...")
 g <- ggplot(filter(spatial_pvals, test=='sac') , aes(pvalue, )) + geom_histogram(bins=bins) +
   facet_grid(method~test+version, scales='free')
 ggsave('plots/spatial_pvalues_sac.png', g, width=5, height=5)
-g <- filter(spatial_pvals, test=='GOF' & grepl('osa', x=method)) %>%
-  ggplot(aes(pvalue)) + geom_histogram(bins=bins) +
-  facet_grid(method~test+version, scales='free')
+g <- filter(spatial_pvals, grepl('GOF', test) & grepl('osa', x=method)) %>%
+  mutate(test=gsub('GOF.', '', x=test), method=gsub('osa.', '', x=method))  %>%
+  ggplot(aes(pvalue, fill=test)) + geom_histogram(bins=bins) +
+  facet_grid(method~version, scales='free')
 ggsave('plots/spatial_pvalues_GOF_osa.png', g, width=5, height=5)
-g <- filter(spatial_pvals, test=='GOF' & !grepl('osa', x=method)) %>%
-  ggplot(aes(pvalue)) + geom_histogram(bins=bins) +
-  facet_grid(method~test+version, scales='free')
+g <- filter(spatial_pvals, grepl('GOF', test) & !grepl('osa', x=method)) %>%
+  mutate(test=gsub('GOF.', '', x=test), method=gsub('osa.', '', x=method))  %>%
+  ggplot(aes(pvalue, fill=test)) + geom_histogram(bins=bins) +
+  facet_grid(method~version, scales='free')
 ggsave('plots/spatial_pvalues_GOF_DHARMa.png', g, width=5, height=5)
 ## g <- pivot_longer(resids, c('osa.cdf', 'osa.gen', 'sim_cond', 'sim_uncond', 'sim_parcond'),
 ##                   names_to='type', values_to='residual') %>%
@@ -42,13 +44,16 @@ message("Randomwalk: making results plots...")
 ## g <- ggplot(filter(randomwalk_pvals, test=='disp') , aes(pvalue, )) + geom_histogram(bins=bins) +
 ##   facet_grid(method~test+version, scales='free')
 ## ggsave('plots/randomwalk_pvalues_disp.png', g, width=5, height=5)
-g <- filter(randomwalk_pvals, test=='GOF' & grepl('osa', x=method)) %>%
-  ggplot(aes(pvalue)) + geom_histogram(bins=bins) +
-  facet_grid(method~test+version, scales='free')
+
+g <- filter(randomwalk_pvals, grepl('GOF', test) & grepl('osa', x=method)) %>%
+  mutate(test=gsub('GOF.', '', x=test), method=gsub('osa.', '', x=method))  %>%
+  ggplot(aes(pvalue, fill=test)) + geom_histogram(bins=bins) +
+  facet_grid(method~version, scales='free')
 ggsave('plots/randomwalk_pvalues_GOF_osa.png', g, width=5, height=5)
-g <- filter(randomwalk_pvals, test=='GOF' & !grepl('osa', x=method)) %>%
-  ggplot(aes(pvalue)) + geom_histogram(bins=bins) +
-  facet_grid(method~test+version, scales='free')
+g <- filter(randomwalk_pvals, grepl('GOF', test) & !grepl('osa', x=method)) %>%
+  mutate(test=gsub('GOF.', '', x=test), method=gsub('osa.', '', x=method))  %>%
+  ggplot(aes(pvalue, fill=test)) + geom_histogram(bins=bins) +
+  facet_grid(method~version, scales='free')
 ggsave('plots/randomwalk_pvalues_GOF_DHARMa.png', g, width=5, height=5)
 ## g <- pivot_longer(randomwalk_resids, c('osa.cdf', 'osa.gen', 'sim_cond', 'sim_uncond', 'sim_parcond'),
 ##                   names_to='type', values_to='residual') %>%
@@ -73,13 +78,15 @@ message("SimpleGLMM: making results plots...")
 ## g <- ggplot(filter(simpleGLMM_pvals, test=='disp') , aes(pvalue, )) + geom_histogram(bins=bins) +
 ##   facet_grid(method~test+version, scales='free')
 ## ggsave('plots/simpleGLMM_pvalues_disp.png', g, width=5, height=5)
-g <- filter(simpleGLMM_pvals, test=='GOF' & grepl('osa', x=method)) %>%
-  ggplot(aes(pvalue)) + geom_histogram(bins=bins) +
-  facet_grid(method~test+version, scales='free')
+g <- filter(simpleGLMM_pvals, grepl('GOF', test) & grepl('osa', x=method)) %>%
+  mutate(test=gsub('GOF.', '', x=test), method=gsub('osa.', '', x=method))  %>%
+  ggplot(aes(pvalue, fill=test)) + geom_histogram(bins=bins) +
+  facet_grid(method~version, scales='free')
 ggsave('plots/simpleGLMM_pvalues_GOF_osa.png', g, width=5, height=5)
-g <- filter(simpleGLMM_pvals, test=='GOF' & !grepl('osa', x=method)) %>%
-  ggplot(aes(pvalue)) + geom_histogram(bins=bins) +
-  facet_grid(method~test+version, scales='free')
+g <- filter(simpleGLMM_pvals, grepl('GOF', test) & !grepl('osa', x=method)) %>%
+  mutate(test=gsub('GOF.', '', x=test), method=gsub('osa.', '', x=method))  %>%
+  ggplot(aes(pvalue, fill=test)) + geom_histogram(bins=bins) +
+  facet_grid(method~version, scales='free')
 ggsave('plots/simpleGLMM_pvalues_GOF_DHARMa.png', g, width=5, height=5)
 ## g <- pivot_longer(resids, c('osa.cdf', 'osa.gen', 'sim_cond', 'sim_uncond', 'sim_parcond'),
 ##                   names_to='type', values_to='residual') %>%
@@ -104,10 +111,16 @@ message("linmod: making results plots...")
 ## g <- ggplot(filter(linmod_pvals, test=='disp') , aes(pvalue, )) + geom_histogram(bins=bins) +
 ##   facet_grid(method~test+version, scales='free')
 ## ggsave('plots/linmod_pvalues_disp.png', g, width=5, height=5)
-g <- filter(linmod_pvals, test=='GOF') %>%
-  ggplot(aes(pvalue)) + geom_histogram(bins=bins) +
-  facet_grid(method~test+version, scales='free')
-ggsave('plots/linmod_pvalues_GOF.png', g, width=5, height=7)
+g <- filter(linmod_pvals, grepl('GOF', test) & grepl('osa', x=method)) %>%
+  mutate(test=gsub('GOF.', '', x=test), method=gsub('osa.', '', x=method))  %>%
+  ggplot(aes(pvalue, fill=test)) + geom_histogram(bins=bins) +
+  facet_grid(method~version, scales='free')
+ggsave('plots/linmod_pvalues_GOF_osa.png', g, width=5, height=5)
+g <- filter(linmod_pvals, grepl('GOF', test) & !grepl('osa', x=method)) %>%
+  mutate(test=gsub('GOF.', '', x=test), method=gsub('osa.', '', x=method))  %>%
+  ggplot(aes(pvalue, fill=test)) + geom_histogram(bins=bins) +
+  facet_grid(method~version, scales='free')
+ggsave('plots/linmod_pvalues_GOF_DHARMa.png', g, width=5, height=5)
 g <- pivot_longer(linmod_resids, c('pearsons', 'sim_cond', 'sim_parcond'),
                   names_to='type', values_to='residual') %>%
   filter(replicate<=5) %>%

@@ -143,9 +143,9 @@ run.linmod.iter <- function(ii){
     message("Making plots for replicate 1...")
     library(ggplot2)
     resids.long <- resids %>%
-      pivot_longer(c('pearsons', 'sim_cond', 'sim_parcond')) %>%
-      # pivot_longer(c('osa.cdf', 'osa.gen', 'osa.fg', 'osa.osg',
-      #                'sim_cond')) %>%
+     ## pivot_longer(c('pearsons', 'sim_cond', 'sim_parcond')) %>%
+      pivot_longer(c('osa.cdf', 'osa.gen', 'osa.fg', 'osa.osg',
+                     'sim_cond')) %>%
       filter(!is.na(value))
     theme_set(theme_bw())
     ## Plot of data
