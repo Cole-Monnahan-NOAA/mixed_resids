@@ -114,6 +114,13 @@ run.simpleGLMM.iter <- function(ii){
                    sim_cond=sim0_cond$resids,
                    sim_uncond=sim0_uncond$resids,
                    sim_parcond=sim0_parcond$resids,
+                   runtime_cond=sim0_cond$runtime,
+                   runtime_uncond=sim0_uncond$runtime,
+                   runtime_parcond=sim0_parcond$runtime,
+                   runtime.cdf=osa0$runtime.cdf,
+                   runtime.fg=osa0$runtime.fg,
+                   runtime.osg=osa0$runtime.osg,
+                   runtime.gen=osa0$runtime.gen,
                    maxgrad=max(abs(obj0$gr(opt0$par))),
                    AIC=opt0$AIC, AICc=opt0$AICc)
   r1 <- data.frame(model='simpleGLMM', replicate=ii, y=dat0$y,
@@ -122,6 +129,13 @@ run.simpleGLMM.iter <- function(ii){
                    osa.fg=osa1$fg, osa.osg=osa1$osg,
                    sim_cond=sim1_cond$resids, sim_uncond=sim1_uncond$resids,
                    sim_parcond=sim1_parcond$resids,
+                   runtime_cond=sim1_cond$runtime,
+                   runtime_uncond=sim1_uncond$runtime,
+                   runtime_parcond=sim1_parcond$runtime,
+                   runtime.cdf=osa1$runtime.cdf,
+                   runtime.fg=osa1$runtime.fg,
+                   runtime.osg=osa1$runtime.osg,
+                   runtime.gen=osa1$runtime.gen,
                    maxgrad=max(abs(obj1$gr(opt1$par))),
                    AIC=opt1$AIC, AICc=opt1$AICc)
   resids <- rbind(r0, r1)
