@@ -119,7 +119,8 @@ calculate.jp <- function(obj, sdr, opt, obs, data.name, fpr, N=1000, random = TR
                    error=function(e) 'error')
   if(is.character(test)){
     warning("Joint-Precision approach failed b/c Chol factor failed")
-    return(list(sims=NA, resids=NA, disp=NA, outlier=NA, pval=NA))
+    return(list(sims=NA, resids=NA, disp=NA, outlier=NA,
+                         pval.ks=NA, pval.ad=NA))
   }
   jp.sim <- function(){
     newpar <- rmvnorm_prec(mu=joint.mle, prec=sdr$jointPrecision)
