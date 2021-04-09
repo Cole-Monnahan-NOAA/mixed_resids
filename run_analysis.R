@@ -46,20 +46,7 @@ source("code/make_plots.R")
 
 
 
-## Compare GOF across models
-pvals <- bind_rows(randomwalk_pvals, simpleGLMM_pvals,
-                   linmod_pvals, spatial_pvals) %>%
-  filter(version == 'm0' & grepl('GOF', test)) %>%
-  mutate(test=gsub('GOF.', '', test))
-g <- filter(pvals, grepl('osa', method)) %>%
-  ggplot(aes(pvalue, fill=test)) + geom_histogram(bins=20) +
-  facet_grid(method~model, scales='free_y')
-ggsave("plots/GOF_by_model_OSA.png", g, width=7, height=5)
 
-g <- filter(pvals, !grepl('osa', method)) %>%
-  ggplot(aes(pvalue, fill=test)) + geom_histogram(bins=20) +
-  facet_grid(method~model, scales='free_y')
-ggsave("plots/GOF_by_model_dharma.png", g, width=7, height=5)
 
 ## ## Quick test of nonparameteric tests on real normal samples
 ## library(goftest)
