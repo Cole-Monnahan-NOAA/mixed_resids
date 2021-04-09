@@ -44,9 +44,24 @@ source('code/load_results.R')
 ### Make quick plots of results
 source("code/make_plots.R")
 
-
-
-
+## Loop over varying sample sizes to check that effect
+sfInit( parallel=T, cpus=cpus )
+mles <- pvals <- list(); k <- 1
+sfExportAll()
+for(nobs in c(10,20, 40, 80)){
+  tmp <- sfLapply(1:Nreps, function(ii)
+    run.linmod.iter(ii, nobs, FALSE))
+  pvals[[k]] <- lapply(tmp, function(x) cbind(nobs=nobs, x$pvals)) %>% bind_rows
+  mles[[k]] <- lapply(tmp, function(x) cbind(nobs=nobs, x$mles)) %>% bind_rows
+  k <- k+1
+}
+mles <- bind_rows(mles)
+pvals <- bind_rows(pvals) %>%
+  filter(grepl('GOF', test)) %>%
+  mutate(type=gsub('GOF.','',test))
+g <- ggplot(pvals, aes(pvalue, fill=type)) + facet_grid(nobs~method) +
+  geom_histogram(position='identity', alpha=.5)
+ggsave("plots/linmod_pvals_by_dim.png", width=7, height=7)
 
 ## ## Quick test of nonparameteric tests on real normal samples
 ## library(goftest)
