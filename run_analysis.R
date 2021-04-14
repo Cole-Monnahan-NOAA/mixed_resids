@@ -26,7 +26,7 @@ packageVersion('DHARMa')                # 0.3.3.0
 ##   conditioned on data)
 
 (cpus <- parallel::detectCores()-2)
-Nreps <- 1000
+Nreps <- 5000
 
 ## Simple linear model as sanity check. Some resid methods not
 ## applicable b/c no random effects
