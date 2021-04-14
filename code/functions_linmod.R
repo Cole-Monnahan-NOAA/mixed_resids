@@ -1,4 +1,4 @@
-simulate.linmod <- function(seed, n=10){
+simulate.linmod <- function(seed, n){
   intercept <- 4
   slope <- -5
   sigma <- 1
@@ -13,7 +13,7 @@ simulate.linmod <- function(seed, n=10){
 
 
 
-run.linmod.iter <- function(ii){
+run.linmod.iter <- function(ii, nobs=100, savefiles=TRUE){
   library(TMB)
   library(DHARMa)
   library(INLA)
@@ -22,7 +22,6 @@ run.linmod.iter <- function(ii){
   library(R.utils)
   library(goftest)
   dyn.load(dynlib("models/linmod"))
-  nobs <- 100
 
   ## simulate data with these parameters
   message(ii, ": Simulating data...")
@@ -35,7 +34,6 @@ run.linmod.iter <- function(ii){
   #dat1$y[ind] <- dat1$y[ind]+sample(c(-2,2), size=length(ind), replace=TRUE)
   #add lognormal error
   dat1$y <- dat1$y * exp(rnorm(nobs,0,1))
-
   message(ii, ": Optimizing two competing models...")
   ## H0: correctly specified
   obj0 <- MakeADFun(dat0, out$Par, DLL = 'linmod')
@@ -52,7 +50,6 @@ run.linmod.iter <- function(ii){
   opt1 <- add_aic(opt1, n=length(dat1$y))
   sdr1 <- sdreport(obj1, getJointPrecision=TRUE)
   rep1 <- obj1$report(obj1$env$last.par.best)
-
   ## Save MLEs to test for properties. These are the true pars as
   ## parameterized in the TMB model
   truepars <- c(4,-5, log(1))
@@ -62,7 +59,7 @@ run.linmod.iter <- function(ii){
     data.frame(version='m1', rep=ii, mle=opt1$par,
                par=names(obj1$par), true=truepars))
   dir.create('results/linmod_mles', showWarnings=FALSE)
-  saveRDS(mles, file=paste0('results/linmod_mles/mles_', ii, '.RDS'))
+  if(savefiles) saveRDS(mles, file=paste0('results/linmod_mles/mles_', ii, '.RDS'))
 
 
   message(ii, ": Calculating residuals..")
@@ -95,16 +92,28 @@ run.linmod.iter <- function(ii){
                    sim_cond=sim0_cond$resids,
                    ## sim_uncond=sim0_uncond$resids,
                    sim_parcond=sim0_parcond$resids,
+                   runtime_cond=sim0_cond$runtime,
+                   runtime_parcond=sim0_parcond$runtime,
+                   runtime.cdf=osa0$runtime.cdf,
+                   runtime.fg=osa0$runtime.fg,
+                   runtime.osg=osa0$runtime.osg,
+                   runtime.gen=osa0$runtime.gen,
                    maxgrad=max(abs(obj0$gr(opt0$par))),
                    AIC=opt0$AIC, AICc=opt0$AICc)
-  r1 <- data.frame(model='linmod', replicate=ii, y=dat1$y, x=dat1$x, ##AMH: changed from dat0$y to dat1$y
+  r1 <- data.frame(model='linmod', replicate=ii, y=dat1$y, x=dat1$x,
                    ypred=rep1$mu, version='m1',
-                   ##  pearsons = osa1,
+                   ## pearsons = osa1,
                    osa.cdf = osa1$cdf, osa.gen = osa1$gen,
-                    osa.fg=osa1$fg, osa.osg=osa1$osg,
+                   osa.fg=osa1$fg, osa.osg=osa1$osg,
                    sim_cond=sim1_cond$resids,
                    ## sim_uncond=sim1_uncond$resids,
                    sim_parcond=sim1_parcond$resids,
+                   runtime_cond=sim1_cond$runtime,
+                   runtime_parcond=sim1_parcond$runtime,
+                   runtime.cdf=osa1$runtime.cdf,
+                   runtime.fg=osa1$runtime.fg,
+                   runtime.osg=osa1$runtime.osg,
+                   runtime.gen=osa1$runtime.gen,
                    maxgrad=max(abs(obj1$gr(opt1$par))),
                    AIC=opt1$AIC, AICc=opt1$AICc)
   resids <- rbind(r0, r1)
@@ -135,11 +144,13 @@ run.linmod.iter <- function(ii){
   #resids <- resids %>% dplyr::select(-c('sim_parcond', 'sim_uncond'))
 
   ## save to file in case it crashes can recover what did run
-  dir.create('results/linmod_pvals', showWarnings=FALSE)
-  dir.create('results/linmod_resids', showWarnings=FALSE)
-  saveRDS(pvals, file=paste0('results/linmod_pvals/pvals_', ii, '.RDS'))
-  saveRDS(resids, file=paste0('results/linmod_resids/resids_', ii, '.RDS'))
-  if(ii==1){
+  if(savefiles){
+    dir.create('results/linmod_pvals', showWarnings=FALSE)
+    dir.create('results/linmod_resids', showWarnings=FALSE)
+    saveRDS(pvals, file=paste0('results/linmod_pvals/pvals_', ii, '.RDS'))
+    saveRDS(resids, file=paste0('results/linmod_resids/resids_', ii, '.RDS'))
+  }
+  if(ii==1 & savefiles){
     message("Making plots for replicate 1...")
     library(ggplot2)
     resids.long <- resids %>%
@@ -171,5 +182,5 @@ run.linmod.iter <- function(ii){
     g <- g+geom_point(col='red', alpha=.5, data=rbind(data.frame(dat0), data.frame(dat1)))
     ggsave('plots/linmod_simdata.png', g, width=9, height=6)
   }
-  return(invisible(list(pvals=pvals, resids=resids)))
+  return(invisible(list(pvals=pvals, resids=resids, mles=mles)))
 }

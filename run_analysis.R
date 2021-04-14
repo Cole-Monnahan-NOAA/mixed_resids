@@ -39,11 +39,18 @@ source('code/run_simpleGLMM.R')
 source('code/run_spatial.R')
 
 
+## This script runs the same examples above but with varying
+## sample sizes and tracks runtime and pvalues to see the effect
+## of this dimension.
+(cpus <- parallel::detectCores()-2)
+Nreps <- 2000
+sfInit( parallel=TRUE, cpus=cpus )
+source('code/run_sample_sizes.R')
+
 ### Load results into workspace
 source('code/load_results.R')
 ### Make quick plots of results
 source("code/make_plots.R")
-
 
 
 

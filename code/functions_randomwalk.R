@@ -1,6 +1,6 @@
 
 ## randomwalk is conditional, randomwalk2 is unconditional
-run.randomwalk.iter <- function(ii){
+run.randomwalk.iter <- function(ii, nobs=100, savefiles=TRUE){
   library(TMB)
   library(DHARMa)
   library(INLA)
@@ -17,7 +17,7 @@ run.randomwalk.iter <- function(ii){
   tau <- 1
   huge <- 1e3
   ## simulate random track
-  nt <- 100
+  nt <- nobs
   X <- rnorm(nt,mean=0,sd=tau)
   Ypred <- rep(NA, nt)
   Ypred[1] <- X[1]
@@ -60,9 +60,10 @@ run.randomwalk.iter <- function(ii){
                par=names(obj1$par), true=truepars),
     data.frame(version='m0', rep=ii, mle=opt0$par,
                par=names(obj0$par), true=c(mu,truepars)))
-  dir.create('results/randomwalk_mles', showWarnings=FALSE)
-  saveRDS(mles, file=paste0('results/randomwalk_mles/mles_', ii, '.RDS'))
-
+  if(savefiles){
+    dir.create('results/randomwalk_mles', showWarnings=FALSE)
+    saveRDS(mles, file=paste0('results/randomwalk_mles/mles_', ii, '.RDS'))
+  }
 
   message(ii, ": Calculating residuals..")
   osa0 <- calculate.osa(obj0, methods=c('gen','fg', 'osg', 'cdf'), observation.name='y')
@@ -93,14 +94,29 @@ run.randomwalk.iter <- function(ii){
                    sim_cond=sim0_cond$resids,
                    sim_uncond=sim0_uncond$resids,
                    sim_parcond=sim0_parcond$resids,
+                   runtime_cond=sim0_cond$runtime,
+                   runtime_uncond=sim0_uncond$runtime,
+                   runtime_parcond=sim0_parcond$runtime,
+                   runtime.cdf=osa0$runtime.cdf,
+                   runtime.fg=osa0$runtime.fg,
+                   runtime.osg=osa0$runtime.osg,
+                   runtime.gen=osa0$runtime.gen,
                    maxgrad=max(abs(obj0$gr(opt0$par))),
                    AIC=opt0$AIC, AICc=opt0$AICc)
   r1 <- data.frame(model='randomwalk', replicate=ii, y=Y,
                    ypred=rep1$ypred, version='m1',
                    osa.cdf = osa1$cdf, osa.gen = osa1$gen,
                    osa.fg=osa1$fg, osa.osg=osa1$osg,
-                   sim_cond=sim1_cond$resids, sim_uncond=sim1_uncond$resids,
+                   sim_cond=sim1_cond$resids,
+                   sim_uncond=sim1_uncond$resids,
                    sim_parcond=sim1_parcond$resids,
+                   runtime_cond=sim1_cond$runtime,
+                   runtime_uncond=sim1_uncond$runtime,
+                   runtime_parcond=sim1_parcond$runtime,
+                   runtime.cdf=osa1$runtime.cdf,
+                   runtime.fg=osa1$runtime.fg,
+                   runtime.osg=osa1$runtime.osg,
+                   runtime.gen=osa1$runtime.gen,
                    maxgrad=max(abs(obj1$gr(opt1$par))),
                    AIC=opt1$AIC, AICc=opt1$AICc)
   resids <- rbind(r0, r1)
@@ -117,9 +133,11 @@ run.randomwalk.iter <- function(ii){
   pvals$replicate <- ii; pvals$model <- 'randomwalk'
 
   ## save to file in case it crashes can recover what did run
-  dir.create('results/randomwalk_pvals', showWarnings=FALSE)
-  dir.create('results/randomwalk_resids', showWarnings=FALSE)
-  saveRDS(pvals, file=paste0('results/randomwalk_pvals/pvals_', ii, '.RDS'))
-  saveRDS(resids, file=paste0('results/randomwalk_resids/resids_', ii, '.RDS'))
-  return(invisible(list(pvals=pvals, resids=resids)))
+  if(savefiles){
+    dir.create('results/randomwalk_pvals', showWarnings=FALSE)
+    dir.create('results/randomwalk_resids', showWarnings=FALSE)
+    saveRDS(pvals, file=paste0('results/randomwalk_pvals/pvals_', ii, '.RDS'))
+    saveRDS(resids, file=paste0('results/randomwalk_resids/resids_', ii, '.RDS'))
+  }
+  return(invisible(list(pvals=pvals, resids=resids, mles=mles)))
 }
