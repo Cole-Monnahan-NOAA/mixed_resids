@@ -1,6 +1,6 @@
-simulate.simpleGLMM <- function(seed, n.j=3, n.i=10){
-  ## n.j <- 3 #number of subjects
-  ## n.i <- 10 #number of observations
+simulate.simpleGLMM <- function(seed, ngroups=3, nobs=10){
+  ## ngroups <- 3 #number of subjects
+  ## nobs <- 10 #number of observations
   b0 <- 4
   sig2.y <- .5 #obs variance
   #groups are being simulated with high overlap - hard for model to differentiate
@@ -11,25 +11,25 @@ simulate.simpleGLMM <- function(seed, n.j=3, n.i=10){
   ## ## This is Andrea's way of forcing some separation in the group
   ## ## means
   ## U <- rnorm(1000, mean=0, sd=sqrt(sig2.u))
-  ## quant.u <- quantile(U, probs = seq(0,1,length=n.j))
-  ## u <- as.vector(c(quant.u[1:(n.j-1)], 0-sum(quant.u[1:(n.j-1)])))
+  ## quant.u <- quantile(U, probs = seq(0,1,length=ngroups))
+  ## u <- as.vector(c(quant.u[1:(ngroups-1)], 0-sum(quant.u[1:(ngroups-1)])))
 
   ## This way just randomly generates them from rnorm.
-  u <- rnorm(n.j, 0, sqrt(sig2.u))
-  y <- matrix(0, n.i, n.j)
-  for(j in 1:n.j){
-    y[,j] <- rnorm(n.i, b0 + u[j], sqrt(sig2.y))
+  u <- rnorm(ngroups, 0, sqrt(sig2.u))
+  y <- matrix(0, nobs, ngroups)
+  for(j in 1:ngroups){
+    y[,j] <- rnorm(nobs, b0 + u[j], sqrt(sig2.y))
   }
   ## boxplot(y)
-  Dat <- data.frame(y = as.vector(y), group = rep(1:n.j, each = n.i))
+  Dat <- data.frame(y = as.vector(y), group = rep(1:ngroups, each = nobs))
   Data <- list(y = Dat[,1], group = Dat[,2]-1, sim_re = 0)
-  Par <- list(b0=0, ln_sig_u=0, ln_sig_y=0, u=rep(0, n.j))
+  Par <- list(b0=0, ln_sig_u=0, ln_sig_y=0, u=rep(0, ngroups))
   return(list(Data=Data, Par=Par))
 }
 
 
 
-run.simpleGLMM.iter <- function(ii){
+run.simpleGLMM.iter <- function(ii, ngroups=5, nobs=20, savefiles=TRUE){
   library(TMB)
   library(DHARMa)
   library(INLA)
@@ -40,10 +40,8 @@ run.simpleGLMM.iter <- function(ii){
   dyn.load(dynlib("models/simpleGLMM"))
 
   ## simulate data with these parameters
-  nobs <- 20
-  nj <- 5
   message(ii, ": Simulating data...")
-  out <- simulate.simpleGLMM(ii, nj, nobs)
+  out <- simulate.simpleGLMM(ii, ngroups, nobs)
   dat0 <- out$Data
   ## Add an outlier to each group
   dat1 <- dat0
@@ -64,7 +62,7 @@ run.simpleGLMM.iter <- function(ii){
   par1 <- out$Par
   par1$ln_sig_u <- log(1/sqrt(2*pi)) #need to fix so log(dnorm(0,0,sig_u)) = 0
   obj1 <- MakeADFun(dat1, par1,
-                    map = list(ln_sig_u = factor(NA), u = rep(factor(NA),nj) ),
+                    map = list(ln_sig_u = factor(NA), u = rep(factor(NA),ngroups) ),
                     DLL = 'simpleGLMM')
   trash <- obj1$env$beSilent()
   opt1 <- nlminb(obj1$par, obj1$fn, obj1$gr)
@@ -80,9 +78,10 @@ run.simpleGLMM.iter <- function(ii){
                par=c(names(obj1$par),'ln_sig_u'), true=truepars),
     data.frame(version='m0', rep=ii, mle=opt0$par,
                par=names(obj0$par), true=truepars))
-  dir.create('results/simpleGLMM_mles', showWarnings=FALSE)
-  saveRDS(mles, file=paste0('results/simpleGLMM_mles/mles_', ii, '.RDS'))
-
+  if(savefiles){
+    dir.create('results/simpleGLMM_mles', showWarnings=FALSE)
+    saveRDS(mles, file=paste0('results/simpleGLMM_mles/mles_', ii, '.RDS'))
+  }
 
   message(ii, ": Calculating residuals..")
   osa0 <- calculate.osa(obj0, methods=c('gen','fg', 'osg', 'cdf'), observation.name='y')
@@ -152,11 +151,13 @@ run.simpleGLMM.iter <- function(ii){
   pvals$replicate <- ii; pvals$model <- 'simpleGLMM'
 
   ## save to file in case it crashes can recover what did run
-  dir.create('results/simpleGLMM_pvals', showWarnings=FALSE)
-  dir.create('results/simpleGLMM_resids', showWarnings=FALSE)
-  saveRDS(pvals, file=paste0('results/simpleGLMM_pvals/pvals_', ii, '.RDS'))
-  saveRDS(resids, file=paste0('results/simpleGLMM_resids/resids_', ii, '.RDS'))
-  if(ii==1){
+  if(savefiles){
+    dir.create('results/simpleGLMM_pvals', showWarnings=FALSE)
+    dir.create('results/simpleGLMM_resids', showWarnings=FALSE)
+    saveRDS(pvals, file=paste0('results/simpleGLMM_pvals/pvals_', ii, '.RDS'))
+    saveRDS(resids, file=paste0('results/simpleGLMM_resids/resids_', ii, '.RDS'))
+  }
+  if(ii==1 & savefiles){
     message("Making plots for replicate 1...")
     library(ggplot2)
     resids.long <- cbind(resids,x=1:length(dat0$y), group=c(dat0$group, dat1$group)) %>%
@@ -195,5 +196,5 @@ run.simpleGLMM.iter <- function(ii){
     g <- g+geom_jitter(alpha=.5, width=.2, data=rbind(data.frame(dat0), data.frame(dat1)))
     ggsave('plots/simpleGLMM_simdata.png', g, width=9, height=6)
   }
-  return(invisible(list(pvals=pvals, resids=resids)))
+  return(invisible(list(pvals=pvals, resids=resids, mles=mles)))
 }

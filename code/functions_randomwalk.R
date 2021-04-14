@@ -1,6 +1,6 @@
 
 ## randomwalk is conditional, randomwalk2 is unconditional
-run.randomwalk.iter <- function(ii){
+run.randomwalk.iter <- function(ii, nobs=100, savefiles=TRUE){
   library(TMB)
   library(DHARMa)
   library(INLA)
@@ -17,7 +17,7 @@ run.randomwalk.iter <- function(ii){
   tau <- 1
   huge <- 1e3
   ## simulate random track
-  nt <- 100
+  nt <- nobs
   X <- rnorm(nt,mean=0,sd=tau)
   Ypred <- rep(NA, nt)
   Ypred[1] <- X[1]
@@ -60,9 +60,10 @@ run.randomwalk.iter <- function(ii){
                par=names(obj1$par), true=truepars),
     data.frame(version='m0', rep=ii, mle=opt0$par,
                par=names(obj0$par), true=c(mu,truepars)))
-  dir.create('results/randomwalk_mles', showWarnings=FALSE)
-  saveRDS(mles, file=paste0('results/randomwalk_mles/mles_', ii, '.RDS'))
-
+  if(savefiles){
+    dir.create('results/randomwalk_mles', showWarnings=FALSE)
+    saveRDS(mles, file=paste0('results/randomwalk_mles/mles_', ii, '.RDS'))
+  }
 
   message(ii, ": Calculating residuals..")
   osa0 <- calculate.osa(obj0, methods=c('gen','fg', 'osg', 'cdf'), observation.name='y')
@@ -132,9 +133,11 @@ run.randomwalk.iter <- function(ii){
   pvals$replicate <- ii; pvals$model <- 'randomwalk'
 
   ## save to file in case it crashes can recover what did run
-  dir.create('results/randomwalk_pvals', showWarnings=FALSE)
-  dir.create('results/randomwalk_resids', showWarnings=FALSE)
-  saveRDS(pvals, file=paste0('results/randomwalk_pvals/pvals_', ii, '.RDS'))
-  saveRDS(resids, file=paste0('results/randomwalk_resids/resids_', ii, '.RDS'))
-  return(invisible(list(pvals=pvals, resids=resids)))
+  if(savefiles){
+    dir.create('results/randomwalk_pvals', showWarnings=FALSE)
+    dir.create('results/randomwalk_resids', showWarnings=FALSE)
+    saveRDS(pvals, file=paste0('results/randomwalk_pvals/pvals_', ii, '.RDS'))
+    saveRDS(resids, file=paste0('results/randomwalk_resids/resids_', ii, '.RDS'))
+  }
+  return(invisible(list(pvals=pvals, resids=resids, mles=mles)))
 }

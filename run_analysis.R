@@ -26,7 +26,7 @@ packageVersion('DHARMa')                # 0.3.3.0
 ##   conditioned on data)
 
 (cpus <- parallel::detectCores()-2)
-Nreps <- 1000
+Nreps <- 2000
 
 ## Simple linear model as sanity check. Some resid methods not
 ## applicable b/c no random effects
@@ -39,29 +39,21 @@ source('code/run_simpleGLMM.R')
 source('code/run_spatial.R')
 
 
+## This script runs the same examples above but with varying
+## sample sizes and tracks runtime and pvalues to see the effect
+## of this dimension.
+(cpus <- parallel::detectCores()-2)
+Nreps <- 2000
+sfInit( parallel=TRUE, cpus=cpus )
+source('code/run_sample_sizes.R')
+
 ### Load results into workspace
 source('code/load_results.R')
 ### Make quick plots of results
 source("code/make_plots.R")
 
-## Loop over varying sample sizes to check that effect
-sfInit( parallel=T, cpus=cpus )
-mles <- pvals <- list(); k <- 1
-sfExportAll()
-for(nobs in c(10,20, 40, 80)){
-  tmp <- sfLapply(1:Nreps, function(ii)
-    run.linmod.iter(ii, nobs, FALSE))
-  pvals[[k]] <- lapply(tmp, function(x) cbind(nobs=nobs, x$pvals)) %>% bind_rows
-  mles[[k]] <- lapply(tmp, function(x) cbind(nobs=nobs, x$mles)) %>% bind_rows
-  k <- k+1
-}
-mles <- bind_rows(mles)
-pvals <- bind_rows(pvals) %>%
-  filter(grepl('GOF', test)) %>%
-  mutate(type=gsub('GOF.','',test))
-g <- ggplot(pvals, aes(pvalue, fill=type)) + facet_grid(nobs~method) +
-  geom_histogram(position='identity', alpha=.5)
-ggsave("plots/linmod_pvals_by_dim.png", width=7, height=7)
+
+
 
 ## ## Quick test of nonparameteric tests on real normal samples
 ## library(goftest)

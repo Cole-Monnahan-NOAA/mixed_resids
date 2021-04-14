@@ -79,7 +79,7 @@ sim.data <- function(X, Beta, omega, parm, fam, link, Loc){
 
 ## Wrapper function to run a single simulation iteration. Called
 ## in spatial.R using parallel hence the extra stuff
-run.spatial.iter <- function(ii){
+run.spatial.iter <- function(ii, nobs=100, savefiles=TRUE){
   library(TMB)
   library(DHARMa)
   library(INLA)
@@ -88,15 +88,14 @@ run.spatial.iter <- function(ii){
   library(R.utils)
   library(goftest)
   dyn.load(TMB::dynlib("models/spatial")) ## simulate data with these parameters
-
   message(ii, ": Simulating data...")
+  rm(n)
   set.seed(ii)
-  n <- 100
   sp.var <- 0.5
   sd.obs <- .5
   Range <- 20
   ## Simulate spatial random effects
-  Loc <- matrix(runif(n*2,0,100),ncol=2)
+  Loc <- matrix(runif(nobs*2,0,nobs),ncol=2)
   dmat <- as.matrix(dist(Loc))
   mesh <- try(
     withTimeout( INLA::inla.mesh.2d(Loc, max.edge = c(Range/3, Range), offset = c(2, Range*.75)),
@@ -118,7 +117,7 @@ run.spatial.iter <- function(ii){
   ## Add outliers to 5 random values to create second data set
   noutlier <- 5
   y1 <- y0
-  ind <- sample(1:n, size=noutlier)
+  ind <- sample(1:nobs, size=noutlier)
   y1[ind] <- y0[ind]+rnorm(noutlier, 0, sd.obs*4)
   par <- list(beta = 0*Beta, theta = 0, log_tau = 0, log_kappa = 0,
               omega = rep(0,mesh$n))
@@ -156,9 +155,10 @@ run.spatial.iter <- function(ii){
                par=names(obj0$par), true=truepars),
     data.frame(version='m1', rep=ii, mle=opt1$par,
                par=names(obj1$par), true=truepars))
-  dir.create('results/spatial_mles', showWarnings=FALSE)
-  saveRDS(mles, file=paste0('results/spatial_mles/mles_', ii, '.RDS'))
-
+  if(savefiles){
+    dir.create('results/spatial_mles', showWarnings=FALSE)
+    saveRDS(mles, file=paste0('results/spatial_mles/mles_', ii, '.RDS'))
+  }
   message(ii, ": Calculating residuals..")
   osa0 <- calculate.osa(obj0, methods=c('gen', 'fg', 'osg', 'cdf'), observation.name='y')
   osa1 <- calculate.osa(obj1, methods=c('gen', 'fg', 'osg', 'cdf'), observation.name='y')
@@ -260,7 +260,7 @@ run.spatial.iter <- function(ii){
   pvals$replicate <- ii; pvals$model <- 'spatial'
 
   ## Exploratory plots for first replicate
-  if(ii==1){
+  if(ii==1 & savefiles){
     message("Making plots for replicate 1...")
     library(ggplot2)
     resids.long <- resids %>%
@@ -301,10 +301,12 @@ run.spatial.iter <- function(ii){
     ## ggsave('plots/spatial_simdata.png', g, width=9, height=9)
   }
   ## save to file in case it crashes can recover what did run
-  dir.create('results/spatial_pvals', showWarnings=FALSE)
-  dir.create('results/spatial_resids', showWarnings=FALSE)
-  saveRDS(pvals, file=paste0('results/spatial_pvals/pvals_', ii, '.RDS'))
-  saveRDS(resids, file=paste0('results/spatial_resids/resids_', ii, '.RDS'))
-  return(invisible(list(pvals=pvals, resids=resids)))
+  if(savefiles){
+    dir.create('results/spatial_pvals', showWarnings=FALSE)
+    dir.create('results/spatial_resids', showWarnings=FALSE)
+    saveRDS(pvals, file=paste0('results/spatial_pvals/pvals_', ii, '.RDS'))
+    saveRDS(resids, file=paste0('results/spatial_resids/resids_', ii, '.RDS'))
+  }
+  return(invisible(list(pvals=pvals, resids=resids, mles=mles)))
 }
 

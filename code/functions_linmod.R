@@ -34,7 +34,6 @@ run.linmod.iter <- function(ii, nobs=100, savefiles=TRUE){
   #dat1$y[ind] <- dat1$y[ind]+sample(c(-2,2), size=length(ind), replace=TRUE)
   #add lognormal error
   dat1$y <- dat1$y * exp(rnorm(nobs,0,1))
-
   message(ii, ": Optimizing two competing models...")
   ## H0: correctly specified
   obj0 <- MakeADFun(dat0, out$Par, DLL = 'linmod')
@@ -51,7 +50,6 @@ run.linmod.iter <- function(ii, nobs=100, savefiles=TRUE){
   opt1 <- add_aic(opt1, n=length(dat1$y))
   sdr1 <- sdreport(obj1, getJointPrecision=TRUE)
   rep1 <- obj1$report(obj1$env$last.par.best)
-
   ## Save MLEs to test for properties. These are the true pars as
   ## parameterized in the TMB model
   truepars <- c(4,-5, log(1))
