@@ -43,7 +43,7 @@ source('code/run_spatial.R')
 ## sample sizes and tracks runtime and pvalues to see the effect
 ## of this dimension.
 (cpus <- parallel::detectCores()-2)
-Nreps <- 2000
+Nreps <- 1000
 sfInit( parallel=TRUE, cpus=cpus )
 source('code/run_sample_sizes.R')
 

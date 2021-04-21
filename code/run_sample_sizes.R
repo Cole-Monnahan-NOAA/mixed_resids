@@ -29,9 +29,9 @@ process_results <- function(mles, runtimes, pvals, model){
 }
 plot_sample_sizes <- function(results){
   model <- results$model
-  g <- ggplot(results$pvals, aes(pvalue, fill=type)) + facet_grid(nobs~method) +
+  g <- ggplot(filter(results$pvals, !is.na(pvalue)), aes(pvalue, fill=type)) + facet_grid(nobs~method) +
     geom_histogram(position='identity', alpha=.5, bins=20)
-  ggsave(paste0("plots/", model,"_pvals_by_dim.png"), g, width=7, height=7)
+  ggsave(paste0("plots/", model,"_pvals_by_dim.png"), g, width=8, height=5)
   g <- ggplot(results$runtimes,
               aes(nobs, med, ymin=lwr, ymax=upr,  color=type)) +
     geom_line()+
@@ -41,7 +41,14 @@ plot_sample_sizes <- function(results){
     geom_violin() +
     geom_hline(yintercept=0, color='red') +
     facet_wrap('par') + labs(y='Absolute error')
-  ggsave(paste0("plots/", model,"_mles_by_dim.png"),g, width=7, height=7)
+  ggsave(paste0("plots/", model,"_mles_by_dim.png"),g, width=8, height=5)
+}
+get.value <- function(x, val, nobs){
+  if(is.null(x)) return(NULL)
+  if(val!='runtimes')
+    data.frame(nobs=nobs, x[[val]]) %>% bind_rows
+  else
+    data.frame(nobs=nobs, extract_runtime(x[['resids']])) %>% bind_rows
 }
 
 
@@ -54,9 +61,9 @@ for(nobs in c(10, 50, 100)){
   sfExport('nobs')
   tmp <- sfLapply(1:Nreps, function(ii)
     run.linmod.iter(ii, nobs=nobs, savefiles=FALSE))
-  pvals[[k]] <- lapply(tmp, function(x) cbind(nobs=nobs, x$pvals)) %>% bind_rows
-  mles[[k]] <- lapply(tmp, function(x) cbind(nobs=nobs, x$mles)) %>% bind_rows
-  runtimes[[k]] <- lapply(tmp, function(x) cbind(nobs=nobs, extract_runtime(x$resids))) %>% bind_rows
+  pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nobs))
+  mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nobs))
+  runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'resids', nobs))
   k <- k+1
 }
 results.linmod <- process_results(mles, runtimes, pvals, model='linmod')
@@ -70,9 +77,9 @@ for(nobs in c(10, 50, 100)){
   sfExport('nobs')
   tmp <- sfLapply(1:Nreps, function(ii)
     run.randomwalk.iter(ii, nobs=nobs, savefiles=FALSE))
-  pvals[[k]] <- lapply(tmp, function(x) cbind(nobs=nobs, x$pvals)) %>% bind_rows
-  mles[[k]] <- lapply(tmp, function(x) cbind(nobs=nobs, x$mles)) %>% bind_rows
-  runtimes[[k]] <- lapply(tmp, function(x) cbind(nobs=nobs, extract_runtime(x$resids))) %>% bind_rows
+  pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nobs))
+  mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nobs))
+  runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'resids', nobs))
   k <- k+1
 }
 results.randomwalk <- process_results(mles, runtimes, pvals, model='randomwalk')
@@ -81,13 +88,13 @@ plot_sample_sizes(results.randomwalk)
 
 runtimes <- mles <- pvals <- list(); k <- 1
 sfExportAll()
-for(nobs in c(25, 50, 100)){
+for(nobs in c(50, 100, 201)){
   sfExport('nobs')
   tmp <- sfLapply(1:Nreps, function(ii)
     run.spatial.iter(ii, nobs=nobs, savefiles=FALSE))
-  pvals[[k]] <- lapply(tmp, function(x) cbind(nobs=nobs, x$pvals)) %>% bind_rows
-  mles[[k]] <- lapply(tmp, function(x) cbind(nobs=nobs, x$mles)) %>% bind_rows
-  runtimes[[k]] <- lapply(tmp, function(x) cbind(nobs=nobs, extract_runtime(x$resids))) %>% bind_rows
+  pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nobs))
+  mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nobs))
+  runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'resids', nobs))
   k <- k+1
 }
 results.spatial <- process_results(mles, runtimes, pvals, model='spatial')
@@ -105,9 +112,9 @@ for(ngroups in c(5, 10, 25)){
   sfExport('ngroups', 'nobs')
   tmp <- sfLapply(1:Nreps, function(ii)
     run.simpleGLMM.iter(ii, ngroups=ngroups, nobs=10,  savefiles=FALSE))
-  pvals[[k]] <- lapply(tmp, function(x) cbind(nobs=nobs, x$pvals)) %>% bind_rows
-  mles[[k]] <- lapply(tmp, function(x) cbind(nobs=nobs, x$mles)) %>% bind_rows
-  runtimes[[k]] <- lapply(tmp, function(x) cbind(nobs=nobs, extract_runtime(x$resids))) %>% bind_rows
+  pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nobs))
+  mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nobs))
+  runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'resids', nobs))
   k <- k+1
 }
 results.simpleGLMM <- process_results(mles, runtimes, pvals, model='simpleGLMM')
