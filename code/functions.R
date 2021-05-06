@@ -8,13 +8,20 @@ make.pval.df <- function(osa, sim_cond, sim_uncond, sim_parcond){
     data.frame(method='parcond', test='disp', pvalue=sim_parcond$disp),
     data.frame(method='cond', test='disp', pvalue=sim_cond$disp),
     data.frame(method='uncond', test='disp', pvalue=sim_uncond$disp),
-    data.frame(method='parcond', test='GOF', pvalue=sim_parcond$pval),
-    data.frame(method='cond', test='GOF', pvalue=sim_cond$pval),
-    data.frame(method='uncond', test='GOF', pvalue=sim_uncond$pval),
-    data.frame(method='osa.fg', test='GOF', pvalue=osa$fg),
-    data.frame(method='osa.osg', test='GOF', pvalue=osa$osg),
-    data.frame(method='osa.cdf', test='GOF', pvalue=osa$cdf),
-    data.frame(method='osa.gen', test='GOF', pvalue=osa$gen))
+    data.frame(method='parcond', test='GOF.ks', pvalue=sim_parcond$pval.ks),
+    data.frame(method='cond', test='GOF.ks', pvalue=sim_cond$pval.ks),
+    data.frame(method='uncond', test='GOF.ks', pvalue=sim_uncond$pval.ks),
+    data.frame(method='osa.fg', test='GOF.ks', pvalue=osa$fg.ks),
+    data.frame(method='osa.osg', test='GOF.ks', pvalue=osa$osg.ks),
+    data.frame(method='osa.cdf', test='GOF.ks', pvalue=osa$cdf.ks),
+    data.frame(method='osa.gen', test='GOF.ks', pvalue=osa$gen.ks),
+    data.frame(method='parcond', test='GOF.ad', pvalue=sim_parcond$pval.ad),
+    data.frame(method='cond', test='GOF.ad', pvalue=sim_cond$pval.ad),
+    data.frame(method='uncond', test='GOF.ad', pvalue=sim_uncond$pval.ad),
+    data.frame(method='osa.fg', test='GOF.ad', pvalue=osa$fg.ad),
+    data.frame(method='osa.osg', test='GOF.ad', pvalue=osa$osg.ad),
+    data.frame(method='osa.cdf', test='GOF.ad', pvalue=osa$cdf.ad),
+    data.frame(method='osa.gen', test='GOF.ad', pvalue=osa$gen.ad))
   return(pvals)
 }
 
@@ -28,45 +35,32 @@ calc.sac <- function(x, w){
   return(y)
 }
 
-
-calc.osa.pvals.ks <- function(osa){
-  fg <- osg <- cdf <- gen <- NA
-  if(is.numeric(osa$fg)) fg <- suppressWarnings(ks.test(osa$fg,'pnorm')$p.value)
-  if(is.numeric(osa$osg)) osg <- suppressWarnings(ks.test(osa$osg,'pnorm')$p.value)
-  if(is.numeric(osa$cdf)) cdf <- suppressWarnings(ks.test(osa$cdf,'pnorm')$p.value)
-  if(is.numeric(osa$gen)) gen <- suppressWarnings(ks.test(osa$gen,'pnorm')$p.value)
-  return(list(fg=fg, osg=osg, cdf=cdf, gen=gen))
-}
-
 calc.osa.pvals <- function(osa){
-  fg <- osg <- cdf <- gen <- NA
-  if(is.numeric(osa$fg)) fg <- ad.test(osa$fg,'pnorm', estimated = TRUE)$p.value
-  if(is.numeric(osa$osg)) osg <- ad.test(osa$osg,'pnorm', estimated = TRUE)$p.value
-  if(is.numeric(osa$cdf)) cdf <- ad.test(osa$cdf,'pnorm', estimated = TRUE)$p.value
-  if(is.numeric(osa$gen)) gen <- ad.test(osa$gen,'pnorm', estimated = TRUE)$p.value
-  return(list(fg=fg, osg=osg, cdf=cdf, gen=gen))
+  fg.ks <- osg.ks <- cdf.ks <- gen.ks <- NA
+  fg.ad <- osg.ad <- cdf.ad <- gen.ad <- NA
+  if(is.numeric(osa$fg)){
+    fg.ad <- goftest::ad.test(osa$fg,'pnorm', estimated = TRUE)$p.value
+    fg.ks <- suppressWarnings(ks.test(osa$fg,'pnorm')$p.value)
+  }
+  if(is.numeric(osa$osg)){
+    osg.ad <- goftest::ad.test(osa$osg,'pnorm', estimated = TRUE)$p.value
+    osg.ks <- suppressWarnings(ks.test(osa$osg,'pnorm')$p.value)
+  }
+  if(is.numeric(osa$cdf)){
+    cdf.ad <- goftest::ad.test(osa$cdf,'pnorm', estimated = TRUE)$p.value
+    cdf.ks <- suppressWarnings(ks.test(osa$cdf,'pnorm')$p.value)
+  }
+  if(is.numeric(osa$gen)){
+    gen.ad <- goftest::ad.test(osa$gen,'pnorm', estimated = TRUE)$p.value
+    gen.ks <- suppressWarnings(ks.test(osa$gen,'pnorm')$p.value)
+  }
+  return(list(fg.ks=fg.ks, osg.ks=osg.ks, cdf.ks=cdf.ks, gen.ks=gen.ks,
+              fg.ad=fg.ad, osg.ad=osg.ad, cdf.ad=cdf.ad, gen.ad=gen.ad))
 }
 
-calc.dharma.pvals.ks <- function(dharma, alternative = c("two.sided", "greater",
-                                                      "less")){
-  ## Extract p-values calculated by DHARMa
-  ##
-  ## Note: Type binomial for continuous, if integer be careful. Not
-  ## sure if we want two-sided for dispersion? Using defaults for
-  ## now.
-  ## AMH: change to alternative = 'greater' when testing for overdispersion in positive only distributions
-  ## AMH: Add significance tests
-  alternative <- match.arg(alternative)
-  disp <- testDispersion(dharma, alternative, plot=FALSE)
-  outlier <- testOutliers(dharma, alternative,
-                          margin = 'upper', type='binomial', plot=FALSE)
-  pval <-
-    suppressWarnings(ks.test(dharma$scaledResiduals,'punif')$p.value)
-  return(list(disp=disp, outlier=outlier, pval=pval))
-}
 
-calc.dharma.pvals <- function(dharma, alternative = c("two.sided", "greater",
-                                                      "less")){
+calc.dharma.pvals <-
+  function(dharma, alternative = c("two.sided", "greater", "less")){
   ## Extract p-values calculated by DHARMa
   ##
   ## Note: Type binomial for continuous, if integer be careful. Not
@@ -79,10 +73,11 @@ calc.dharma.pvals <- function(dharma, alternative = c("two.sided", "greater",
   outlier <- testOutliers(dharma, alternative,
                           margin = 'upper', type='binomial', plot=FALSE)
   resids <- residuals(dharma, quantileFunction = qnorm, outlierValues = c(-7,7))
-  pval <- ad.test(resids,'pnorm', estimated = TRUE)$p.value
-  return(list(disp=disp, outlier=outlier, pval=pval))
+  pval.ks <-
+    suppressWarnings(ks.test(dharma$scaledResiduals,'punif')$p.value)
+  pval.ad <- goftest::ad.test(resids,'pnorm', estimated = TRUE)$p.value
+  return(list(disp=disp, outlier=outlier, pval.ks=pval.ks, pval.ad=pval.ad))
 }
-
 
 
 ## Function to simulate parameters from the joint precisions
@@ -118,13 +113,15 @@ add_aic <- function(opt,n){
 calculate.jp <- function(obj, sdr, opt, obs, data.name, fpr, N=1000, random = TRUE,
                          alternative = c("two.sided", "greater","less")){
   alternative = match.arg(alternative)
+  t0 <- Sys.time()
   joint.mle <- obj$env$last.par.best
   if(random){
   test <- tryCatch(Matrix::Cholesky(sdr$jointPrecision, super=TRUE),
                    error=function(e) 'error')
   if(is.character(test)){
     warning("Joint-Precision approach failed b/c Chol factor failed")
-    return(list(sims=NA, resids=NA, disp=NA, outlier=NA, pval=NA))
+    return(list(sims=NA, runtime=NA, resids=NA, disp=NA, outlier=NA,
+                         pval.ks=NA, pval.ad=NA))
   }
   jp.sim <- function(){
     newpar <- rmvnorm_prec(mu=joint.mle, prec=sdr$jointPrecision)
@@ -144,28 +141,34 @@ calculate.jp <- function(obj, sdr, opt, obs, data.name, fpr, N=1000, random = TR
   tmp <- replicate(N, {jp.sim()})
   if(any(is.nan(tmp))){
     warning("NaN values in JP simulated data")
-    return(list(sims=NA, resids=NA, disp=NA, outlier=NA, pval=NA))
+    return(list(sims=NA, runtime=NA, resids=NA, disp=NA, outlier=NA,
+                         pval.ks=NA, pval.ad=NA))
   }
   dharma <- createDHARMa(tmp, obs, fittedPredictedResponse=fpr)
   resids <- residuals(dharma, quantileFunction = qnorm, outlierValues = c(-7,7))
+  runtime <- as.numeric(Sys.time()-t0, 'secs')
   disp <- testDispersion(dharma, alternative = alternative, plot=FALSE)
   outlier <- testOutliers(dharma, alternative = alternative,
                           margin = 'upper', type='binomial', plot=FALSE)
-  pval <- ad.test(resids,'pnorm', estimated = TRUE)$p.value
-  return(list(sims=tmp, resids=resids, disp=disp$p.value, outlier=outlier$p.value, pval=pval))
+  pval.ks <-
+    suppressWarnings(ks.test(dharma$scaledResiduals,'punif')$p.value)
+  pval.ad <- goftest::ad.test(resids,'pnorm', estimated = TRUE)$p.value
+  return(list(sims=tmp, runtime=runtime, resids=resids, disp=disp$p.value,
+                         outlier=outlier$p.value,
+                         pval.ks=pval.ks, pval.ad=pval.ad))
 }
 
 
 
-#AMH: repetitive with calc.dharma.pvals...can we condense?
-calculate.dharma <- function(obj, expr, N=1000, obs, fpr, 
+calculate.dharma <- function(obj, expr, N=1000, obs, fpr,
                              alternative = c("two.sided", "greater","less")){
-  alternative = match.arg(alternative)
+  alternative <- match.arg(alternative)
+  t0 <- Sys.time()
   tmp <- replicate(N, eval(expr))
   dharma <- createDHARMa(tmp, obs, fittedPredictedResponse = fpr)
   resids <- residuals(dharma, quantileFunction = qnorm,
                       outlierValues = c(-7,7))
-
+  runtime <- as.numeric(Sys.time()-t0, 'secs')
   ## Extract p-values calculated by DHARMa
   ##
   ## Note: Type binomial for continuous, if integer be careful. Not
@@ -176,62 +179,79 @@ calculate.dharma <- function(obj, expr, N=1000, obs, fpr,
   disp <- testDispersion(dharma, alternative = alternative, plot=FALSE)
   outlier <- testOutliers(dharma, alternative = alternative,
                           margin = 'upper', type='binomial', plot=FALSE)
-  pval <- ad.test(resids,'pnorm', estimated = TRUE)$p.value
-  return(list(sims=tmp, resids=resids, disp=disp$p.value, outlier=outlier$p.value, pval=pval))
+  pval.ks <-
+    suppressWarnings(ks.test(dharma$scaledResiduals,'punif')$p.value)
+  pval.ad <- goftest::ad.test(resids,'pnorm', estimated = TRUE)$p.value
+  return(list(sims=tmp, resids=resids, disp=disp$p.value,
+              outlier=outlier$p.value, pval.ks=pval.ks,
+              pval.ad=pval.ad, runtime=runtime))
 }
 
 calculate.osa <- function(obj, methods, observation.name,
-                          data.term.indicator='keep', Range = c(-Inf,Inf)){
+                          data.term.indicator='keep',
+                          Range = c(-Inf,Inf)){
   ## OSA residuals
   fg <- osg <- cdf <- gen <- NA
-
+  runtime.fg <- runtime.osg <- runtime.cdf <- runtime.gen <- NA
   if('fg' %in% methods){
+    t0 <- Sys.time()
     fg <- tryCatch(
       oneStepPredict(obj, observation.name=observation.name,
                      method="fullGaussian", trace=FALSE)$residual,
       error=function(e) 'error')
+    runtime.fg <- as.numeric(Sys.time()-t0, 'secs')
     if(is.character(fg)){
       warning("OSA Full Gaussian failed")
-      fg <- NA
+      fg <- NA; runtime.fg <- NA
     }
   }
   ## one step Gaussian method
   if('osg' %in% methods){
+    t0 <- Sys.time()
     osg <- tryCatch(
       oneStepPredict(obj, observation.name=observation.name,
                      data.term.indicator='keep' ,
                      method="oneStepGaussian", trace=FALSE)$residual,
       error=function(e) 'error')
+    runtime.osg <- as.numeric(Sys.time()-t0, 'secs')
     if(is.character(osg)){
       warning("OSA one Step Gaussian failed")
-      osg <- NA
+      osg <- NA; runtime.osg <- NA
     }
   }
   ## cdf method
   if('cdf' %in% methods){
+    t0 <- Sys.time()
     cdf <- tryCatch(
       oneStepPredict(obj, observation.name=observation.name,
                      data.term.indicator='keep' ,
                      method="cdf", trace=FALSE)$residual,
       error=function(e) 'error')
-    if(is.character(cdf) | any(is.infinite(cdf))){
+    runtime.cdf <- as.numeric(Sys.time()-t0, 'secs')
+    if(is.character(cdf) | any(!is.finite(cdf))){
       warning("OSA cdf failed")
-      cdf <- NA
+      cdf <- NA; runtime.cdf <- NA
     }
   }
   ## one step Generic method
   if('gen' %in% methods){
+    t0 <- Sys.time()
     gen <- tryCatch(
       oneStepPredict(obj, observation.name=observation.name,
-                     data.term.indicator='keep' , range = Range, ##! range = c(0,Inf) only when obs>0 ,
+                     data.term.indicator='keep' ,
+                     range = Range,
+                     ##! range = c(0,Inf) only when obs>0 ,
                      method="oneStepGeneric", trace=FALSE)$residual,
       error=function(e) 'error')
-    if(is.character(gen)){
+    runtime.gen <- as.numeric(Sys.time()-t0, 'secs')
+    if(is.character(gen) | (!is.character(gen) & any(!is.finite(gen)))){
       warning("OSA Generic failed")
-      gen <- NA
+      gen <- NA; runtime.gen <- NA
     }
   }
-  return(list(gen=gen, fg=fg, osg=osg, cdf=cdf))
+  return(list(gen=gen, fg=fg, osg=osg, cdf=cdf,
+              runtime.gen=runtime.gen, runtime.fg=runtime.fg,
+              runtime.osg=runtime.osg, runtime.cdf=runtime.cdf))
 }
 
 
