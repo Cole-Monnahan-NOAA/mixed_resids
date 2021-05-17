@@ -29,7 +29,7 @@ Type objective_function<Type>::operator()()
     
     for(int i=0; i<y.size(); i++){
       mu(i) = b0 + u(group(i));
-      nll -= dnorm(y(i), mu(i), sig_y, true);
+      nll -= keep(i) * dnorm(y(i), mu(i), sig_y, true);
       cdf = squeeze(pnorm(y(i),  mu(i), sig_y ));
       nll -= keep.cdf_lower(i) * log( cdf );
       nll -= keep.cdf_upper(i) * log( 1.0 - cdf );

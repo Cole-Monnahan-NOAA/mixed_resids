@@ -160,8 +160,8 @@ run.spatial.iter <- function(ii, nobs=100, savefiles=TRUE){
     saveRDS(mles, file=paste0('results/spatial_mles/mles_', ii, '.RDS'))
   }
   message(ii, ": Calculating residuals..")
-  osa0 <- calculate.osa(obj0, methods=c('gen', 'fg', 'osg', 'cdf'), observation.name='y')
-  osa1 <- calculate.osa(obj1, methods=c('gen', 'fg', 'osg', 'cdf'), observation.name='y')
+  osa0 <- calculate.osa(obj0, methods=c('gen', 'fg', 'osg', 'cdf')[-1], observation.name='y')
+  osa1 <- calculate.osa(obj1, methods=c('gen', 'fg', 'osg', 'cdf')[-1], observation.name='y')
 
   ## DHARMa resids, both conditional and unconditional
   ## hack to get this to evaluate in a function

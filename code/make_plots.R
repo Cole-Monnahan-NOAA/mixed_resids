@@ -73,15 +73,15 @@ g <- resids.long %>% filter(replicate<5) %>%
   facet_grid(model~type) + stat_qq_line()
 ggsave("plots/qq_plots.png", g, width=10, height=6)
 
-resids.long <- resids %>%
-  select(c(contains('runtime'), model, version, replicate)) %>%
-  group_by(model, version, replicate) %>% slice_head(n=1) %>%
-  pivot_longer(contains('runtime'), names_to='type', names_prefix='runtime.',
-               values_to='runtime')
-g <- ggplot(resids.long, aes(version, y=runtime)) + geom_violin() +
-  facet_grid(model~type, scale='free_y') + scale_y_log10()
-ggsave("plots/runtime_by_type.png", g, width=7, height=6)
-## resids.long %>% group_by(model, version, type) %>% summarize(mean=mean(runtime))
+## resids.long <- resids %>%
+##   select(c(contains('runtime'), model, version, replicate)) %>%
+##   group_by(model, version, replicate) %>% slice_head(n=1) %>%
+##   pivot_longer(contains('runtime'), names_to='type', names_prefix='runtime.',
+##                values_to='runtime')
+## g <- ggplot(resids.long, aes(version, y=runtime)) + geom_violin() +
+##   facet_grid(model~type, scale='free_y') + scale_y_log10()
+## ggsave("plots/runtime_by_type.png", g, width=7, height=6)
+## ## resids.long %>% group_by(model, version, type) %>% summarize(mean=mean(runtime))
 
 if(exists("spatial_pvals")){
 message("Spatial: making results plots...")
