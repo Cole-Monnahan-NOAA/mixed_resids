@@ -20,6 +20,44 @@ g <- filter(pvals, !grepl('osa', method)) %>%
 ggsave("plots/GOF_by_model_dharma.png", g, width=7, height=5)
 
 
+## Simplify down to coverage plots
+coverage <- pvals_ss %>% filter(test=='ad') %>%
+  group_by(method, nobs, version, model) %>%
+  summarize(reps=n()/1000, coverage=mean(pvalue<.05)-.05,
+            .groups='drop')
+## %>%
+##   filter(coverage>.001 & reps > .9)
+g <- ggplot(coverage, aes(model, y=coverage, color=factor(nobs)))+
+  geom_abline(slope=0, intercept=.05) +
+  facet_grid(method~.) + geom_jitter(width=.2, size=3, alpha=.5) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+ggsave('plots/coverage_by_method_nobs.png', g, width=4, height=6.5)
+## g <- ggplot(coverage, aes(nobs, y=coverage, group=model, color=factor(model)))+
+##   facet_grid(method~.) + geom_line()+ geom_point() +
+##   geom_abline(slope=0, intercept=.95) +
+##   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+## g
+## coverage <- pvals %>% group_by(method, test, version, model) %>%
+##   summarize(coverage=mean(pvalue>.05), .groups='drop') %>%
+##   filter(test=='ad')
+## g <- ggplot(coverage, aes(method, y=coverage, color=test))+
+##   facet_grid(model~.) + geom_point() + geom_abline(slope=0, intercept=.95)
+## g
+## coverage <- pvals %>% group_by(method, test, version, model) %>%
+##   summarize(coverage=mean(pvalue>.05), .groups='drop') %>%
+##   filter(test=='ad')
+## g <- ggplot(coverage, aes(method, y=coverage, color=test))+
+##   facet_grid(model~.) + geom_point() + geom_abline(slope=0, intercept=.95)
+## g
+
+tests <- pvals %>%
+  group_by(test, method, version, model) %>%
+  summarize(coverage=mean(pvalue<.05)-.95, .groups='drop') %>%
+  pivot_wider(names_from='test', values_from='coverage')
+ggplot(tests, aes(ks, ad, color=method)) + geom_point() + facet_grid(model~.)
+
+
+
 resids <- bind_rows(randomwalk_resids, simpleGLMM_resids,
                     linmod_resids, spatial_resids)
 ## resids %>% group_by(model, version)  %>% summarize(max(maxgrad))
