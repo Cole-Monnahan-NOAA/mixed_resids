@@ -84,8 +84,8 @@ run.simpleGLMM.iter <- function(ii, ngroups=5, nobs=20, savefiles=TRUE){
   }
 
   message(ii, ": Calculating residuals..")
-  osa0 <- calculate.osa(obj0, methods=c('gen','fg', 'osg', 'cdf'), observation.name='y')
-  osa1 <- calculate.osa(obj1, methods=c('gen','fg', 'osg', 'cdf'), observation.name='y')
+  osa0 <- calculate.osa(obj0, methods=c('gen','fg', 'osg', 'cdf')[2], observation.name='y')
+  osa1 <- calculate.osa(obj1, methods=c('gen','fg', 'osg', 'cdf')[2], observation.name='y')
 
   ## DHARMa resids, both conditional and unconditional
   ## hack to get this to evaluate in a function

@@ -39,8 +39,10 @@ calc.osa.pvals <- function(osa){
   fg.ks <- osg.ks <- cdf.ks <- gen.ks <- NA
   fg.ad <- osg.ad <- cdf.ad <- gen.ad <- NA
   if(is.numeric(osa$fg)){
-    fg.ad <- goftest::ad.test(osa$fg,'pnorm', estimated = TRUE)$p.value
-    fg.ks <- suppressWarnings(ks.test(osa$fg,'pnorm')$p.value)
+    fg.ad <- goftest::ad.test(osa$fg,'pnorm', mean=mean(osa$fg),
+                              sd=sd(osa$fg), estimated = TRUE)$p.value
+    fg.ks <- suppressWarnings(ks.test(osa$fg,'pnorm',
+                                      mean=mean(osa$fg), sd=sd(osa$fg))$p.value)
   }
   if(is.numeric(osa$osg)){
     osg.ad <- goftest::ad.test(osa$osg,'pnorm', estimated = TRUE)$p.value
