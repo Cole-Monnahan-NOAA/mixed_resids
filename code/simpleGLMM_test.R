@@ -20,7 +20,7 @@ compile('models/simpleGLMM.cpp')
 dyn.load(dynlib('models/simpleGLMM'))
 
 #check consistency
-out <- simulate.simpleGLMM(seed = 1)
+out <- simulate.simpleGLMM(seed = 123)
 out$Data$sim_re <- 1
 obj <- MakeADFun(out$Data, out$Par, random = "u", DLL = "simpleGLMM", silent = TRUE)
 opt <- nlminb(obj$par, obj$fn, obj$gr)
@@ -34,8 +34,7 @@ for(i in 1:nsim){
   obj <- MakeADFun(out$Data, out$Par, random = "u", DLL = "simpleGLMM", silent = TRUE)
   opt <- nlminb(obj$par, obj$fn, obj$gr)
   osa <- oneStepPredict(obj,observation.name = 'y',
-                        data.term.indicator = 'keep',
                         method = 'fullGaussian')
   fg.pval[i] <- ad.test(osa$residual, null = 'pnorm', estimated = TRUE)$p.value[[1]]
 }
-hist(fg.pval, xlim = c(0,1),breaks= 500)
+hist(fg.pval, xlim = c(0,1))
