@@ -1,4 +1,4 @@
-simulate.simpleGLMM <- function(seed, b0 = 4, sig2 = c(.5,10), ngroups=3, nobs=10){
+simulate.simpleGLMM <- function(seed = NULL, b0 = 4, sig2 = c(.5,10), ngroups=3, nobs=10){
   sig2.y <- sig2[1] # within group variance
   sig2.u <- sig2[2] # between group variance
   set.seed(seed)
@@ -20,7 +20,7 @@ compile('models/simpleGLMM.cpp')
 dyn.load(dynlib('models/simpleGLMM'))
 
 #check consistency
-out <- simulate.simpleGLMM(seed = 123)
+out <- simulate.simpleGLMM(seed = 1)
 out$Data$sim_re <- 1
 obj <- MakeADFun(out$Data, out$Par, random = "u", DLL = "simpleGLMM", silent = TRUE)
 opt <- nlminb(obj$par, obj$fn, obj$gr)
@@ -30,7 +30,7 @@ nsim <- 500
 fg.pval <- rep(0,nsim)
 set.seed(123)
 for(i in 1:nsim){
-  out <- simulate.simpleGLMM(seed = NULL)
+  out <- simulate.simpleGLMM()
   obj <- MakeADFun(out$Data, out$Par, random = "u", DLL = "simpleGLMM", silent = TRUE)
   opt <- nlminb(obj$par, obj$fn, obj$gr)
   osa <- oneStepPredict(obj,observation.name = 'y',
