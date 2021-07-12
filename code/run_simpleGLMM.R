@@ -43,6 +43,8 @@ mles <- lapply(fs, readRDS) %>% bind_rows
 saveRDS(mles, file='results/simpleGLMM_mles.RDS')
 
 
+
+stop("Temp code beyond here")
 temp <- resids %>%   filter(version=='m0' & replicate==1) %>%
   select(c(y, ypred, version, osa.fg))
 
