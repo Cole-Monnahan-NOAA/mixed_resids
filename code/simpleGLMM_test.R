@@ -1,8 +1,9 @@
-library(TMB)
 library(goftest)
 library(DHARMa)
+library(TMB)
 compile('models/simpleGLMM.cpp')
 dyn.load(dynlib('models/simpleGLMM'))
+library(tmbstan)
 source("code/startup.R")
 
 simulate.simpleGLMM <- function(seed = NULL, b0 = 4, sig2 = c(.5,10), ngroups=3, nobs=10){
@@ -22,17 +23,18 @@ simulate.simpleGLMM <- function(seed = NULL, b0 = 4, sig2 = c(.5,10), ngroups=3,
 }
 
 #check consistency
-out <- simulate.simpleGLMM(seed = 123)
+n.groups <- 10; n.obs <- 15
+out <- simulate.simpleGLMM(141, ngroups=n.groups, nobs=n.obs)
 out$Data$sim_re <- 1
 obj <- MakeADFun(out$Data, out$Par, random = "u", DLL = "simpleGLMM", silent = TRUE)
 opt <- nlminb(obj$par, obj$fn, obj$gr)
 print(checkConsistency(obj))
 
-nsim <- 500
-uncond.pval <- cond.pval <- fg.pval <- rep(0,nsim)
-set.seed(123)
+## Now quick simulation testing of pvalues
+nsim <- 5000
+uncond.pval <- cond.pval <- fg.pval <- posttruth.pval <- postmle.pval <- rep(0,nsim)
 for(i in 1:nsim){
-  out <- simulate.simpleGLMM(i)
+  out <- simulate.simpleGLMM(i, ngroups=n.groups, nobs=n.obs)
   obj <- MakeADFun(out$Data, out$Par, random = "u", DLL = "simpleGLMM", silent = TRUE)
   opt <- nlminb(obj$par, obj$fn, obj$gr)
   rep <- obj$report()
@@ -55,97 +57,37 @@ for(i in 1:nsim){
   resids.uncond <- residuals(dharma.uncond, quantileFunction = qnorm,
                              outlierValues = c(-7,7))
   uncond.pval[i] <- ad.test(resids.uncond, null = 'pnorm', estimated = TRUE)$p.value[[1]]
+  ## Use posterior draws via tmbstan, after fixing the FE at
+  ## either the truth or the MLE
+  map <- list(b0=factor(NA), ln_sig_u=factor(NA), ln_sig_y=factor(NA))
+  pars <- list(b0=4, ln_sig_u=log(sqrt(out$sig2[2])), ln_sig_y=log(sqrt(out$sig2[1])), u=rep(0, n.groups))
+  objtruth <- MakeADFun(out$Data, parameters=pars, map = map)
+  fittruth <- tmbstan(objtruth, chains=1, warmup=500, iter=501, refresh=-1)
+  ## Take single posterior sample
+  posttruth <- as.numeric(as.matrix(fittruth))
+  Fx <- pnorm(q=out$Data$y,
+              mean=pars$b0+ posttruth[out$Data$group+1],
+              sd=exp(pars$ln_sig_y))
+  residual <- qnorm(Fx)
+  posttruth.pval[i] <- ad.test(residual, null='pnorm', estimated=TRUE)$p.value[1]
+  ## Redo but use the MLE values
+  pars <- c(as.list(opt$par)); pars$u <- rep(0, len=n.groups)
+  objmle <- MakeADFun(out$Data, parameters=pars, map = map)
+  fitmle <- tmbstan(objmle, chains=1, warmup=500, iter=501, refresh=-1)
+  ## Take single posterior sample
+  postmle <- as.numeric(as.matrix(fitmle))
+  Fx <- pnorm(q=out$Data$y,
+              mean=pars$b0+ postmle[out$Data$group+1],
+              sd=exp(pars$ln_sig_y))
+  residual <- qnorm(Fx)
+  postmle.pval[i] <- ad.test(residual, null='pnorm', estimated=TRUE)$p.value[1]
 }
 
-par(mfrow=c(3,1))
-hist(fg.pval, xlim = c(0,1))
-hist(cond.pval, xlim = c(0,1))
-hist(uncond.pval, xlim = c(0,1))
-dev.off()
+pvals <-
+  tibble(fg.pval, cond.pval, uncond.pval, posttruth.pval,
+                postmle.pval) %>%
+  pivot_longer(cols=everything(), names_to='method',
+                values_to='pvalue') %>%
+                mutate(method=gsub('.pval', '', method))
+ggplot(pvals, aes(pvalue)) + facet_wrap('method') + geom_histogram(bins=20)
 
-## Try Kasper's simulation residuals using tmbstan
-library(tmbstan)
-
-#Laplace approx can be biased when n.obs small
-n.groups <- 5
-n.obs <- 50
-out <- simulate.simpleGLMM(1, ngroups=n.groups, nobs=n.obs)
-out$Data$sim_re <- 1
-obj <- MakeADFun(out$Data, out$Par, random = "u", DLL = "simpleGLMM", silent = TRUE)
-opt <- nlminb(obj$par, obj$fn, obj$gr)
-sdr <- sdreport(obj)
-sdr
-chk <- checkConsistency(obj)
-chk
-s <- summary(chk)
-s$marginal$p.value
-
-report <- obj$report()
-res.fg <- oneStepPredict(obj, observation.name = 'y', method = 'fullGaussian')
-qqnorm(res.fg$residual); qqline(res.fg$residual)
-
-
-## Remake Obj with fixed effects at their truth
-FIXED <- factor(NA)
-map <- list(b0=FIXED, ln_sig_u=FIXED, ln_sig_y=FIXED)
-pars <- list(b0=4, ln_sig_u=log(sqrt(out$sig2[2])), ln_sig_y=log(sqrt(out$sig2[1])), u=rep(0, n.groups))
-obj2 <- MakeADFun(out$Data, parameters=pars, map = map)
-fit2 <- tmbstan(obj2)
-u.post2 <- as.matrix(fit2)[,1:n.groups]
-#posteriors centered around true values of u with some bias
-hist(u.post2[,1], breaks = 100); abline(v=out$u[1],col='red')
-hist(u.post2[,2], breaks = 100); abline(v=out$u[2],col='red')
-hist(u.post2[,3], breaks = 100); abline(v=out$u[3],col='red')
-hist(u.post2[,4], breaks = 100); abline(v=out$u[4],col='red')
-hist(u.post2[,5], breaks = 100); abline(v=out$u[5],col='red')
-pairs(u.post2)
-
-#mean. <- pars$b0+u.post2[,out$Data$group+1]
-#Fx <- t(apply(mean., 1, function(x) pnorm(out$Data$y, x, sd=exp(pars$ln_sig_y))))
-mean. <- pars$b0+apply(u.post2,2,median)[out$Data$group+1]
-Fx <- pnorm(out$Data$y, mean., sd=exp(pars$ln_sig_y))
-residual <- qnorm(Fx)
-qqnorm(residual); qqline(residual)
-ad.test(residual, 'pnorm')
-#boxplot(residual)
-plot(out$Data$y, residual)
-
-## Check correlations of resids
-# pairs(residual, horInd=1:8, verInd=1:8)
-
-## unconditional DHARMa:
-u <- t(replicate(4000, {rnorm(n.groups,0,sd=exp(pars$ln_sig_u))}))
-#simulations centered around 0
-hist(u[,1], breaks = 100); abline(v=out$u[1],col='red')
-hist(u[,2], breaks = 100); abline(v=out$u[2],col='red')
-hist(u[,3], breaks = 100); abline(v=out$u[3],col='red')
-hist(u[,4], breaks = 100); abline(v=out$u[4],col='red')
-hist(u[,5], breaks = 100); abline(v=out$u[5],col='red')
-pairs(u)
-mean. <- pars$b0 + u[,out$Data$group+1]
-y.sim <- sapply(1:4000, function(x) rnorm(n.groups*n.obs, mean.[x,], sd=exp(pars$ln_sig_y)))
-res.dharma <- createDHARMa(y.sim,out$Data$y, fittedPredictedResponse = rep(pars$b0,n.groups*n.obs))
-qqnorm(res.dharma$scaledResiduals); qqline(res.dharma$scaledResiduals)
-plot( out$Data$y, res.dharma$scaledResiduals)
-
-#use DHARMa mean in pnorm method
-mean. <- pars$b0+apply(u,2,median)[out$Data$group+1]
-Fx <- pnorm(out$Data$y, mean., sd=exp(pars$ln_sig_y))
-residual <- qnorm(Fx)
-qqnorm(residual[is.finite(residual)]); qqline(residual[is.finite(residual)])
-plot(out$Data$y, residual)
-
-#use stan mean in DHARMa method
-mean. <-  pars$b0 + u.post2[,out$Data$group+1]
-y.sim <- sapply(1:4000, function(x) rnorm(n.groups*n.obs, mean.[x,], sd=exp(pars$ln_sig_y)))
-res.dharma <- createDHARMa(y.sim,out$Data$y, fittedPredictedResponse = rep(pars$b0,n.groups*n.obs))
-qqnorm(res.dharma$scaledResiduals); qqline(res.dharma$scaledResiduals)
-plot(out$Data$y, res.dharma$scaledResiduals)
-
-
-## conditional DHARMa:
-mean. <- pars$b0 + out$u[out$Data$group+1]
-y.sim <- sapply(1:4000, function(x) rnorm(n.groups*n.obs, mean., sd=exp(pars$ln_sig_y)))
-res.dharma <- createDHARMa(y.sim,out$Data$y, fittedPredictedResponse = rep(pars$b0,n.groups*n.obs))
-qqnorm(res.dharma$scaledResiduals); qqline(res.dharma$scaledResiduals)
-plot(out$Data$y, res.dharma$scaledResiduals )
