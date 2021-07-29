@@ -119,3 +119,16 @@ g <- ggplot(pvals, aes(pvalue)) + facet_wrap('method') +
 ggsave('plots/simpleGLMM_test.png', g, width=7, height=5)
 
 
+## Explore the simulated data in the parcond2 vs posterior ways
+fit <- tmbstan(objmle, iter=1000)
+post <- as.data.frame(fit)[,1:10]
+tmp <- replicate(2000, {
+  newpar <- mvtnorm::rmvnorm(1, mean=joint.mle, sigma=sdrmle$cov.fixed)
+  #objmle$simulate(par=newpar)[['y']]
+})[1,,] %>% t %>% as.data.frame
+names(post) <- names(tmp)
+xx <- bind_rows(data.frame(type='post', post),
+                data.frame(type='hessian', tmp))
+pairs(xx[,-1], col=ifelse(xx$type=='post', 1,2))
+## I'm confused why these are the same, but above the residuals
+## aren't right for parcond2
