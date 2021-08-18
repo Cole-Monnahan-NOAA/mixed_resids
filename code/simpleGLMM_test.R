@@ -1,7 +1,11 @@
 library(goftest)
+## experimental branch w/ rotation option
+## devtools::install_github(repo = "florianhartig/DHARMa",
+##                          subdir='DHARMa', ref = "issue301-rotation",
+##                          dependencies = TRUE, build_vignettes = TRUE)
 library(DHARMa)
 library(TMB)
-compile('models/simpleGLMM.cpp')
+TMB::compile('models/simpleGLMM.cpp')
 dyn.load(dynlib('models/simpleGLMM'))
 library(tmbstan)
 source("code/startup.R")
@@ -32,6 +36,7 @@ print(checkConsistency(obj))
 
 ## Now quick simulation testing of pvalues
 nsim <- 5000
+rotation <- 'estimated'
 parcond.pval <- parcond2.pval <- uncond.pval <- cond.pval <- fg.pval <- posttruth.pval <- postmle.pval <- rep(0,nsim)
 for(i in 1:nsim){
   out <- simulate.simpleGLMM(i, ngroups=n.groups, nobs=n.obs)
@@ -45,7 +50,8 @@ for(i in 1:nsim){
   obj$env$data$sim_re <- 0 #turn off RE simulation
   dharma.cond <- createDHARMa(replicate(1000, obj$simulate()$y),
                               observedResponse=out$Data$y,
-                              fittedPredictedResponse = rep$mu)
+                              fittedPredictedResponse = rep$mu,
+                              rotation=rotation)
   resids.cond <- residuals(dharma.cond, quantileFunction = qnorm,
                            outlierValues = c(-7,7))
   cond.pval[i] <- ad.test(resids.cond, null = 'pnorm', estimated = TRUE)$p.value[[1]]
@@ -53,7 +59,8 @@ for(i in 1:nsim){
   obj$env$data$sim_re <- 1 #turn on RE simulation
   dharma.uncond <- createDHARMa(replicate(1000, obj$simulate()$y),
                                 observedResponse=out$Data$y,
-                                fittedPredictedResponse = rep$mu)
+                                fittedPredictedResponse = rep$mu,
+                                rotation=rotation)
   resids.uncond <- residuals(dharma.uncond, quantileFunction = qnorm,
                              outlierValues = c(-7,7))
   uncond.pval[i] <- ad.test(resids.uncond, null = 'pnorm', estimated = TRUE)$p.value[[1]]
@@ -67,7 +74,8 @@ for(i in 1:nsim){
         newpar <- rmvnorm_prec(mu=joint.mle, prec=sdr$jointPrecision)
         obj$simulate(par=newpar)[['y']]
   })
-  dharma <- createDHARMa(tmp, dat$y, fittedPredictedResponse=rep$mu)
+  dharma <- createDHARMa(tmp, dat$y, fittedPredictedResponse=rep$mu,
+                         rotation=rotation)
   resids <- residuals(dharma, quantileFunction = qnorm, outlierValues = c(-7,7))
   parcond.pval[i] <- goftest::ad.test(resids,'pnorm', estimated = TRUE)$p.value
   ## To drop the fixed effects I Think I need to rebuild the obj
@@ -83,7 +91,8 @@ for(i in 1:nsim){
     newpar <- mvtnorm::rmvnorm(1, mean=joint.mle, sigma=sdrmle$cov.fixed)
     objmle$simulate(par=newpar)[['y']]
   })
-  dharma <- createDHARMa(tmp, dat$y, fittedPredictedResponse=rep$mu)
+  dharma <- createDHARMa(tmp, dat$y, fittedPredictedResponse=rep$mu,
+                         rotation=rotation)
   resids <- residuals(dharma, quantileFunction = qnorm, outlierValues = c(-7,7))
   parcond2.pval[i] <- goftest::ad.test(resids,'pnorm', estimated = TRUE)$p.value
   ## Use posterior draws via tmbstan, after fixing the FE at
@@ -114,6 +123,11 @@ pvals <-
   pivot_longer(cols=everything(), names_to='method',
                 values_to='pvalue') %>%
                 mutate(method=gsub('.pval', '', method))
+if(rotation=='estimated')
+  saveRDS(pvals, file='results/simpleGLMM_test_pvals_rotated.RDS')
+else
+  saveRDS(pvals, file='results/simpleGLMM_test_pvals_unrotated.RDS')
+
 g <- ggplot(pvals, aes(pvalue)) + facet_wrap('method') +
   geom_histogram(bins=20)
 ggsave('plots/simpleGLMM_test.png', g, width=7, height=5)
