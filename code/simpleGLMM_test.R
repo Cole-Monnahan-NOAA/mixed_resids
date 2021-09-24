@@ -1,4 +1,8 @@
 library(goftest)
+library(dplyr)
+library(ggplot2)
+theme_set(theme_bw())
+library(tidyr)
 ## experimental branch w/ rotation option
 ## devtools::install_github(repo = "florianhartig/DHARMa",
 ##                          subdir='DHARMa', ref = "issue301-rotation",
@@ -8,7 +12,7 @@ library(TMB)
 TMB::compile('models/simpleGLMM.cpp')
 dyn.load(dynlib('models/simpleGLMM'))
 library(tmbstan)
-source("code/startup.R")
+## source("code/startup.R")
 
 simulate.simpleGLMM <- function(seed = NULL, b0 = 4, sig2 = c(.5,10), ngroups=3, nobs=10){
   sig2.y <- sig2[1] # within group variance
@@ -26,13 +30,57 @@ simulate.simpleGLMM <- function(seed = NULL, b0 = 4, sig2 = c(.5,10), ngroups=3,
   return(list(Data=Data, Par=Par, u = u, y=y, sig2=sig2))
 }
 
-#check consistency
+## check consistency of LA
 n.groups <- 10; n.obs <- 15
 out <- simulate.simpleGLMM(141, ngroups=n.groups, nobs=n.obs)
 out$Data$sim_re <- 1
 obj <- MakeADFun(out$Data, out$Par, random = "u", DLL = "simpleGLMM", silent = TRUE)
 opt <- nlminb(obj$par, obj$fn, obj$gr)
 print(checkConsistency(obj))
+
+
+## Check differences among OSA methods
+get_osa_resids <- function(n.groups, n.obs, seed=1){
+  ## simualte and fit model
+  out <- simulate.simpleGLMM(seed, ngroups=n.groups, nobs=n.obs)
+  out$Data$sim_re <- 1
+  obj <- MakeADFun(out$Data, out$Par, random = "u", DLL = "simpleGLMM", silent = TRUE)
+  opt <- nlminb(obj$par, obj$fn, obj$gr)
+  ## calculate each of them
+  fg <- oneStepPredict(obj, observation.name='y',
+                       method="fullGaussian", trace=FALSE)$residual
+  osg <- oneStepPredict(obj, observation.name='y', data.term.indicator='keep',
+                        method="oneStepGaussian", trace=FALSE)$residual
+  cdf <- oneStepPredict(obj, observation.name='y', data.term.indicator='keep',
+                        method="cdf", trace=FALSE)$residual
+  gen <- oneStepPredict(obj, observation.name='y', data.term.indicator='keep',
+                        method="oneStepGeneric",
+                        trace=FALSE)$residual
+  ## compare residuals to the fullGaussian
+  data.frame(y=out$Data$y, group=out$Data$group, n.groups=n.groups, n.obs=n.obs,
+             fg=fg-fg, osg=osg-fg, cdf=cdf-fg, gen=gen-fg)
+}
+
+## Loop over some combinations to check more broadly. Takes a
+## while to run due to generic method
+xx <- lapply(c(10,20), function(x)
+              lapply( c(5,20), function(y)
+                get_osa_resids(x,y))) %>% bind_rows
+
+## FG is zero by definition so drop it and pivot longer for
+## plotting
+x <- xx %>% select(-fg) %>% pivot_longer(-(1:4), names_to='method', values_to='residual')
+
+## Generic and OSG are basically identical so drop them
+group_by(x, method) %>% summarize(max(abs(residual)))
+
+g <- ggplot(filter(x, method=='cdf'), aes(y, residual, color=factor(group))) +
+  facet_grid(n.groups~n.obs, scales='free')+
+  geom_point(alpha=.5) +
+  labs(x='simulated observation', y='CDF-FullGaussian residuals difference')
+ggsave('plots/OSA_consistency check.png', g, width=7, height=5)
+
+
 
 ## Now quick simulation testing of pvalues
 nsim <- 5000
@@ -128,9 +176,12 @@ if(rotation=='estimated')
 else
   saveRDS(pvals, file='results/simpleGLMM_test_pvals_unrotated.RDS')
 
-g <- ggplot(pvals, aes(pvalue)) + facet_wrap('method') +
-  geom_histogram(bins=20)
-ggsave('plots/simpleGLMM_test.png', g, width=7, height=5)
+xx <- bind_rows(cbind(rotation='unrotated', readRDS('results/simpleGLMM_test_pvals_unrotated.RDS')),
+                cbind(rotation='rotated', readRDS('results/simpleGLMM_test_pvals_rotated.RDS')))
+g <- filter(xx, !method %in% c('fg', 'postmle', 'posttruth')) %>%
+  ggplot(aes(pvalue, fill=rotation)) + facet_wrap('method') +
+  geom_histogram(bins=20, position='identity', alpha=.5)
+ggsave('plots/simpleGLMM_test_dharma_rotations.png', g, width=7, height=5)
 
 
 ## Explore the simulated data in the parcond2 vs posterior ways
