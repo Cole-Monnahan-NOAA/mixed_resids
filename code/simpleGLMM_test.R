@@ -57,29 +57,30 @@ get_osa_resids <- function(n.groups, n.obs, seed=1){
                         method="oneStepGeneric",
                         trace=FALSE)$residual
   ## compare residuals to the fullGaussian
-  data.frame(y=out$Data$y, group=out$Data$group, n.groups=n.groups, n.obs=n.obs,
+  data.frame(y=out$Data$y, group=out$Data$group, i=1:length(fg), n.groups=n.groups, n.obs=n.obs,
              fg=fg-fg, osg=osg-fg, cdf=cdf-fg, gen=gen-fg)
 }
 
 ## Loop over some combinations to check more broadly. Takes a
 ## while to run due to generic method
 xx <- lapply(c(10,20), function(x)
-              lapply( c(5,20), function(y)
+              lapply( c(5,20)[1], function(y)
                 get_osa_resids(x,y))) %>% bind_rows
 
 ## FG is zero by definition so drop it and pivot longer for
 ## plotting
-x <- xx %>% select(-fg) %>% pivot_longer(-(1:4), names_to='method', values_to='residual')
+x <- xx %>% select(-fg) %>% pivot_longer(-(1:5), names_to='method', values_to='residual')
 
 ## Generic and OSG are basically identical so drop them
 group_by(x, method) %>% summarize(max(abs(residual)))
 
-g <- ggplot(filter(x, method=='cdf'), aes(y, residual, color=factor(group))) +
+g <- ggplot(filter(x, method=='cdf'), aes(i, residual, color=factor(group))) +
   facet_grid(n.groups~n.obs, scales='free')+
-  geom_point(alpha=.5) +
-  labs(x='simulated observation', y='CDF-FullGaussian residuals difference')
+  geom_point() +
+  labs(x='observation order',
+       y='CDF-FullGaussian residuals difference')+
+ guides(color=guide_legend(ncol=2))
 ggsave('plots/OSA_consistency check.png', g, width=7, height=5)
-
 
 
 ## Now quick simulation testing of pvalues
