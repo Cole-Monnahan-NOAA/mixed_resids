@@ -23,13 +23,13 @@ setup_trueparms <- function(mod, misp){
     sd.vec <- sqrt(c(.5,10))
     fam <- 'Gaussian'
     link <- 'identity'
-    
+
     #parms when fam = 'Poisson'; link = 'log'
     # theta <- 1.5
     # sd.vec <- sqrt(c(.5,2))
     # fam <- 'Poisson'
     # link <- 'log'
-    
+
     sp.parm <- 0
     if(misp=='miss.cov'){
       #parms when fam = 'Gaussian';link='identity
@@ -48,7 +48,7 @@ setup_trueparms <- function(mod, misp){
     link <- 'log'
     if(misp=='miss.cov'){
       theta <- c(1,2)
-    } 
+    }
     if(misp=='overdispersion'){
       sd.vec <- c(sd.vec, sd.vec[1]*2)
     }
@@ -66,56 +66,56 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
   library(tidyr)
   library(R.utils)
   library(goftest)
-  
+
   if(mod == 'linmod'){
     Random <- FALSE
   } else {
     Random <- TRUE
   }
-  
+
   setupTMB(mod)
   true.parms <- setup_trueparms(mod,misp)
   osa.methods <- c('fg', 'osg', 'gen', 'cdf')
-  dharma.methods <- c('parcond', 'uncond', 'cond')
-  
+  dharma.methods <- c('parcond', 'uncond', 'cond')[-1]
+
   ## simulate data with these parameters
   message(ii, ": Simulating data...")
   sim.dat <- simdat(n, ng, mod, cov.mod, true.parms, misp, ii)
-  
+
   init.dat <- mkTMBdat(sim.dat, true.parms, mod, misp)
   init.par <- mkTMBpar(true.parms, sim.dat, mod, misp, do.true)
   init.random <- mkTMBrandom(mod, misp, do.true)
   init.map <- mkTMBmap(init.par, mod, misp, true.parms$fam, do.true)
   mod.out <- osa.out <- dharma.out <- list(h0 = NULL, h1 = NULL)
-  pvals <- data.frame(type = character(), method = character(), 
+  pvals <- data.frame(type = character(), method = character(),
                       test = character(), version = character(), pvalue = numeric())
   mles <- list(true = true.parms)
   r <- list()
-  
+
   for(h in 1:2){
-    
+
     message(ii, ": Optimizing two competing models...")
     init.obj <- list(data = init.dat[[h]], parameters = init.par[[h]], map = init.map[[h]], random = init.random[[h]], DLL = mod)
     mod.out[[h]] <- fit_tmb(obj.args = init.obj, control = list(run.model = !do.true, do.sdreport = TRUE))
-    
+
     mles[[names(mod.out)[h]]] <- mod.out[[h]]$opt$par
 
     message(ii, ": Calculating residuals..")
     disc <- FALSE; ran <- c(-Inf,Inf)
     if(!is.null(true.parms$fam)){
-      if(true.parms$fam == 'Poisson') disc <- TRUE 
-      if(true.parms$fam == 'Gamma') ran <- c(0,Inf) 
+      if(true.parms$fam == 'Poisson') disc <- TRUE
+      if(true.parms$fam == 'Gamma') ran <- c(0,Inf)
     }
     osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, methods=osa.methods, observation.name='y', Discrete = disc, Range = ran)
-    
+
     expr <- expression(obj$simulate()$y)
     dharma.out[[h]]$cond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], fpr=mod.out[[h]]$report$fpr)
     mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
     dharma.out[[h]]$uncond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], fpr=mod.out[[h]]$report$fpr)
     #not working for randomwalk model
-    dharma.out[[h]]$parcond <- calculate.jp(mod.out[[h]]$obj, mod.out[[h]]$sdr, mod.out[[h]]$opt, 
+    dharma.out[[h]]$parcond <- calculate.jp(mod.out[[h]]$obj, mod.out[[h]]$sdr, mod.out[[h]]$opt,
                                             sim.dat[[h]], 'y', fpr=mod.out[[h]]$report$fpr, random = Random)
-    
+
     r[[h]] <- data.frame(model=mod, replicate=ii, y=sim.dat[[h]],
                          ypred=mod.out[[h]]$report$exp_val, version=names(mod.out)[h],
                          osa.cdf = osa.out[[h]]$cdf, osa.gen = osa.out[[h]]$gen,
@@ -133,7 +133,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
                          maxgrad=max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))),
                          AIC=mod.out[[h]]$aic$AIC, AICc=mod.out[[h]]$aic$AICc)
 
-    pvals <- rbind(pvals, calc.pvals( type = 'osa', method = osa.methods, mod = mod, 
+    pvals <- rbind(pvals, calc.pvals( type = 'osa', method = osa.methods, mod = mod,
                                       res.obj = osa.out[[h]], version = names(mod.out)[h],
                                       fam = true.parms$fam, do.true ))
     pvals <- rbind(pvals, calc.pvals( type = 'sim', method = dharma.methods, mod = mod,
@@ -150,12 +150,12 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
         pvals <- rbind(pvals, data.frame(type='sim', method=dharma.methods[m], model=mod, test='SAC', version = names(mod.out)[h],
                        pvalue = calc.sac(dharma.out[[h]][[dharma.methods[m]]]$resids, wt)))
       }
-      
+
     }
   }
   resids <- rbind(r[[1]], r[[2]])
   pvals$replicate = ii
-  
+
   if(savefiles){
     dir.create(paste0('results/', mod, '_pvals'), showWarnings=FALSE)
     dir.create(paste0('results/', mod, '_resids'), showWarnings=FALSE)
@@ -164,13 +164,13 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     dir.create(paste0('results/', mod, '_mles'), showWarnings=FALSE)
     saveRDS(mles, file=paste0('results/', mod, '_mles/mles_', ii, '.RDS'))
   }
-  # 
+  #
   # if(ii==1 & savefiles){
   #   message("Making plots for replicate 1...")
   #   library(ggplot2)
     ## Need to generalize plots
     # if(mod == 'simpleGLMM'){
-    # 
+    #
     #   resids.long <- cbind(resids,x=1:length(dat0$y), group=c(dat0$group, dat1$group)) %>%
     #     pivot_longer(c('osa.cdf', 'osa.gen', 'osa.fg', 'osa.osg',
     #                    'sim_cond', 'sim_uncond', 'sim_parcond')) %>%
@@ -188,9 +188,9 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     #                    'sim_cond')) %>%
     #     filter(!is.na(value))
     # }
-    
-# 
-#     
+
+#
+#
 #     ## plot of resids
 #     g <- ggplot(resids.long, aes(x, y=value, color=factor(group))) +
 #       geom_point() + facet_grid(version~name) +
@@ -230,10 +230,10 @@ mkTMBdat <- function(Dat, Pars, Mod, Misp){
   if(Mod == 'simpleGLMM'){
     ng <- length(Dat$random$u)
     ni <- length(Dat$y0)/ng
-    dat0 <- list(y=Dat$y0, X = Dat$x, 
+    dat0 <- list(y=Dat$y0, X = Dat$x,
                  group = rep(0:(ng-1), each = ni),
                  obs = rep(0:(ni-1), ng),
-                 family = fam_enum(Pars$fam), 
+                 family = fam_enum(Pars$fam),
                  link = link_enum(Pars$link),
                  sim_re = 0)
     dat1 <- dat0
@@ -243,9 +243,9 @@ mkTMBdat <- function(Dat, Pars, Mod, Misp){
     loc <- Dat$loc
     mesh <- Dat$mesh
     dd <- as.matrix(dist(loc))
-    dat0 <- list(y = Dat$y0, X = Dat$x, dd = dd, nu = 1, 
+    dat0 <- list(y = Dat$y0, X = Dat$x, dd = dd, nu = 1,
                  mesh_i = mesh$idx$loc-1, sim_re = 0,
-                 family = fam_enum(Pars$fam), 
+                 family = fam_enum(Pars$fam),
                  link = link_enum(Pars$link), reStruct = 10)
     dat0$spde <-  INLA::inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
     dat1 <- dat0
@@ -259,7 +259,7 @@ mkTMBdat <- function(Dat, Pars, Mod, Misp){
 }
 
 mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
-  
+
   if(Mod == 'linmod'){
     if(doTrue){
       par0 <-  list(beta = Pars$theta, ln_sig = log(Pars$sd.vec[1]))
@@ -267,12 +267,12 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
       par0 <- list(beta = c(0,0), ln_sig = 0)
     }
     par1 <- par0
-      
+
     if(Misp == 'miss.cov'){
       par1$beta <- par1$beta[1]
     }
   }
-  
+
   if(Mod == 'randomwalk'){
     if(doTrue){
       par0 <-  list(u = Dat$random$u, mu = Pars$theta, ln_sig = log(Pars$sd.vec[1]), ln_tau = log(Pars$sd.vec[2]))
@@ -281,15 +281,15 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
     }
     par1 <- par0
   }
-  
+
   if(Mod == 'simpleGLMM'){
     if(doTrue){
-      par0 <- list(beta = Pars$theta, ln_sig_y = log(Pars$sd.vec[1]), 
-                   ln_sig_u = log(Pars$sd.vec[2]), ln_sig_v = numeric(0), 
+      par0 <- list(beta = Pars$theta, ln_sig_y = log(Pars$sd.vec[1]),
+                   ln_sig_u = log(Pars$sd.vec[2]), ln_sig_v = numeric(0),
                    u = Dat$random$u, v = rep(0,length(Dat$y0)/length(Dat$random$u)))
     } else {
-      par0 <- list(beta = 0, ln_sig_y = 0, ln_sig_u = 0, ln_sig_v = numeric(0), 
-                   u = rep(0, length(Dat$random$u)), 
+      par0 <- list(beta = 0, ln_sig_y = 0, ln_sig_u = 0, ln_sig_v = numeric(0),
+                   u = rep(0, length(Dat$random$u)),
                    v = rep(0, length(Dat$y0)/length(Dat$random$u)))
     }
     if(Pars$fam == "Poisson") par0$ln_sig_y = numeric(0)
@@ -304,13 +304,13 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
     }
     if(Misp == 'miss.cov'){
       par1$beta <- par1$beta[1]
-      if(!doTrue) par0$beta <- c(0,0)  
+      if(!doTrue) par0$beta <- c(0,0)
     }
   }
-  
+
   if(Mod == 'spatial'){
     if(doTrue){
-      par0 <- list(beta = Pars$theta, theta = log(Pars$sd.vec[1]), 
+      par0 <- list(beta = Pars$theta, theta = log(Pars$sd.vec[1]),
                    ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/Pars$sp.parm*sd.vec[2])),
                    ln_kappa = log(sqrt(8)/Pars$sp.parm),
                    ln_sig_v = numeric(0),
