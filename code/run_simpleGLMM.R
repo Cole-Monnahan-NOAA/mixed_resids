@@ -44,40 +44,40 @@ saveRDS(mles, file='results/simpleGLMM_mles.RDS')
 
 
 
-stop("Temp code beyond here")
-temp <- resids %>%   filter(version=='m0' & replicate==1) %>%
-  select(c(y, ypred, version, osa.fg))
+## stop("Temp code beyond here")
+## temp <- resids %>%   filter(version=='m0' & replicate==1) %>%
+##   select(c(y, ypred, version, osa.fg))
 
-ggplot(temp, aes(y, osa.fg, color=version)) + geom_point()
-ggplot(temp, aes(sample=osa.fg, color=version)) + geom_qq() + facet_wrap('version')
+## ggplot(temp, aes(y, osa.fg, color=version)) + geom_point()
+## ggplot(temp, aes(sample=osa.fg, color=version)) + geom_qq() + facet_wrap('version')
 
-ad.test(temp$osa.fg, "pnorm", mean=mean(temp$osa.fg),
-        sd=sd(temp$osa.fg), estimated=TRUE)
-ad.test(temp$osa.fg, "pnorm")
-
-
-pvals %>% filter(version=='m0' & method=='osa.fg' & grepl('GOF', x=test)) %>%
-  ggplot(aes(pvalue, fill=test)) +
-  geom_histogram(position='identity', alpha=.5)
+## ad.test(temp$osa.fg, "pnorm", mean=mean(temp$osa.fg),
+##         sd=sd(temp$osa.fg), estimated=TRUE)
+## ad.test(temp$osa.fg, "pnorm")
 
 
-## Quick exploration of cholesky rotation
-set.seed(2355)
-N <- 5
-Sigma <- rWishart(1, df=N, Sigma=diag(N))[,,1]
-cov2cor(Sigma)
-(ses <- sqrt(diag(Sigma)))
-
-Y <- rmvnorm(500, sigma=Sigma)
-pairs(Y)
-
-L <- t(chol(Sigma))
-L %*% t(L)-Sigma # check
+## pvals %>% filter(version=='m0' & method=='osa.fg' & grepl('GOF', x=test)) %>%
+##   ggplot(aes(pvalue, fill=test)) +
+##   geom_histogram(position='identity', alpha=.5)
 
 
-z <- rnorm(N)
-y <- L %*% z
-pairs(rbind(Y,t(y)), col=c(rep(1,500), 2), pch=16)
+## ## Quick exploration of cholesky rotation
+## set.seed(2355)
+## N <- 5
+## Sigma <- rWishart(1, df=N, Sigma=diag(N))[,,1]
+## cov2cor(Sigma)
+## (ses <- sqrt(diag(Sigma)))
 
-Z <- solve(L) %*% t(Y) %>% t
-pairs(Z)
+## Y <- rmvnorm(500, sigma=Sigma)
+## pairs(Y)
+
+## L <- t(chol(Sigma))
+## L %*% t(L)-Sigma # check
+
+
+## z <- rnorm(N)
+## y <- L %*% z
+## pairs(rbind(Y,t(y)), col=c(rep(1,500), 2), pch=16)
+
+## Z <- solve(L) %*% t(Y) %>% t
+## pairs(Z)
