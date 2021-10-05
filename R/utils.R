@@ -68,7 +68,7 @@ run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = 
   unlink(paste0('results/',mod,'_pvals', TRUE))
   unlink(paste0('results/', mod,'_mles', TRUE))
 
-  message("Preparing workspace to run ", length(reps), " iterations in parallel...")
+  message(mod,": Preparing workspace to run ", length(reps), " iterations in parallel...")
   ## TMB::compile(paste0("src/",mod,".cpp")) # modified for simulation
   sfInit( parallel=TRUE, cpus=cpus )
   ## sfExport('run.linmod.iter', 'sim.omega', 'cMatern', 'sim.data',
