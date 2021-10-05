@@ -166,6 +166,11 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     dir.create(paste0('results/', mod, '_mles'), showWarnings=FALSE)
     saveRDS(mles, file=paste0('results/', mod, '_mles/mles_', ii, '.RDS'))
   }
+
+  ## Tack this on for plotting later
+  resids$do.true <- do.true
+  pvals$do.true <- do.true
+
   #
   # if(ii==1 & savefiles){
   #   message("Making plots for replicate 1...")
