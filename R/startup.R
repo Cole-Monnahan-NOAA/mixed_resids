@@ -24,3 +24,8 @@ source('R/model_fns.R')
 source('R/resid_fns.R')
 
 
+message("Compiling models if needed...")
+TMB::compile('src/linmod.cpp')
+TMB::compile('src/randomwalk.cpp')
+TMB::compile('src/simpleGLMM.cpp')
+TMB::compile('src/spatial.cpp')
