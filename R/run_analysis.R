@@ -26,19 +26,40 @@ packageVersion('DHARMa')                # 0.3.3.0
 ##   conditioned on data)
 
 (cpus <- parallel::detectCores()-2)
-reps <- 1:1000
+reps <- 1:500
 
 do.true <- TRUE
 
 ## Simple linear model as sanity check. Some resid methods not
 ## applicable b/c no random effects
-run_model(reps, mod='linmod', misp='overdispersion', do.true = do.true, savefiles=TRUE)
+run_model(reps, mod='linmod', misp='overdispersion', do.true = do.true)
 ## Random walk from the paper
-run_model(reps, mod='randomwalk', misp='mu0', do.true = do.true, savefiles=TRUE)
+run_model(reps, mod='randomwalk', misp='mu0', do.true = do.true)
 ## Andrea's simple GLMM with 5 groups
-run_model(reps, ng = 5, mod='simpleGLMM', misp='miss.cov', do.true = do.true, savefiles=TRUE)
-## Simple spatial SPDE model
-run_model(reps, mod='spatial', misp='overdispersion', do.true = do.true, savefiles=TRUE)
+run_model(reps, ng = 5, mod='simpleGLMM', misp='miss.cov', do.true = do.true)
+## ## Simple spatial SPDE model
+## run_model(reps, mod='spatial', misp='overdispersion', do.true = do.true)
+
+
+pvals <- lapply(list.files('results', pattern='_pvals.RDS',
+                           full.names=TRUE), readRDS) %>% bind_rows
+
+## Effect of do.true for true model
+filter(pvals, version=='h0' & method != 'uncond' &  test=='GOF.ks') %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(model~method) + geom_histogram(position='identity', alpha=.5)
+
+## KS vs AD for true model
+pvals %>% filter(version=='h0'& test!= 'outlier' & do.true==FALSE) %>%
+  ggplot(aes(pvalue, fill=test)) +
+  facet_grid(model~method) + geom_histogram(position='identity', alpha=.5)
+
+## Model version for KS test
+pvals %>% filter(test== 'GOF.ks' & do.true==FALSE) %>%
+  ggplot(aes(pvalue, fill=version)) +
+  facet_grid(model~method) + geom_histogram(position='identity', alpha=.5)
+
+
 
 #! Not modified yet
 # ## This script runs the same examples above but with varying
