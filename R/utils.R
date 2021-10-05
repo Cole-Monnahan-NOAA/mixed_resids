@@ -1,4 +1,4 @@
-#' Setup C++ TMB code 
+#' Setup C++ TMB code
 #'
 #' @param comp boolean that determines whether or not to compile the C++ file
 #'
@@ -45,10 +45,10 @@ fit_tmb <- function(obj.args, opt.args = list(control = list(iter = 800, eval = 
 
 ## Quick fn to check for failed runs by looking at results output
 ## that doesn't exist
-which.failed <- function(Nreps){
+which.failed <- function(reps){
   success <- gsub('results/spatial_pvals/pvals_|.RDS', "", x=fs) %>%
     as.numeric()
-  fail <- which(! 1:Nreps %in% success)
+  fail <- which(! reps %in% success)
   fail
 }
 
@@ -61,37 +61,37 @@ add_aic <- function(opt,n){
 }
 
 
-run_model <- function(Nreps, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FALSE, savefiles=TRUE){
-  
+run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FALSE, savefiles=TRUE){
+
   ## Clean up the old runs
   unlink(paste0('results/',mod,'_resids', TRUE))
   unlink(paste0('results/',mod,'_pvals', TRUE))
   unlink(paste0('results/', mod,'_mles', TRUE))
-  
-  message("Preparing workspace to run ", Nreps, " iterations in parallel...")
-  TMB::compile(paste0("src/",mod,".cpp")) # modified for simulation
+
+  message("Preparing workspace to run ", length(reps), " iterations in parallel...")
+  ## TMB::compile(paste0("src/",mod,".cpp")) # modified for simulation
   sfInit( parallel=TRUE, cpus=cpus )
   ## sfExport('run.linmod.iter', 'sim.omega', 'cMatern', 'sim.data',
   ##          'rmvnorm_prec', 'add_aic')
   sfExportAll()
-  
+
   message("Starting parallel runs...")
-  results <- sfLapply(1:Nreps, function(ii) run_iter(ii, n, ng, mod, cov.mod, misp, do.true, savefiles))
-  #results <- sapply(1:Nreps, function(ii) run_iter(ii, n, ng, mod, cov.mod, misp, do.true, savefiles))
-  
+  results <- sfLapply(reps, function(ii) run_iter(ii, n, ng, mod, cov.mod, misp, do.true, savefiles))
+  #results <- sapply(reps, function(ii) run_iter(ii, n, ng, mod, cov.mod, misp, do.true, savefiles))
+
   ## ## Read results back in from file
   ## fs <- list.files('results/linmod_pvals/', full.names=TRUE)
   ## ## Sometimes they fail to run for some unkonwn reason so try
   ## ## rerunning those ones once
-  ## if(length(fs)<Nreps){
+  ## if(length(fs)<length(reps)){
   ##   message("Rerunning some failed runs...")
-  ##   bad <- which.failed(Nreps)
+  ##   bad <- which.failed(reps)
   ##   results <- sfLapply(bad, function(ii) run.linmod.iter(ii))
   ##   fs <- list.files('results/linmod_pvals/', full.names=TRUE)
   ## }
-  ## bad <- which.failed(Nreps)
+  ## bad <- which.failed(reps)
   ## if(length(bad)>0) warning(length(bad), " runs failed")
-  
+
   message("Processing and saving final results...")
   ## Read results back in from file
   fs <- list.files(paste0('results/',mod,'_pvals/'), full.names=TRUE)
@@ -105,5 +105,5 @@ run_model <- function(Nreps, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true =
   ##! mles need to be standardize, so far they are saved as list
   #mles <- lapply(fs, readRDS) %>% bind_rows
   #saveRDS(mles, file=paste0('results/',mod,'_mles.RDS'))
-  
+
 }
