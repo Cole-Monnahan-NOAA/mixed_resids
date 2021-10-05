@@ -26,19 +26,19 @@ packageVersion('DHARMa')                # 0.3.3.0
 ##   conditioned on data)
 
 (cpus <- parallel::detectCores()-2)
-Nreps <- 5000
+reps <- 1:1000
 
-
+do.true <- TRUE
 
 ## Simple linear model as sanity check. Some resid methods not
 ## applicable b/c no random effects
-run_model(Nreps, mod='linmod', misp='overdispersion', do.true = FALSE, savefiles=TRUE)
+run_model(reps, mod='linmod', misp='overdispersion', do.true = do.true, savefiles=TRUE)
 ## Random walk from the paper
-run_model(Nreps, mod='randomwalk', misp='mu0', do.true = FALSE, savefiles=TRUE)
+run_model(reps, mod='randomwalk', misp='mu0', do.true = do.true, savefiles=TRUE)
 ## Andrea's simple GLMM with 5 groups
-run_model(Nreps, ng = 5, mod='simpleGLMM', misp='miss.cov', do.true = FALSE, savefiles=TRUE)
+run_model(reps, ng = 5, mod='simpleGLMM', misp='miss.cov', do.true = do.true, savefiles=TRUE)
 ## Simple spatial SPDE model
-run_model(Nreps, mod='spatial', misp='overdispersion', do.true = FALSE, savefiles=TRUE)
+run_model(reps, mod='spatial', misp='overdispersion', do.true = do.true, savefiles=TRUE)
 
 #! Not modified yet
 # ## This script runs the same examples above but with varying
