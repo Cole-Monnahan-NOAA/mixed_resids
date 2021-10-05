@@ -116,6 +116,9 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     dharma.out[[h]]$parcond <- calculate.jp(mod.out[[h]]$obj, mod.out[[h]]$sdr, mod.out[[h]]$opt,
                                             sim.dat[[h]], 'y', fpr=mod.out[[h]]$report$fpr, random = Random)
 
+    AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC)
+    AICc <- ifelse(do.true, NA, mod.out[[h]]$aic$AICc)
+    maxgrad <- ifelse(do.true,NA, max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) )
     r[[h]] <- data.frame(model=mod, replicate=ii, y=sim.dat[[h]],
                          ypred=mod.out[[h]]$report$exp_val, version=names(mod.out)[h],
                          osa.cdf = osa.out[[h]]$cdf, osa.gen = osa.out[[h]]$gen,
@@ -130,8 +133,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
                          runtime.fg=osa.out[[h]]$runtime.fg,
                          runtime.osg=osa.out[[h]]$runtime.osg,
                          runtime.gen=osa.out[[h]]$runtime.gen,
-                         maxgrad=max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))),
-                         AIC=mod.out[[h]]$aic$AIC, AICc=mod.out[[h]]$aic$AICc)
+                         maxgrad=maxgrad, AIC=AIC, AICc=AICc)
 
     pvals <- rbind(pvals, calc.pvals( type = 'osa', method = osa.methods, mod = mod,
                                       res.obj = osa.out[[h]], version = names(mod.out)[h],
@@ -155,7 +157,6 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
   }
   resids <- rbind(r[[1]], r[[2]])
   pvals$replicate = ii
-  browser()
   if(savefiles){
     if(do.true) mod <- paste0(mod, "_true")
     dir.create(paste0('results/', mod, '_pvals'), showWarnings=FALSE)
