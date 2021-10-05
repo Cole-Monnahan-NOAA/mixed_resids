@@ -93,6 +93,7 @@ run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = 
   ## if(length(bad)>0) warning(length(bad), " runs failed")
 
   message("Processing and saving final results...")
+  if(do.true) mod <- paste0(mod, "_true")
   ## Read results back in from file
   fs <- list.files(paste0('results/',mod,'_pvals/'), full.names=TRUE)
   pvals <- lapply(fs, readRDS) %>% bind_rows %>% filter(!is.na(pvalue))

@@ -155,8 +155,9 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
   }
   resids <- rbind(r[[1]], r[[2]])
   pvals$replicate = ii
-
+  browser()
   if(savefiles){
+    if(do.true) mod <- paste0(mod, "_true")
     dir.create(paste0('results/', mod, '_pvals'), showWarnings=FALSE)
     dir.create(paste0('results/', mod, '_resids'), showWarnings=FALSE)
     saveRDS(pvals, file=paste0('results/', mod, '_pvals/pvals_', ii, '.RDS'))
