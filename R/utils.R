@@ -92,6 +92,7 @@ run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = 
   ## bad <- which.failed(reps)
   ## if(length(bad)>0) warning(length(bad), " runs failed")
 
+  sfStop()
   message("Processing and saving final results...")
   if(do.true) mod <- paste0(mod, "_true")
   ## Read results back in from file
@@ -106,5 +107,4 @@ run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = 
   ##! mles need to be standardize, so far they are saved as list
   #mles <- lapply(fs, readRDS) %>% bind_rows
   #saveRDS(mles, file=paste0('results/',mod,'_mles.RDS'))
-
 }

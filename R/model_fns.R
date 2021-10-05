@@ -157,6 +157,9 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
   }
   resids <- rbind(r[[1]], r[[2]])
   pvals$replicate = ii
+  ## Tack this on for plotting later
+  resids$do.true <- do.true
+  pvals$do.true <- do.true
   if(savefiles){
     if(do.true) mod <- paste0(mod, "_true")
     dir.create(paste0('results/', mod, '_pvals'), showWarnings=FALSE)
@@ -167,9 +170,6 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     saveRDS(mles, file=paste0('results/', mod, '_mles/mles_', ii, '.RDS'))
   }
 
-  ## Tack this on for plotting later
-  resids$do.true <- do.true
-  pvals$do.true <- do.true
 
   #
   # if(ii==1 & savefiles){
