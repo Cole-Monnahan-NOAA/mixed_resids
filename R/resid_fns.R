@@ -1,7 +1,7 @@
 calculate.osa <- function(obj, methods, observation.name,
                           data.term.indicator='keep',
                           Range = c(-Inf,Inf), Discrete = NULL, 
-                          DiscreteSupport = NULL, Subset = NULL){
+                          Subset = NULL){
   ## OSA residuals
   fg <- osg <- cdf <- gen <- NA
   runtime.fg <- runtime.osg <- runtime.cdf <- runtime.gen <- NA
@@ -10,7 +10,7 @@ calculate.osa <- function(obj, methods, observation.name,
     fg <- tryCatch(
       oneStepPredict(obj, observation.name=observation.name,
                      method="fullGaussian", trace=FALSE,
-                     discrete = Discrete, discreteSupport = DiscreteSupport,
+                     discrete = Discrete,
                      subset = Subset)$residual,
       error=function(e) 'error')
     runtime.fg <- as.numeric(Sys.time()-t0, 'secs')
@@ -26,7 +26,7 @@ calculate.osa <- function(obj, methods, observation.name,
       oneStepPredict(obj, observation.name=observation.name,
                      data.term.indicator='keep' ,
                      method="oneStepGaussian", trace=FALSE,
-                     discrete = Discrete, discreteSupport = DiscreteSupport,
+                     discrete = Discrete, 
                      subset = Subset)$residual,
       error=function(e) 'error')
     runtime.osg <- as.numeric(Sys.time()-t0, 'secs')
@@ -42,7 +42,7 @@ calculate.osa <- function(obj, methods, observation.name,
       oneStepPredict(obj, observation.name=observation.name,
                      data.term.indicator='keep' ,
                      method="cdf", trace=FALSE,
-                     discrete = Discrete, discreteSupport = DiscreteSupport,
+                     discrete = Discrete, 
                      subset = Subset)$residual,
       error=function(e) 'error')
     runtime.cdf <- as.numeric(Sys.time()-t0, 'secs')
@@ -60,7 +60,7 @@ calculate.osa <- function(obj, methods, observation.name,
                      range = Range,
                      ##! range = c(0,Inf) only when obs>0 ,
                      method="oneStepGeneric", trace=FALSE,
-                     discrete = Discrete, discreteSupport = DiscreteSupport,
+                     discrete = Discrete, 
                      subset = Subset)$residual,
       error=function(e) 'error')
     runtime.gen <- as.numeric(Sys.time()-t0, 'secs')
@@ -218,7 +218,7 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
                                  sd=sd(res.obj[[method[m]]]), estimated = TRUE)$p.value
         }
         ks <- suppressWarnings(ks.test(res.obj[[method[m]]],'pnorm')$p.value)
-        df <- rbind(df, data.frame(type='osa', method=method[m], model=mod, test='GOF.ad', version = version, pvalue = ad))
+      #  df <- rbind(df, data.frame(type='osa', method=method[m], model=mod, test='GOF.ad', version = version, pvalue = ad))
         df <- rbind(df, data.frame(type='osa', method=method[m], model=mod, test='GOF.ks', version = version, pvalue = ks))
       }
     }
@@ -273,7 +273,7 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
         }
         ks <- suppressWarnings(ks.test(res.obj[[method[m]]]$out$scaledResiduals,'punif')$p.value)
     
-        df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='GOF.ad', version = version, pvalue = ad))
+     #   df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='GOF.ad', version = version, pvalue = ad))
         df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='GOF.ks', version = version, pvalue = ks))
       }
     }
