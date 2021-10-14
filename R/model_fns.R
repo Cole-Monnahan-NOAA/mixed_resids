@@ -75,8 +75,6 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
 
   setupTMB(mod)
   true.parms <- setup_trueparms(mod,misp)
-  osa.methods <- c('fg', 'osg', 'gen', 'cdf')
-  dharma.methods <- c('parcond', 'uncond', 'cond')[-1]
 
   ## simulate data with these parameters
   message(ii, ": Simulating data...")
@@ -103,18 +101,23 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     message(ii, ": Calculating residuals..")
     disc <- FALSE; ran <- c(-Inf,Inf)
     if(!is.null(true.parms$fam)){
-      if(true.parms$fam == 'Poisson') disc <- TRUE
+      if(true.parms$fam == 'Poisson') disc <- TRUE; ran <- c(0,Inf)
       if(true.parms$fam == 'Gamma') ran <- c(0,Inf)
     }
     osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, methods=osa.methods, observation.name='y', Discrete = disc, Range = ran)
 
     expr <- expression(obj$simulate()$y)
-    dharma.out[[h]]$cond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], fpr=mod.out[[h]]$report$fpr)
-    mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
-    dharma.out[[h]]$uncond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], fpr=mod.out[[h]]$report$fpr)
+    if('cond' %in% dharma.methods){
+      dharma.out[[h]]$cond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], fpr=mod.out[[h]]$report$fpr)
+    }
+    
+    if('uncond' %in% dharma.methods){
+      mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
+      dharma.out[[h]]$uncond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], fpr=mod.out[[h]]$report$fpr)
+    }
     #not working for randomwalk model
-    dharma.out[[h]]$parcond <- calculate.jp(mod.out[[h]]$obj, mod.out[[h]]$sdr, mod.out[[h]]$opt,
-                                            sim.dat[[h]], 'y', fpr=mod.out[[h]]$report$fpr, random = Random)
+    # dharma.out[[h]]$parcond <- calculate.jp(mod.out[[h]]$obj, mod.out[[h]]$sdr, mod.out[[h]]$opt,
+    #                                         sim.dat[[h]], 'y', fpr=mod.out[[h]]$report$fpr, random = Random)
 
     AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC)
     AICc <- ifelse(do.true, NA, mod.out[[h]]$aic$AICc)
@@ -125,10 +128,10 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
                          osa.fg=osa.out[[h]]$fg, osa.osg=osa.out[[h]]$osg,
                          sim_cond= dharma.out[[h]]$cond$resids,
                          sim_uncond=dharma.out[[h]]$uncond$resids,
-                         sim_parcond=dharma.out[[h]]$parcond$resids,
+                        # sim_parcond=dharma.out[[h]]$parcond$resids,
                          runtime_cond=dharma.out[[h]]$cond$runtime,
                          runtime_uncond=dharma.out[[h]]$uncond$runtime,
-                         runtime_parcond=dharma.out[[h]]$parcond$runtime,
+                        # runtime_parcond=dharma.out[[h]]$parcond$runtime,
                          runtime.cdf=osa.out[[h]]$runtime.cdf,
                          runtime.fg=osa.out[[h]]$runtime.fg,
                          runtime.osg=osa.out[[h]]$runtime.osg,

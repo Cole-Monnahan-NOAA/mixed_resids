@@ -29,16 +29,21 @@ packageVersion('DHARMa')                # 0.3.3.0
 reps <- 1:500
 
 do.true <- TRUE
+osa.methods <- c('fg', 'osg', 'gen', 'cdf')
+dharma.methods <- c('uncond', 'cond')
 
 ## Simple linear model as sanity check. Some resid methods not
 ## applicable b/c no random effects
+## possible mispecifications: 
 run_model(reps, mod='linmod', misp='overdispersion', do.true = do.true)
 ## Random walk from the paper
 run_model(reps, mod='randomwalk', misp='mu0', do.true = do.true)
 ## Andrea's simple GLMM with 5 groups
 run_model(reps, ng = 5, mod='simpleGLMM', misp='miss.cov', do.true = do.true)
-## ## Simple spatial SPDE model
-## run_model(reps, mod='spatial', misp='overdispersion', do.true = do.true)
+## Simple spatial SPDE model
+#Turn off generic method - takes too long
+osa.methods <- c('cdf') #only 'cdf' and 'gen' suitable for discrete distributions
+run_model(reps, mod='spatial', misp='overdispersion', do.true = do.true)
 
 
 pvals <- lapply(list.files('results', pattern='_pvals.RDS',
