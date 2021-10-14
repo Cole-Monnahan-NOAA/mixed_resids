@@ -87,8 +87,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
   mod.out <- osa.out <- dharma.out <- list(h0 = NULL, h1 = NULL)
   pvals <- data.frame(type = character(), method = character(),
                       test = character(), version = character(), pvalue = numeric())
-  mles <- list(true = true.parms)
-  r <- list()
+  mles <-  r <- list()
 
   for(h in 1:2){
 
@@ -96,8 +95,11 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     init.obj <- list(data = init.dat[[h]], parameters = init.par[[h]], map = init.map[[h]], random = init.random[[h]], DLL = mod)
     mod.out[[h]] <- fit_tmb(obj.args = init.obj, control = list(run.model = !do.true, do.sdreport = TRUE))
 
-    mles[[names(mod.out)[h]]] <- mod.out[[h]]$opt$par
 
+    tmp1 <- unlist(true.parms); tmp2 <- mod.out[[h]]$obj$env$last.par.best
+    ## Save the true values and estimated ones to file
+    mles[[h]] <- rbind(data.frame(h=h-1, type='true', par=names(tmp1), value=as.numeric(tmp1)),
+                       data.frame(h=h-1, type='mle', par=names(tmp2), value=as.numeric(tmp2)))
     message(ii, ": Calculating residuals..")
     disc <- FALSE; ran <- c(-Inf,Inf)
     if(!is.null(true.parms$fam)){
@@ -110,7 +112,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     if('cond' %in% dharma.methods){
       dharma.out[[h]]$cond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], fpr=mod.out[[h]]$report$fpr)
     }
-    
+
     if('uncond' %in% dharma.methods){
       mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
       dharma.out[[h]]$uncond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], fpr=mod.out[[h]]$report$fpr)
@@ -163,6 +165,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
   ## Tack this on for plotting later
   resids$do.true <- do.true
   pvals$do.true <- do.true
+  mles <- cbind(replicate=ii, do.true=do.true,  model=mod, do.call(rbind, mles))
   if(savefiles){
     if(do.true) mod <- paste0(mod, "_true")
     dir.create(paste0('results/', mod, '_pvals'), showWarnings=FALSE)

@@ -70,7 +70,7 @@ run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = 
 
   message(mod,": Preparing workspace to run ", length(reps), " iterations in parallel...")
   ## TMB::compile(paste0("src/",mod,".cpp")) # modified for simulation
-  sfInit( parallel=TRUE, cpus=cpus )
+  sfInit( parallel=cpus>1, cpus=cpus )
   ## sfExport('run.linmod.iter', 'sim.omega', 'cMatern', 'sim.data',
   ##          'rmvnorm_prec', 'add_aic')
   sfExportAll()
@@ -104,7 +104,6 @@ run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = 
   resids <- lapply(fs, readRDS) %>% bind_rows
   saveRDS(resids, file=paste0('results/',mod,'_resids.RDS'))
   fs <- list.files(paste0('results/',mod,'_mles/'), full.names=TRUE)
-  ##! mles need to be standardize, so far they are saved as list
-  #mles <- lapply(fs, readRDS) %>% bind_rows
-  #saveRDS(mles, file=paste0('results/',mod,'_mles.RDS'))
+  mles <- lapply(fs, readRDS) %>% bind_rows
+  saveRDS(mles, file=paste0('results/',mod,'_mles.RDS'))
 }
