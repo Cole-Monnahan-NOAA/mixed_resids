@@ -101,7 +101,10 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     message(ii, ": Calculating residuals..")
     disc <- FALSE; ran <- c(-Inf,Inf)
     if(!is.null(true.parms$fam)){
-      if(true.parms$fam == 'Poisson') disc <- TRUE; ran <- c(0,Inf)
+      if(true.parms$fam == 'Poisson'){
+        disc <- TRUE
+        ran <- c(0,Inf)
+      } 
       if(true.parms$fam == 'Gamma') ran <- c(0,Inf)
     }
     osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, methods=osa.methods, observation.name='y', Discrete = disc, Range = ran)
@@ -119,9 +122,9 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     # dharma.out[[h]]$parcond <- calculate.jp(mod.out[[h]]$obj, mod.out[[h]]$sdr, mod.out[[h]]$opt,
     #                                         sim.dat[[h]], 'y', fpr=mod.out[[h]]$report$fpr, random = Random)
 
-    AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC)
-    AICc <- ifelse(do.true, NA, mod.out[[h]]$aic$AICc)
-    maxgrad <- ifelse(do.true,NA, max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) )
+    AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC) #!doesn't work if doTrue == TRUE
+    AICc <- ifelse(do.true, NA, mod.out[[h]]$aic$AICc) #!doesn't work if doTrue == TRUE
+    maxgrad <- ifelse(do.true,NA, max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) ) #!doesn't work if doTrue == TRUE
     r[[h]] <- data.frame(model=mod, replicate=ii, y=sim.dat[[h]],
                          ypred=mod.out[[h]]$report$exp_val, version=names(mod.out)[h],
                          osa.cdf = osa.out[[h]]$cdf, osa.gen = osa.out[[h]]$gen,
@@ -331,6 +334,9 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
                    ln_sig_v = numeric(0),
                    omega = rep(0, length(Dat$random$omega)),
                    v = rep(0,length(Dat$y0)))
+      if(Misp == 'miss.cov'){
+        par0$beta <- c(0,0)
+      }
     }
     if(Pars$fam == "Poisson") par0$theta = 0
     par1 <- par0

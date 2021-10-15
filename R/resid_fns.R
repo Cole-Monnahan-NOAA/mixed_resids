@@ -46,7 +46,7 @@ calculate.osa <- function(obj, methods, observation.name,
                      subset = Subset)$residual,
       error=function(e) 'error')
     runtime.cdf <- as.numeric(Sys.time()-t0, 'secs')
-    if(is.character(cdf) | any(!is.finite(cdf))){
+    if(is.character(cdf)){# | any(!is.finite(cdf))){
       warning("OSA cdf failed")
       cdf <- NA; runtime.cdf <- NA
     }
@@ -58,7 +58,6 @@ calculate.osa <- function(obj, methods, observation.name,
       oneStepPredict(obj, observation.name=observation.name,
                      data.term.indicator='keep' ,
                      range = Range,
-                     ##! range = c(0,Inf) only when obs>0 ,
                      method="oneStepGeneric", trace=FALSE,
                      discrete = Discrete, 
                      subset = Subset)$residual,
@@ -211,12 +210,12 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
       if(is.numeric(res.obj[[method[m]]])){
         #outlier, disp, GOF.ad, GOF.ks !outlier test not available yet for osa
 
-        if(doTrue){
-          ad <- goftest::ad.test(res.obj[[method[m]]],'pnorm', estimated = FALSE)$p.value #assume mean=0,sd=1?
-        } else {
-          ad <- goftest::ad.test(res.obj[[method[m]]],'pnorm', mean=mean(res.obj[[method[m]]]),
-                                 sd=sd(res.obj[[method[m]]]), estimated = TRUE)$p.value
-        }
+        # if(doTrue){
+        #   ad <- goftest::ad.test(res.obj[[method[m]]],'pnorm', estimated = FALSE)$p.value #assume mean=0,sd=1?
+        # } else {
+        #   ad <- goftest::ad.test(res.obj[[method[m]]],'pnorm', mean=mean(res.obj[[method[m]]]),
+        #                          sd=sd(res.obj[[method[m]]]), estimated = TRUE)$p.value
+        # }
         ks <- suppressWarnings(ks.test(res.obj[[method[m]]],'pnorm')$p.value)
       #  df <- rbind(df, data.frame(type='osa', method=method[m], model=mod, test='GOF.ad', version = version, pvalue = ad))
         df <- rbind(df, data.frame(type='osa', method=method[m], model=mod, test='GOF.ks', version = version, pvalue = ks))
@@ -266,11 +265,11 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
           df <- rbind(df,  data.frame(type='sim',method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
         }
         
-        if(doTrue){
-          ad <- goftest::ad.test(res.obj[[method[m]]]$out$scaledResiduals,'punif')$p.value #assume mean=0,sd=1?
-        } else {
-          ad <- goftest::ad.test(res.obj[[method[m]]]$out$scaledResiduals,'punif', estimated = TRUE)$p.value
-        }
+        # if(doTrue){
+        #   ad <- goftest::ad.test(res.obj[[method[m]]]$out$scaledResiduals,'punif')$p.value #assume mean=0,sd=1?
+        # } else {
+        #   ad <- goftest::ad.test(res.obj[[method[m]]]$out$scaledResiduals,'punif', estimated = TRUE)$p.value
+        # }
         ks <- suppressWarnings(ks.test(res.obj[[method[m]]]$out$scaledResiduals,'punif')$p.value)
     
      #   df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='GOF.ad', version = version, pvalue = ad))
