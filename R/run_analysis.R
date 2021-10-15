@@ -34,13 +34,18 @@ dharma.methods <- c('uncond', 'cond')
 
 ## Simple linear model as sanity check. Some resid methods not
 ## applicable b/c no random effects
-## possible mispecifications:
+
+## possible mispecifications: overdispersion, outliers, miss.cov
+
 run_model(reps, mod='linmod', misp='overdispersion', do.true = do.true)
 ## Random walk from the paper
+## possible mispecifications: mu0, outliers
 run_model(reps, mod='randomwalk', misp='mu0', do.true = do.true)
 ## Andrea's simple GLMM with 5 groups
+## possible mispecifications: overdispersion, outliers, miss.cov
 run_model(reps, ng = 5, mod='simpleGLMM', misp='miss.cov', do.true = do.true)
 ## Simple spatial SPDE model
+## possible mispecifications: overdispersion, outliers, miss.cov, misp.omega
 #Turn off generic method - takes too long
 osa.methods <- c('cdf') #only 'cdf' and 'gen' suitable for discrete distributions
 run_model(reps, mod='spatial', misp='overdispersion', do.true = do.true)
