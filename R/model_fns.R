@@ -120,9 +120,43 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
       mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
       dharma.out[[h]]$uncond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], fpr=mod.out[[h]]$report$fpr)
     }
-    #not working for randomwalk model
-    # dharma.out[[h]]$parcond <- calculate.jp(mod.out[[h]]$obj, mod.out[[h]]$sdr, mod.out[[h]]$opt,
-    #                                         sim.dat[[h]], 'y', fpr=mod.out[[h]]$report$fpr, random = Random)
+
+    ## only makes sense to run when MLE is estimated and there
+    ## are no RE
+    if('mcmc' %in% osa.methods & !do.true & Random ){
+      t0 <- Sys.time()
+      ## Build up TMB obj again
+      FE <- mod.out[[h]]$opt$par # estimated FE
+      ## make into list; https://stackoverflow.com/questions/46251725/convert-named-vector-to-list-in-r/46251794
+      FE <- split(unname(FE),names(FE))
+      MLE <- modifyList(init.par[[h]], FE) #
+      ## Get FE and map them off
+      xx <- names(MLE)[-which(names(MLE) %in% init.random[[h]])]
+      map <- lapply(names(FE), function(x) factor(FE[[x]]*NA))
+      names(map) <- names(FE)
+      map <- c(map, init.map[[h]])
+      ## Rebuild with original FE mapped off and RE as FE
+      objmle <- MakeADFun(data=init.dat[[h]], parameters=MLE,
+                          map=map, DLL=mod.out[[h]]$obj$env$DLL)
+      fitmle <- tmbstan::tmbstan(objmle, chains=1, warmup=300, iter=301, seed=ii, refresh=-1)
+      postmle <- as.numeric(as.matrix(fitmle)) ## single sample
+      postmle <- postmle[-length(postmle)] # drop lp__ value
+      ## Calculate residuals given the sample
+      tmp <- objmle$report(postmle)
+      if(mod=='spatial'){
+        Fx <- ppois(init.dat[[h]]$y, tmp$exp_val)
+        px <- dpois(init.dat[[h]]$y, tmp$exp_val)
+        u <- runif(length(Fx))
+        osa.out[[h]]$mcmc <- qnorm(Fx - u * px)
+      } else {
+        sig <- if(is.null(tmp$sig)) tmp$sig_y else tmp$sig
+        Fx <- pnorm(q=init.dat[[h]]$y, mean= tmp$exp_val, sd=sig)
+        osa.out[[h]]$mcmc <-  qnorm(Fx)
+      }
+      osa.out[[h]]$runtime.mcmc <- as.numeric(Sys.time()-t0, 'secs')
+    } else {
+      osa.out[[h]]$mcmc <- osa.out[[h]]$runtime.mcmc <- NA
+    }
 
     AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC) #!doesn't work if doTrue == TRUE
     AICc <- ifelse(do.true, NA, mod.out[[h]]$aic$AICc) #!doesn't work if doTrue == TRUE
@@ -131,6 +165,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
                          ypred=mod.out[[h]]$report$exp_val, version=names(mod.out)[h],
                          osa.cdf = osa.out[[h]]$cdf, osa.gen = osa.out[[h]]$gen,
                          osa.fg=osa.out[[h]]$fg, osa.osg=osa.out[[h]]$osg,
+                         osa.mcmc=osa.out[[h]]$mcmc,
                          sim_cond= dharma.out[[h]]$cond$resids,
                          sim_uncond=dharma.out[[h]]$uncond$resids,
                         # sim_parcond=dharma.out[[h]]$parcond$resids,
@@ -141,6 +176,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
                          runtime.fg=osa.out[[h]]$runtime.fg,
                          runtime.osg=osa.out[[h]]$runtime.osg,
                          runtime.gen=osa.out[[h]]$runtime.gen,
+                         runtime.mcmc=osa.out[[h]]$runtime.mcmc,
                          maxgrad=maxgrad, AIC=AIC, AICc=AICc)
 
     pvals <- rbind(pvals, calc.pvals( type = 'osa', method = osa.methods, mod = mod,
