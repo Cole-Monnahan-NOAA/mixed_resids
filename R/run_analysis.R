@@ -34,7 +34,9 @@ dharma.methods <- c('uncond', 'cond')
 
 ## Simple linear model as sanity check. Some resid methods not
 ## applicable b/c no random effects
+
 ## possible mispecifications: overdispersion, outliers, miss.cov
+
 run_model(reps, mod='linmod', misp='overdispersion', do.true = do.true)
 ## Random walk from the paper
 ## possible mispecifications: mu0, outliers
@@ -51,6 +53,10 @@ run_model(reps, mod='spatial', misp='overdispersion', do.true = do.true)
 
 pvals <- lapply(list.files('results', pattern='_pvals.RDS',
                            full.names=TRUE), readRDS) %>% bind_rows
+
+mles <- lapply(list.files('results', pattern='_mles.RDS',
+                           full.names=TRUE), readRDS) %>% bind_rows
+
 
 ## Effect of do.true for true model
 filter(pvals, version=='h0' & method != 'uncond' &  test=='GOF.ks') %>%
