@@ -2,11 +2,13 @@
 ## Unit tests for functions from resid_fns.R
 source('../../R/sim_data.R')
 source('../../R/model_fns.R')
+source('../../R/resid_fns.R')
 source('../../R/utils.R')
 library(TMB)
 library(INLA)
+library(DHARMa)
 
-
+## Test model in = model out
 run_iter_test <- function(ii, n, ng=0, mod, cov.mod = 'norm', misp, fit.true = FALSE, savefiles=TRUE){
   dyn.load(dynlib(paste0('../../src/',mod)))
   true.parms <- setup_trueparms(mod,misp)
@@ -259,6 +261,37 @@ test_that('spatial, misp.omega',{
   expect_equal(dat$random$v, mod.true$h1$obj$env$parList()$v)
   
 })
+
+context('functional test on run_iter') #verify all combinations work: model x do.true x method x version
+mod.misp <- list(linmod = c('overdispersion', 'outliers', 'miss.cov'),
+                 randomwalk = c('mu0', 'outliers'),
+                 simpleGLMM = c('overdispersion', 'outliers', 'miss.cov'),
+                 spatial = c('overdispersion', 'outliers', 'miss.cov', 'misp.omega'))
+osa.methods <- c('fg', 'osg', 'gen', 'cdf')
+dharma.methods <- c('uncond', 'cond')
+for(m in 1:4){
+  if(m==3) N <- 20 else N <- 100
+  if(names(mod.misp[m]) == 'spatial') osa.methods <- c('cdf')
+  n.misp <- length(mod.misp[[m]])
+  for(n in 1:n.misp){
+    out.true <- run_iter(ii=1, n=N, ng=5, mod=names(mod.misp)[m], 
+                                      misp=mod.misp[[m]][n], do.true = TRUE, savefiles=FALSE)
+    out.false <- run_iter(ii=1, n=N, ng=5, mod=names(mod.misp)[m], 
+                         misp=mod.misp[[m]][n], do.true = FALSE, savefiles=FALSE)
+    test_that(paste0('model: ', names(mod.misp)[m], ', mis-specification: ', mod.misp[[m]][n]),{
+      expect_equal(c('pvals', 'resids', 'mles'), names(out.true))
+      expect_equal(c('pvals', 'resids', 'mles'), names(out.false))
+      expect_true(all(osa.methods %in% out.true$pvals$method))
+      expect_true(all(osa.methods %in% out.false$pvals$method))
+      expect_true(all(dharma.methods %in% out.true$pvals$method))
+      expect_true(all(dharma.methods %in% out.false$pvals$method))
+      expect_equal(unique(out.true$pvals$model), names(mod.misp)[m])
+      expect_equal(2*(length(osa.methods) + length(dharma.methods)), sum(out.true$pvals$test == 'GOF.ks')) #!cdf fails for linmod-overdispersion and miss.cov-h1
+      expect_equal(2*(length(osa.methods) + length(dharma.methods)), sum(out.false$pvals$test == 'GOF.ks')) 
+    })
+    rm(out.true, out.false)
+  }
+}
 
 
 # context('linmod tests')
