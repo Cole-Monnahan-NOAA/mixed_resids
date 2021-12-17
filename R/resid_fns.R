@@ -1,6 +1,6 @@
 calculate.osa <- function(obj, methods, observation.name,
                           data.term.indicator='keep',
-                          Range = c(-Inf,Inf), Discrete = NULL, 
+                          Range = c(-Inf,Inf), Discrete = NULL,
                           Subset = NULL){
   ## OSA residuals
   fg <- osg <- cdf <- gen <- NA
@@ -26,7 +26,7 @@ calculate.osa <- function(obj, methods, observation.name,
       oneStepPredict(obj, observation.name=observation.name,
                      data.term.indicator='keep' ,
                      method="oneStepGaussian", trace=FALSE,
-                     discrete = Discrete, 
+                     discrete = Discrete,
                      subset = Subset)$residual,
       error=function(e) 'error')
     runtime.osg <- as.numeric(Sys.time()-t0, 'secs')
@@ -42,7 +42,7 @@ calculate.osa <- function(obj, methods, observation.name,
       oneStepPredict(obj, observation.name=observation.name,
                      data.term.indicator='keep' ,
                      method="cdf", trace=FALSE,
-                     discrete = Discrete, 
+                     discrete = Discrete,
                      subset = Subset)$residual,
       error=function(e) 'error')
     runtime.cdf <- as.numeric(Sys.time()-t0, 'secs')
@@ -59,7 +59,7 @@ calculate.osa <- function(obj, methods, observation.name,
                      data.term.indicator='keep' ,
                      range = Range,
                      method="oneStepGeneric", trace=FALSE,
-                     discrete = Discrete, 
+                     discrete = Discrete,
                      subset = Subset)$residual,
       error=function(e) 'error')
     runtime.gen <- as.numeric(Sys.time()-t0, 'secs')
@@ -127,7 +127,7 @@ calculate.dharma <- function(obj, expr, N=1000, obs, fpr){
 #     pval.ad <- goftest::ad.test(resids,'pnorm', estimated = TRUE)$p.value
 #     return(list(disp=disp, outlier=outlier, pval.ks=pval.ks, pval.ad=pval.ad))
 #   }
-# 
+#
 
 ## Function to simulate parameters from the joint precisions
 ## matrix (fixed + random effects). Modified from
@@ -224,7 +224,7 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
     if(!is.null(fam)){
       if(fam == 'Poisson'){
         disp <- 1 - pchisq(sum(res.obj$pears$resid), res.obj$pears$df)
-        df <- rbind(df, data.frame(type='osa', method=method[m], model=mod, test='disp', 
+        df <- rbind(df, data.frame(type='osa', method=method[m], model=mod, test='disp',
                                    version = version, pvalue = disp))
       }
     }
@@ -238,18 +238,18 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
         marg <- 'upper'
       }
     }
-    
+
     for(m in 1:length(method)){
       if(!is.na(res.obj[[method[m]]])){
-    
+
         if(!is.null(fam)){
           if(fam == 'Poisson'){
             disp <- testDispersion(res.obj[[method[m]]]$out, alternative = alt, plot=FALSE)$p.value
-            
+
             #outlier test type = 'bootstrap' when discrete
             outlier <- testOutliers(res.obj[[method[m]]]$out, alternative = alt,
                                     margin = marg, type='bootstrap', plot=FALSE)$p.value
-            
+
             df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='disp',version = version, pvalue = disp))
             df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
           } else {
@@ -271,7 +271,7 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
         #   ad <- goftest::ad.test(res.obj[[method[m]]]$out$scaledResiduals,'punif', estimated = TRUE)$p.value
         # }
         ks <- suppressWarnings(ks.test(res.obj[[method[m]]]$out$scaledResiduals,'punif')$p.value)
-    
+
      #   df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='GOF.ad', version = version, pvalue = ad))
         df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='GOF.ks', version = version, pvalue = ks))
       }
