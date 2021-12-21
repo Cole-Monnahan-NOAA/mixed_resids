@@ -113,7 +113,7 @@ Type objective_function<Type>::operator() ()
   if(v_flag){
     // RE contribution for overdispersion
     Type sig_v=exp(ln_sig_v(0));
-    nll -= dnorm(v, 0, sig_v, true).sum();
+    nll -= dnorm(v, Type(0), sig_v, true).sum();
     if(sim_re == 1){
       SIMULATE{
         for(int i=0; i<n; i++) v(i) = rnorm(Type(0.0), sig_v);
