@@ -31,7 +31,7 @@ setup_trueparms <- function(mod, misp){
     # link <- 'log'
 
     sp.parm <- 0
-    if(misp=='miss.cov'){
+    if(misp=='misscov'){
       #parms when fam = 'Gaussian';link='identity
        theta <- c(4,-5)
      #  theta <- c(1.5,-2)
@@ -46,7 +46,7 @@ setup_trueparms <- function(mod, misp){
     sp.parm <- 20
     fam <- 'Poisson'
     link <- 'log'
-    if(misp=='miss.cov'){
+    if(misp=='misscov'){
       theta <- c(1,2)
     }
     if(misp=='overdispersion'){
@@ -79,6 +79,13 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
   ## simulate data with these parameters
   message(ii, ": Simulating data...")
   sim.dat <- simdat(n, ng, mod, cov.mod, true.parms, misp, ii)
+  if(is.null(sim.dat)){
+    set.seed(ii)
+    while(is.null(sim.dat)){
+      new.seed = round(runif(1, 5000, 8000))
+      sim.dat <-  simdat(n, ng, mod, cov.mod, true.parms, misp, new.seed)
+    }
+  }
 
   init.dat <- mkTMBdat(sim.dat, true.parms, mod, misp)
   init.par <- mkTMBpar(true.parms, sim.dat, mod, misp, do.true)
@@ -86,8 +93,9 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
   init.map <- mkTMBmap(init.par, mod, misp, true.parms$fam, do.true)
   mod.out <- osa.out <- dharma.out <- list(h0 = NULL, h1 = NULL)
   pvals <- data.frame(type = character(), method = character(),
-                      test = character(), version = character(), pvalue = numeric())
-  mles <-  r <- list()
+                      test = character(), version = character(), 
+                      pvalue = numeric())
+  mles <-  r <- out <- list()
 
   for(h in 1:2){
 
@@ -96,7 +104,12 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     mod.out[[h]] <- fit_tmb(obj.args = init.obj, control = list(run.model = !do.true, do.sdreport = TRUE))
 
 
-    tmp1 <- unlist(true.parms); tmp2 <- mod.out[[h]]$obj$env$last.par.best
+    tmp1 <- true.parms; tmp2 <- mod.out[[h]]$obj$env$last.par.best
+    if('fam' %in% names(tmp1)){
+      tmp1$fam <- NULL
+      tmp1$link <- NULL
+    }
+    tmp1 <- unlist(tmp1)
     ## Save the true values and estimated ones to file
     mles[[h]] <- rbind(data.frame(h=h-1, type='true', par=names(tmp1), value=as.numeric(tmp1)),
                        data.frame(h=h-1, type='mle', par=names(tmp2), value=as.numeric(tmp2)))
@@ -161,15 +174,24 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC) #!doesn't work if doTrue == TRUE
     AICc <- ifelse(do.true, NA, mod.out[[h]]$aic$AICc) #!doesn't work if doTrue == TRUE
     maxgrad <- ifelse(do.true,NA, max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) ) #!doesn't work if doTrue == TRUE
+    converge <- NA
+    if(!do.true){
+      if(mod.out[[h]]$opt$convergence == 0 & mod.out[[h]]$sdr$pdHess == TRUE){
+        converge <- 0
+      } else {
+        converge <- 1
+      }
+    }
     r[[h]] <- data.frame(model=mod, replicate=ii, y=sim.dat[[h]],
                          ypred=mod.out[[h]]$report$exp_val, version=names(mod.out)[h],
                          osa.cdf = osa.out[[h]]$cdf, osa.gen = osa.out[[h]]$gen,
                          osa.fg=osa.out[[h]]$fg, osa.osg=osa.out[[h]]$osg,
                          osa.mcmc=osa.out[[h]]$mcmc,
                          sim_cond= dharma.out[[h]]$cond$resids,
-                         sim_uncond=dharma.out[[h]]$uncond$resids,
-                        # sim_parcond=dharma.out[[h]]$parcond$resids,
-                         runtime_cond=dharma.out[[h]]$cond$runtime,
+                         sim_uncond=dharma.out[[h]]$uncond$resids)#,
+                         # sim_parcond=dharma.out[[h]]$parcond$resids)
+    out[[h]] <- data.frame(model=mod, replicate = ii, version=names(mod.out)[h],
+                           runtime_cond=dharma.out[[h]]$cond$runtime,
                          runtime_uncond=dharma.out[[h]]$uncond$runtime,
                         # runtime_parcond=dharma.out[[h]]$parcond$runtime,
                          runtime.cdf=osa.out[[h]]$runtime.cdf,
@@ -177,7 +199,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
                          runtime.osg=osa.out[[h]]$runtime.osg,
                          runtime.gen=osa.out[[h]]$runtime.gen,
                          runtime.mcmc=osa.out[[h]]$runtime.mcmc,
-                         maxgrad=maxgrad, AIC=AIC, AICc=AICc)
+                         maxgrad=maxgrad, converge=converge,AIC=AIC, AICc=AICc)
 
     pvals <- rbind(pvals, calc.pvals( type = 'osa', method = osa.methods, mod = mod,
                                       res.obj = osa.out[[h]], version = names(mod.out)[h],
@@ -200,19 +222,24 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     }
   }
   resids <- rbind(r[[1]], r[[2]])
-  pvals$replicate = ii
+  stats <- rbind(out[[1]], out[[2]])
+  pvals$replicate <- ii
+  pvals$misp <- misp
   ## Tack this on for plotting later
   resids$do.true <- do.true
   pvals$do.true <- do.true
+  stats$do.true <- do.true
   mles <- cbind(replicate=ii, do.true=do.true,  model=mod, do.call(rbind, mles))
   if(savefiles){
     if(do.true) mod <- paste0(mod, "_true")
-    dir.create(paste0('results/', mod, '_pvals'), showWarnings=FALSE)
-    dir.create(paste0('results/', mod, '_resids'), showWarnings=FALSE)
-    saveRDS(pvals, file=paste0('results/', mod, '_pvals/pvals_', ii, '.RDS'))
-    saveRDS(resids, file=paste0('results/', mod, '_resids/resids_', ii, '.RDS'))
-    dir.create(paste0('results/', mod, '_mles'), showWarnings=FALSE)
-    saveRDS(mles, file=paste0('results/', mod, '_mles/mles_', ii, '.RDS'))
+    dir.create(paste0('results/', mod, '_', misp, '_pvals'), showWarnings=FALSE)
+    dir.create(paste0('results/', mod, '_', misp, '_resids'), showWarnings=FALSE)
+    saveRDS(pvals, file=paste0('results/', mod, '_', misp, '_pvals/pvals_', ii, '.RDS'))
+    saveRDS(resids, file=paste0('results/', mod, '_', misp, '_resids/resids_', ii, '.RDS'))
+    dir.create(paste0('results/', mod, '_', misp, '_mles'), showWarnings=FALSE)
+    saveRDS(mles, file=paste0('results/', mod, '_', misp, '_mles/mles_', ii, '.RDS'))
+    dir.create(paste0('results/', mod, '_', misp, '_stats'), showWarnings=FALSE)
+    saveRDS(stats, file=paste0('results/', mod, '_', misp, '_stats/stats_', ii, '.RDS'))
   }
 
 
@@ -303,7 +330,7 @@ mkTMBdat <- function(Dat, Pars, Mod, Misp){
     dat1 <- dat0
     dat1$y <- Dat$y1
   }
-  if(Misp=='miss.cov'){
+  if(Misp=='misscov'){
     dat1$X <- as.matrix(dat1$X[,1])
   }
   out = list(h0 = dat0, h1 = dat1)
@@ -320,7 +347,7 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
     }
     par1 <- par0
 
-    if(Misp == 'miss.cov'){
+    if(Misp == 'misscov'){
       par1$beta <- par1$beta[1]
     }
   }
@@ -354,7 +381,7 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
         par0$ln_sig_v <- 0
       }
     }
-    if(Misp == 'miss.cov'){
+    if(Misp == 'misscov'){
       par1$beta <- par1$beta[1]
       if(!doTrue) par0$beta <- c(0,0)
     }
@@ -373,7 +400,7 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
                    ln_sig_v = numeric(0),
                    omega = rep(0, length(Dat$random$omega)),
                    v = rep(0,length(Dat$y0)))
-      if(Misp == 'miss.cov'){
+      if(Misp == 'misscov'){
         par0$beta <- c(0,0)
       }
     }
@@ -387,7 +414,7 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
         par0$ln_sig_v <- 0
       }
     }
-    if(Misp == 'miss.cov'){
+    if(Misp == 'misscov'){
       par1$beta <- par1$beta[1]
     }
   }
