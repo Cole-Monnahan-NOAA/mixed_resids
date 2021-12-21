@@ -224,10 +224,11 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
     if(!is.null(fam)){
       if(fam == 'Poisson'){
         disp <- 1 - pchisq(sum(res.obj$pears$resid), res.obj$pears$df)
-        df <- rbind(df, data.frame(type='osa', method=method[m], model=mod, test='disp',
+        df <- rbind(df, data.frame(type='osa', method='pears', model=mod, test='disp',
                                    version = version, pvalue = disp))
       }
     }
+
   }
   if(type == 'sim'){
     alt <- 'two.sided'
