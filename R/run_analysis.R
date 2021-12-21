@@ -28,28 +28,32 @@ packageVersion('DHARMa')                # 0.3.3.0
 (cpus <- parallel::detectCores()-2)
 reps <- 1:500
 
-do.true <- FALSE
+do.true <- TRUE
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc')[-3]
 dharma.methods <- c('uncond', 'cond')
 
 ## Simple linear model as sanity check. Some resid methods not
 ## applicable b/c no random effects
 
-## possible mispecifications: overdispersion, outliers, miss.cov
+## possible mispecifications: overdispersion, outliers, misscov
 
 run_model(reps, mod='linmod', misp='overdispersion', do.true = do.true)
 ## Random walk from the paper
 ## possible mispecifications: mu0, outliers
 run_model(reps, mod='randomwalk', misp='mu0', do.true = do.true)
 ## Andrea's simple GLMM with 5 groups
-## possible mispecifications: overdispersion, outliers, miss.cov
-run_model(reps, ng = 5, mod='simpleGLMM', misp='miss.cov', do.true = do.true)
+## possible mispecifications: overdispersion, outliers, misscov
+run_model(reps, ng = 5, mod='simpleGLMM', misp='misscov', do.true = do.true)
 ## Simple spatial SPDE model
-## possible mispecifications: overdispersion, outliers, miss.cov, misp.omega
+## possible mispecifications: overdispersion, outliers, misscov, mispomega
 #Turn off generic method - takes too long
 osa.methods <- c('cdf', 'mcmc') #only 'cdf' and 'gen' suitable for discrete distributions
 run_model(reps, mod='spatial', misp='overdispersion', do.true = do.true)
+run_model(reps, mod='spatial', cov.mod = 'unif', misp='misscov', do.true = do.true)
+run_model(reps, mod='spatial', misp='mispomega', do.true = do.true)
 
+# stop clusters 
+# sfStop()
 
 pvals <- lapply(list.files('results', pattern='_pvals.RDS',
                            full.names=TRUE), readRDS) %>% bind_rows
@@ -57,23 +61,66 @@ pvals <- lapply(list.files('results', pattern='_pvals.RDS',
 mles <- lapply(list.files('results', pattern='_mles.RDS',
                            full.names=TRUE), readRDS) %>% bind_rows
 
+resids <- lapply(list.files('results', pattern='_resids.RDS',
+                          full.names=TRUE), readRDS) %>% bind_rows
+
+stats <- lapply(list.files('results', pattern='_stats.RDS',
+                           full.names=TRUE), readRDS) %>% bind_rows
 
 ## Effect of do.true for true model
-filter(pvals, version=='h0' & method != 'uncond' &  test=='GOF.ks') %>%
+filter(pvals, version=='h0' &  test=='GOF.ks') %>%
   ggplot(aes(pvalue, fill=do.true, color=do.true)) +
-  facet_grid(model~method) + geom_histogram(position='identity', alpha=.5)
+  facet_grid(model~method, scales = "free_y") + geom_histogram(position='identity', alpha=.5)
 
-## KS vs AD for true model
-pvals %>% filter(version=='h0'& test!= 'outlier' & do.true==FALSE) %>%
-  ggplot(aes(pvalue, fill=test)) +
-  facet_grid(model~method) + geom_histogram(position='identity', alpha=.5)
+filter(pvals, version=='h1' &  test=='GOF.ks') %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(model~method, scales = "free_y") + geom_histogram(position='identity', alpha=.5)
 
 ## Model version for KS test
 pvals %>% filter(test== 'GOF.ks' & do.true==FALSE) %>%
   ggplot(aes(pvalue, fill=version)) +
+  facet_grid(model~method, scales = "free_y") + geom_histogram(position='identity', alpha=.5)
+
+## KS vs AD for true model - delete create new plots for each test
+#pvals %>% filter(version=='h0'& test!= 'outlier' & do.true==TRUE) %>%
+#  ggplot(aes(pvalue, fill=test)) +
+#  facet_grid(model~method) + geom_histogram(position='identity', alpha=.5)
+sp.pvals <- pvals[pvals$model=='spatial',]
+sp.stats <- stats[stats$model=='spatial',]
+nc.reps <- filter(sp.stats, !is.na(converge) & converge == 1)$replicate
+# filter out models that didn't converge
+sp.pvals <- sp.pvals[!(sp.pvals$replicate %in% nc.reps),] 
+
+sp.pvals %>% filter(do.true==TRUE & test == 'GOF.ks') %>% 
+  ggplot(aes(pvalue, fill=version)) +
+  facet_grid(test~method) + geom_histogram(position='identity', alpha=.5)
+
+sp.pvals %>% filter(do.true==FALSE & test == 'GOF.ks') %>% 
+  ggplot(aes(pvalue, fill=version)) +
+  facet_grid(misp~method, scales = "free_y") + geom_histogram(position='identity', alpha=.5)
+
+sp.pvals %>% filter(do.true==FALSE & test == 'SAC') %>% 
+  ggplot(aes(pvalue, fill=version)) +
+  facet_grid(misp~method, scales = "free_y") + geom_histogram(position='identity', alpha=.5)
+
+sp.pvals %>% filter(do.true==FALSE & test == 'outliers') %>% 
+  ggplot(aes(pvalue, fill=version)) +
+  facet_grid(misp~method, scales = "free_y") + geom_histogram(position='identity', alpha=.5)
+
+
+## Model version for KS test
+pvals %>% filter(test== 'GOF.ks' & do.true==TRUE) %>%
+  ggplot(aes(pvalue, fill=version)) +
   facet_grid(model~method) + geom_histogram(position='identity', alpha=.5)
 
+mles %>% filter(model == 'spatial' & type == 'mle' & do.true == FALSE) %>%
+  ggplot(., aes(x=par, y=value)) + geom_point()
 
+#MLE plots
+mles %>% filter(model == 'spatial' & type == 'mle' & 
+                  do.true == FALSE & h==0) %>% 
+  ggplot(., aes(x=par, y=value)) + geom_violin() + 
+  geom_hline(yintercept = -2) + geom_hline(yintercept = 1)
 
 #! Not modified yet
 # ## This script runs the same examples above but with varying
