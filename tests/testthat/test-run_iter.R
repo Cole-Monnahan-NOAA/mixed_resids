@@ -158,11 +158,11 @@ for(m in 1:length(mods)){
 context('missing covariate test')
 mods <- c('linmod', 'simpleGLMM', 'spatial')
 for(m in 1:length(mods)){ 
-  test_that(paste0(mods[m], ' miss.cov'),{
+  test_that(paste0(mods[m], ' misscov'),{
     N <- 100; Ng <- 10 #Ng only used if mod == 'simpleGLMM'
-    true.parms <- setup_trueparms(mods[m],'miss.cov')
-    dat <- simdat(n=N, ng = 10, mod=mods[m], trueparms = true.parms, misp = 'miss.cov', seed=1)
-    mod.true <- run_iter_test(ii=1, n=N, ng = Ng, mod = mods[m], misp = 'miss.cov', fit.true = TRUE)  
+    true.parms <- setup_trueparms(mods[m],'misscov')
+    dat <- simdat(n=N, ng = 10, mod=mods[m], trueparms = true.parms, misp = 'misscov', seed=1)
+    mod.true <- run_iter_test(ii=1, n=N, ng = Ng, mod = mods[m], misp = 'misscov', fit.true = TRUE)  
     
     h0.true.parm <- c(true.parms$theta, true.parms$sd.vec)
     h1.true.parm <- c(true.parms$theta[1], true.parms$sd.vec)
@@ -228,12 +228,12 @@ test_that('randomwalk mu0',{
   
 })
 
-context('misp.omega test')
-test_that('spatial, misp.omega',{
+context('mispomega test')
+test_that('spatial, mispomega',{
   
-  true.parms <- setup_trueparms('spatial','misp.omega')
-  dat <- simdat(n=100, mod='spatial', trueparms = true.parms, misp = 'misp.omega', seed=1)
-  mod.true <- run_iter_test(ii=1, n=100, ng=0, mod = 'spatial', misp = 'misp.omega', fit.true = TRUE) 
+  true.parms <- setup_trueparms('spatial','mispomega')
+  dat <- simdat(n=100, mod='spatial', trueparms = true.parms, misp = 'mispomega', seed=1)
+  mod.true <- run_iter_test(ii=1, n=100, ng=0, mod = 'spatial', misp = 'mispomega', fit.true = TRUE) 
   Kappa <- sqrt(8)/true.parms$sp.parm
   Tau <- 1/(sqrt(4*pi)*Kappa*true.parms$sd.vec[2])
   # beta, theta, tau, kappa, sig_v
@@ -263,10 +263,10 @@ test_that('spatial, misp.omega',{
 })
 
 context('functional test on run_iter') #verify all combinations work: model x do.true x method x version
-mod.misp <- list(linmod = c('overdispersion', 'outliers', 'miss.cov'),
+mod.misp <- list(linmod = c('overdispersion', 'outliers', 'misscov'),
                  randomwalk = c('mu0', 'outliers'),
-                 simpleGLMM = c('overdispersion', 'outliers', 'miss.cov'),
-                 spatial = c('overdispersion', 'outliers', 'miss.cov', 'misp.omega'))
+                 simpleGLMM = c('overdispersion', 'outliers', 'misscov'),
+                 spatial = c('overdispersion', 'outliers', 'misscov', 'mispomega'))
 osa.methods <- c('fg', 'osg', 'gen', 'cdf')
 dharma.methods <- c('uncond', 'cond')
 for(m in 1:4){
@@ -286,7 +286,7 @@ for(m in 1:4){
       expect_true(all(dharma.methods %in% out.true$pvals$method))
       expect_true(all(dharma.methods %in% out.false$pvals$method))
       expect_equal(unique(out.true$pvals$model), names(mod.misp)[m])
-      expect_equal(2*(length(osa.methods) + length(dharma.methods)), sum(out.true$pvals$test == 'GOF.ks')) #!cdf fails for linmod-overdispersion and miss.cov-h1
+      expect_equal(2*(length(osa.methods) + length(dharma.methods)), sum(out.true$pvals$test == 'GOF.ks')) #!cdf fails for linmod-overdispersion and misscov-h1
       expect_equal(2*(length(osa.methods) + length(dharma.methods)), sum(out.false$pvals$test == 'GOF.ks')) 
     })
     rm(out.true, out.false)
@@ -305,11 +305,11 @@ for(m in 1:4){
 # 
 #   })  
 # 
-# test_that('linmod, misp=miss.cov',{
+# test_that('linmod, misp=misscov',{
 #   
-#   lin.mod.true.parms <- setup_trueparms('linmod','miss.cov')
-#   lin.mod.simdat <- simdat(n=100, mod='linmod', trueparms = lin.mod.true.parms, misp = 'miss.cov', seed=1)
-#   linmod.opt <- run_iter_test(ii=1, n=100, mod = 'linmod', misp = 'miss.cov', fit.true = FALSE)  
+#   lin.mod.true.parms <- setup_trueparms('linmod','misscov')
+#   lin.mod.simdat <- simdat(n=100, mod='linmod', trueparms = lin.mod.true.parms, misp = 'misscov', seed=1)
+#   linmod.opt <- run_iter_test(ii=1, n=100, mod = 'linmod', misp = 'misscov', fit.true = FALSE)  
 #   expect_equal(rep(0,3), unname(linmod.opt$h0$obj$par))
 #   expect_equal(rep(0,2), unname(linmod.opt$h1$obj$par))
 #   expect_equal(c(lin.mod.true.parms$theta, log(lin.mod.true.parms$sd.vec[1])),  unname(linmod.opt$h0$opt$par), tolerance = 0.1)
@@ -409,11 +409,11 @@ for(m in 1:4){
 #   }
 # }) 
 # 
-# test_that('simpleGLMM, misp=miss.cov',{
+# test_that('simpleGLMM, misp=misscov',{
 #   
-#   sg.true.parms <- setup_trueparms('simpleGLMM','miss.cov')
-#   sg.simdat <- simdat(n=30, ng=5, mod='simpleGLMM', trueparms = sg.true.parms, misp = 'miss.cov', seed=1)
-#   sg.opt <- run_iter_test(ii=1, n=30, ng=5, mod = 'simpleGLMM', misp = 'miss.cov', fit.true = FALSE)  
+#   sg.true.parms <- setup_trueparms('simpleGLMM','misscov')
+#   sg.simdat <- simdat(n=30, ng=5, mod='simpleGLMM', trueparms = sg.true.parms, misp = 'misscov', seed=1)
+#   sg.opt <- run_iter_test(ii=1, n=30, ng=5, mod = 'simpleGLMM', misp = 'misscov', fit.true = FALSE)  
 #   expect_equal(rep(0,4), unname(sg.opt$h0$obj$par))
 #   expect_equal(rep(0,3), unname(sg.opt$h1$obj$par))
 #   expect_equal(c(sg.true.parms$theta, log(sg.true.parms$sd.vec)),  unname(sg.opt$h0$opt$par), tolerance = 0.1)

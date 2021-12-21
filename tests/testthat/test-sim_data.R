@@ -69,8 +69,8 @@ test_that('linmod, misp=outliers',{
 
 new.fn <- simdat(n=50, mod='linmod', 
                  trueparms = list(theta=c(4,-5), sd.vec=1, sp.parm=0, sp.fam = NULL, sp.link = NULL),
-                 misp='miss.cov', seed=123)
-test_that('linmod, misp=miss.cov',{
+                 misp='misscov', seed=123)
+test_that('linmod, misp=misscov',{
   expect_equal(old.fn$Data$x, new.fn$x[,2])
   expect_equal(y0, as.vector(new.fn$y0))
   expect_equal(y0, as.vector(new.fn$y1))
@@ -94,7 +94,7 @@ test_that('linmod, invalid misp',{
                       misp='mu0', seed=123))
   expect_error(simdat(n=50, mod='linmod', 
                       trueparms = list(theta=c(4,-5), sd.vec=1, sp.parm=0, sp.fam = NULL, sp.link = NULL), 
-                      misp='misp.omega', seed=123))
+                      misp='mispomega', seed=123))
 })
 rm(y0,y1,old.fn,new.fn,ind,noutlier,simulate_linmod)
 
@@ -140,13 +140,13 @@ test_that('randomwalk, misp=outliers',{
 test_that('randomwalk, invalid misp',{
   expect_error(simdat(n=50, mod='randomwalk', 
                       trueparms = list(theta=.75, sd.vec=c(1,1), sp.parm=0, sp.fam = NULL, sp.link = NULL), 
-                      misp='miss.cov', seed=123))
+                      misp='misscov', seed=123))
   expect_error(simdat(n=50, mod='randomwalk', 
                       trueparms = list(theta=.75, sd.vec=c(1,1), sp.parm=0, sp.fam = NULL, sp.link = NULL), 
                       misp='overdispersion', seed=123))
   expect_error(simdat(n=50, mod='randomwalk', 
                       trueparms = list(theta=.75, sd.vec=c(1,1), sp.parm=0, sp.fam = NULL, sp.link = NULL), 
-                      misp='misp.omega', seed=123))
+                      misp='mispomega', seed=123))
 })
 
 rm(y0,y1,old.fn,new.fn,ind,noutlier,simulate_randomwalk)
@@ -223,8 +223,8 @@ y1 <- y0
 
 new.fn <- simdat(n=10, ng=5, mod='simpleGLMM', 
                  trueparms = list(theta=c(4,-5), sd.vec=sqrt(c(.5,10)), sp.parm=0, fam = 'Gaussian', sp.link = 'identity'), 
-                 misp='miss.cov', seed=123)
-test_that('simpleGLMM, misp=miss.cov',{
+                 misp='misscov', seed=123)
+test_that('simpleGLMM, misp=misscov',{
   expect_equal(X[,2], as.vector(new.fn$x[,2]))
   expect_equal(y0, as.vector(new.fn$y0))
   expect_equal(y1, as.vector(new.fn$y0))
@@ -237,7 +237,7 @@ test_that('simpleGLMM, invalid misp',{
                       misp='mu0', seed=123))
   expect_error(simdat(n=10, ng=5, mod='simpleGLMM', 
                       trueparms = list(theta=4, sd.vec=sqrt(c(.5,10)), sp.parm=0, sp.fam = NULL, sp.link = NULL), 
-                                       misp='misp.omega', seed=123))
+                                       misp='mispomega', seed=123))
 })
 rm(y0,y1,old.fn,new.fn,ind,noutlier,simulate_simpleGLMM)
 
@@ -297,8 +297,8 @@ y <- sim_y(Eta=mu, omega=old.fn,
 new.fn <- simdat(n=50, mod='spatial', 
                  trueparms = list(theta=c(1,2), sd.vec=c(.5,sqrt(0.5)), 
                                   sp.parm = 20, fam = 'Poisson', link = 'log'),
-                 misp='miss.cov', seed=123)
-test_that('spatial, misp=miss.cov',{
+                 misp='misscov', seed=123)
+test_that('spatial, misp=misscov',{
   expect_equal(X,new.fn$x)
   expect_equal(y, new.fn$y0)
   expect_equal(y, new.fn$y1)
@@ -315,7 +315,7 @@ new.fn <- simdat(n=50, mod='spatial',
                  trueparms = list(theta=2, sd.vec=c(.5,sqrt(0.5),0.5*2),
                                   sp.parm = 20, fam = 'Poisson', link = 'log'),
                  misp='overdispersion', seed=123)
-test_that('spatial, misp=miss.cov',{
+test_that('spatial, misp=misscov',{
   expect_equal(X,new.fn$x)
   expect_equal(y, new.fn$y0)
   expect_equal(y, new.fn$y1)
@@ -332,8 +332,8 @@ y1 <- sim_y(Eta=mu, omega=exp(old.fn),
 new.fn <- simdat(n=50, mod='spatial', 
                  trueparms = list(theta=2, sd.vec=c(.5,sqrt(0.5)), 
                                   sp.parm = 20, fam = 'Poisson', link = 'log'),
-                 misp='misp.omega', seed=123)
-test_that('spatial, misp=miss.cov',{
+                 misp='mispomega', seed=123)
+test_that('spatial, misp=misscov',{
   expect_equal(X,new.fn$x)
   expect_equal(y0, new.fn$y0)
   expect_equal(y1, new.fn$y1)

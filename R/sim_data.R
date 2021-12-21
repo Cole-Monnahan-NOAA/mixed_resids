@@ -15,10 +15,10 @@
 #' @param sp.link observation link, specific to spatial case
 #' @param misp model misspecification, options are:
 #' * outliers: randomly added outlier terms
-#' * miss.cov: missing coviariate
+#' * misscov: missing coviariate
 #' * overdispersion: observation level random error added to observations
 #' * mu0: missing drift term, specific to linmod
-#' * misp.omega: non-normal spatial effect, specific to spatial
+#' * mispomega: non-normal spatial effect, specific to spatial
 #' @param seed
 #'
 #' @return
@@ -28,7 +28,7 @@
 simdat <- function(n, ng=0, mod, cov.mod = 'norm',
                    trueparms = list(theta, sd.vec, sp.parm, fam, link),
                    misp, seed){
-  if(!(misp %in% c('outliers', 'miss.cov', 'overdispersion', 'mu0', 'misp.omega'))) stop('incorrect mis-specification name')
+  if(!(misp %in% c('outliers', 'misscov', 'overdispersion', 'mu0', 'mispomega'))) stop('incorrect mis-specification name')
   if(!(mod %in% c('linmod', 'randomwalk', 'simpleGLMM', 'spatial'))) stop('incorrect model name')
 
   list2env(trueparms, envir = environment(simdat))
@@ -37,7 +37,7 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
   set.seed(seed)
   N <- n
   if(mod == 'simpleGLMM') N <- n*ng
-  if(misp == 'miss.cov' | mod == 'linmod'){
+  if(misp == 'misscov' | mod == 'linmod'){
     if(cov.mod == 'norm') X <- cbind(rep(1,n), rnorm(n))
     if(cov.mod == 'unif') X <- cbind(rep(1,n), runif(n, 5,10))
   } else {
@@ -50,13 +50,13 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
     eps <- rnorm(N, 0, sd.vec[1])
     y0 <- eps + mu
     v <- NULL
-    if(misp == 'mu0' | misp == 'misp.omega') stop("Misspecification not available for linmod")
+    if(misp == 'mu0' | misp == 'mispomega') stop("Misspecification not available for linmod")
     if(misp == 'overdispersion'){
       set.seed(seed*3)
       v <- rnorm(N,0,sd.vec[2])  #sd.vec[2] = sd.vec[1]*log(4)
       y1 <- y0*exp(v)
     }
-    if(misp == 'miss.cov'){
+    if(misp == 'misscov'){
       y1 <- y0
     }
     random <- list(v=v)
@@ -70,7 +70,7 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
     for(i in 2:N) eta[i] <- eta[i-1]+u[i]+mu[i]
     ## simulate random measurements
     y0 <- rnorm(N, eta, sd=sd.vec[1])
-    if(misp == 'overdispersion' | misp == 'miss.cov'| misp == 'misp.omega') stop("Misspecification not available for random walk")
+    if(misp == 'overdispersion' | misp == 'misscov'| misp == 'mispomega') stop("Misspecification not available for random walk")
     if(misp == 'mu0'){
       y1 <- y0
     }
@@ -78,7 +78,7 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
   }
 
   if(mod == 'simpleGLMM'){ 
-    if(misp == 'mu0'| misp == 'misp.omega') stop("Misspecification not available for simpleGLMM")
+    if(misp == 'mu0'| misp == 'mispomega') stop("Misspecification not available for simpleGLMM")
     set.seed(seed)
     u <- rnorm(ng, 0, sd=sd.vec[2])
     y0 <- eta <- matrix(0, n, ng)
@@ -125,10 +125,10 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
 
 
     if(misp == 'mu0') stop("Misspecification not available for spatial")
-    if(misp == 'miss.cov' | misp == 'overdispersion'){
+    if(misp == 'misscov' | misp == 'overdispersion'){
       y1 <- y0
     }
-    if(misp=='misp.omega'){
+    if(misp=='mispomega'){
       set.seed(seed)
       y1 <- sim_y(Eta = mu, omega=exp(Omega[mesh$idx$loc]),
                   parm=sd.vec, fam=fam, link=link)

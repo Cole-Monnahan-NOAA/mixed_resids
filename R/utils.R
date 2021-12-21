@@ -96,14 +96,17 @@ run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = 
   message("Processing and saving final results...")
   if(do.true) mod <- paste0(mod, "_true")
   ## Read results back in from file
-  fs <- list.files(paste0('results/',mod,'_pvals/'), full.names=TRUE)
+  fs <- list.files(paste0('results/',mod, '_', misp, '_pvals/'), full.names=TRUE)
   pvals <- lapply(fs, readRDS) %>% bind_rows %>% filter(!is.na(pvalue))
-  saveRDS(pvals, file=paste0('results/',mod,'_pvals.RDS'))
+  saveRDS(pvals, file=paste0('results/',mod, '_', misp, '_pvals.RDS'))
   ## Read in residuals
-  fs <- list.files(paste0('results/',mod,'_resids/'), full.names=TRUE)
+  fs <- list.files(paste0('results/',mod, '_', misp, '_resids/'), full.names=TRUE)
   resids <- lapply(fs, readRDS) %>% bind_rows
-  saveRDS(resids, file=paste0('results/',mod,'_resids.RDS'))
-  fs <- list.files(paste0('results/',mod,'_mles/'), full.names=TRUE)
+  saveRDS(resids, file=paste0('results/',mod, '_', misp,'_resids.RDS'))
+  fs <- list.files(paste0('results/',mod, '_', misp,'_mles/'), full.names=TRUE)
   mles <- lapply(fs, readRDS) %>% bind_rows
-  saveRDS(mles, file=paste0('results/',mod,'_mles.RDS'))
+  saveRDS(mles, file=paste0('results/',mod, '_', misp,'_mles.RDS'))
+  fs <- list.files(paste0('results/',mod, '_', misp,'_stats/'), full.names=TRUE)
+  stats <- lapply(fs, readRDS) %>% bind_rows
+  saveRDS(stats, file=paste0('results/',mod, '_', misp,'_stats.RDS'))
 }
