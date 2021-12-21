@@ -93,7 +93,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
   init.map <- mkTMBmap(init.par, mod, misp, true.parms$fam, do.true)
   mod.out <- osa.out <- dharma.out <- list(h0 = NULL, h1 = NULL)
   pvals <- data.frame(type = character(), method = character(),
-                      test = character(), version = character(), 
+                      test = character(), version = character(),
                       pvalue = numeric())
   mles <-  r <- out <- list()
 
@@ -103,23 +103,38 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     init.obj <- list(data = init.dat[[h]], parameters = init.par[[h]], map = init.map[[h]], random = init.random[[h]], DLL = mod)
     mod.out[[h]] <- fit_tmb(obj.args = init.obj, control = list(run.model = !do.true, do.sdreport = TRUE))
 
-
-    tmp1 <- true.parms; tmp2 <- mod.out[[h]]$obj$env$last.par.best
-    if('fam' %in% names(tmp1)){
+    if(!do.true){
+      ## if estimating, return MLE values
+      tmp1 <- true.parms;
+      tmp2 <- mod.out[[h]]$opt$par
+      stopifnot(length(tmp2)>0)
+      ##if('fam' %in% names(tmp1)){
       tmp1$fam <- NULL
       tmp1$link <- NULL
+      ##}
+      tmp1 <- unlist(tmp1)
+      ## super hacky way to get unique names when there are vectors
+      names(tmp2) <- unlist(sapply(unique(names(tmp2)), function(x) {
+        y <- names(tmp2)[names(tmp2)==x]
+        if(length(y)>1) paste(y, 1:length(y), sep="_") else y
+      }))
+      ## Save the true values and estimated ones to file
+      mles[[h]] <- rbind(data.frame(h=h-1, type='true', par=names(tmp1), value=as.numeric(tmp1)),
+                         data.frame(h=h-1, type='mle', par=names(tmp2), value=as.numeric(tmp2)))
+      mles[[h]] <- cbind(mles[[h]], replicate=ii,
+                         do.true=do.true,  model=mod, misp=misp)
+    } else {
+      ## otherwise just NULL b/c nothing estimated
+      mod.out[[h]] <- NULL
     }
-    tmp1 <- unlist(tmp1)
-    ## Save the true values and estimated ones to file
-    mles[[h]] <- rbind(data.frame(h=h-1, type='true', par=names(tmp1), value=as.numeric(tmp1)),
-                       data.frame(h=h-1, type='mle', par=names(tmp2), value=as.numeric(tmp2)))
+
     message(ii, ": Calculating residuals..")
     disc <- FALSE; ran <- c(-Inf,Inf)
     if(!is.null(true.parms$fam)){
       if(true.parms$fam == 'Poisson'){
         disc <- TRUE
         ran <- c(0,Inf)
-      } 
+      }
       if(true.parms$fam == 'Gamma') ran <- c(0,Inf)
     }
     osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, methods=osa.methods, observation.name='y', Discrete = disc, Range = ran)
@@ -229,15 +244,17 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
   resids$do.true <- do.true
   pvals$do.true <- do.true
   stats$do.true <- do.true
-  mles <- cbind(replicate=ii, do.true=do.true,  model=mod, do.call(rbind, mles))
+  mles <- do.call(rbind, mles)
   if(savefiles){
     if(do.true) mod <- paste0(mod, "_true")
     dir.create(paste0('results/', mod, '_', misp, '_pvals'), showWarnings=FALSE)
     dir.create(paste0('results/', mod, '_', misp, '_resids'), showWarnings=FALSE)
     saveRDS(pvals, file=paste0('results/', mod, '_', misp, '_pvals/pvals_', ii, '.RDS'))
     saveRDS(resids, file=paste0('results/', mod, '_', misp, '_resids/resids_', ii, '.RDS'))
-    dir.create(paste0('results/', mod, '_', misp, '_mles'), showWarnings=FALSE)
-    saveRDS(mles, file=paste0('results/', mod, '_', misp, '_mles/mles_', ii, '.RDS'))
+    if(!is.null(mles)){
+      dir.create(paste0('results/', mod, '_', misp, '_mles'), showWarnings=FALSE)
+      saveRDS(mles, file=paste0('results/', mod, '_', misp, '_mles/mles_', ii, '.RDS'))
+    }
     dir.create(paste0('results/', mod, '_', misp, '_stats'), showWarnings=FALSE)
     saveRDS(stats, file=paste0('results/', mod, '_', misp, '_stats/stats_', ii, '.RDS'))
   }
