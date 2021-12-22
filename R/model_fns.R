@@ -102,7 +102,6 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     message(ii, ": Optimizing two competing models...")
     init.obj <- list(data = init.dat[[h]], parameters = init.par[[h]], map = init.map[[h]], random = init.random[[h]], DLL = mod)
     mod.out[[h]] <- fit_tmb(obj.args = init.obj, control = list(run.model = !do.true, do.sdreport = TRUE))
-
     if(!do.true){
       ## if estimating, return MLE values
       tmp1 <- true.parms;
@@ -125,7 +124,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
                          do.true=do.true,  model=mod, misp=misp)
     } else {
       ## otherwise just NULL b/c nothing estimated
-      mod.out[[h]] <- NULL
+      mles[[h]] <- NULL
     }
 
     message(ii, ": Calculating residuals..")
@@ -251,7 +250,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     dir.create(paste0('results/', mod, '_', misp, '_resids'), showWarnings=FALSE)
     saveRDS(pvals, file=paste0('results/', mod, '_', misp, '_pvals/pvals_', ii, '.RDS'))
     saveRDS(resids, file=paste0('results/', mod, '_', misp, '_resids/resids_', ii, '.RDS'))
-    if(!is.null(mles)){
+    if(length(mles)>0){
       dir.create(paste0('results/', mod, '_', misp, '_mles'), showWarnings=FALSE)
       saveRDS(mles, file=paste0('results/', mod, '_', misp, '_mles/mles_', ii, '.RDS'))
     }
