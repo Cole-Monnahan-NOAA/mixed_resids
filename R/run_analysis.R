@@ -28,7 +28,7 @@ packageVersion('DHARMa')                # 0.3.3.0
 (cpus <- parallel::detectCores()-2)
 reps <- 1:500
 
-do.true <- TRUE
+do.true <- FALSE
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc')[-3]
 dharma.methods <- c('uncond', 'cond')
 
@@ -52,7 +52,7 @@ run_model(reps, mod='spatial', misp='overdispersion', do.true = do.true)
 run_model(reps, mod='spatial', cov.mod = 'unif', misp='misscov', do.true = do.true)
 run_model(reps, mod='spatial', misp='mispomega', do.true = do.true)
 
-# stop clusters 
+# stop clusters
 # sfStop()
 
 pvals <- lapply(list.files('results', pattern='_pvals.RDS',
@@ -89,21 +89,21 @@ sp.pvals <- pvals[pvals$model=='spatial',]
 sp.stats <- stats[stats$model=='spatial',]
 nc.reps <- filter(sp.stats, !is.na(converge) & converge == 1)$replicate
 # filter out models that didn't converge
-sp.pvals <- sp.pvals[!(sp.pvals$replicate %in% nc.reps),] 
+sp.pvals <- sp.pvals[!(sp.pvals$replicate %in% nc.reps),]
 
-sp.pvals %>% filter(do.true==TRUE & test == 'GOF.ks') %>% 
+sp.pvals %>% filter(do.true==TRUE & test == 'GOF.ks') %>%
   ggplot(aes(pvalue, fill=version)) +
   facet_grid(test~method) + geom_histogram(position='identity', alpha=.5)
 
-sp.pvals %>% filter(do.true==FALSE & test == 'GOF.ks') %>% 
+sp.pvals %>% filter(do.true==FALSE & test == 'GOF.ks') %>%
   ggplot(aes(pvalue, fill=version)) +
   facet_grid(misp~method, scales = "free_y") + geom_histogram(position='identity', alpha=.5)
 
-sp.pvals %>% filter(do.true==FALSE & test == 'SAC') %>% 
+sp.pvals %>% filter(do.true==FALSE & test == 'SAC') %>%
   ggplot(aes(pvalue, fill=version)) +
   facet_grid(misp~method, scales = "free_y") + geom_histogram(position='identity', alpha=.5)
 
-sp.pvals %>% filter(do.true==FALSE & test == 'outliers') %>% 
+sp.pvals %>% filter(do.true==FALSE & test == 'outliers') %>%
   ggplot(aes(pvalue, fill=version)) +
   facet_grid(misp~method, scales = "free_y") + geom_histogram(position='identity', alpha=.5)
 
@@ -113,15 +113,29 @@ pvals %>% filter(test== 'GOF.ks' & do.true==TRUE) %>%
   ggplot(aes(pvalue, fill=version)) +
   facet_grid(model~method) + geom_histogram(position='identity', alpha=.5)
 
-mles %>% filter(model == 'spatial' & type == 'mle' & do.true == FALSE) %>%
-  ggplot(., aes(x=par, y=value)) + geom_point()
-
 #MLE plots
-mles %>% filter(model == 'spatial' & type == 'mle' & 
-                  do.true == FALSE & h==0) %>% 
-  ggplot(., aes(x=par, y=value)) + geom_violin() + 
-  geom_hline(yintercept = -2) + geom_hline(yintercept = 1)
+## mles %>% filter(model == 'spatial' & type == 'mle' &
+##                   do.true == FALSE & h==0) %>%
+##   ggplot(., aes(x=par, y=value)) + geom_violin() +
+##   geom_hline(yintercept = -2) + geom_hline(yintercept = 1)
 
+## Check for MLE consistency. True and estimated par names and lengths are
+## different so need to hack this by assuming order is the same
+## then calculating within a unique group
+g <- filter(mles, h==0) %>%
+  mutate(value=if_else((grepl('ln', x=par)), exp(value), value)) %>%
+  filter(par!='sp.parm') %>%
+  group_by(type, h,  replicate, model, misp) %>%
+  mutate(parnum=1:n()) %>%
+  pivot_wider(id_cols=c(replicate, model, misp, parnum), names_from=type, values_from=value)%>%
+  mutate(abs_error=mle-true, rel_error=abs_error/true) %>% ungroup %>%
+  drop_na %>%
+  ggplot(aes(x=factor(parnum), rel_error)) +
+    facet_wrap(model~misp, scales='free_y') + geom_violin()
+g
+filter(g$data, rel_error > 1000)
+
+saveRDS(mles, 'mles.RDS')
 #! Not modified yet
 # ## This script runs the same examples above but with varying
 # ## sample sizes and tracks runtime and pvalues to see the effect
