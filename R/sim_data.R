@@ -64,12 +64,10 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
 
   if(mod == 'randomwalk'){
     set.seed(seed)
-    u <- rnorm(N,mean=0,sd=sd.vec[2])
-    y <- eta <- rep(NA, N)
-    eta[1] <- u[1]
-    for(i in 2:N) eta[i] <- eta[i-1]+u[i]+mu[i]
-    ## simulate random measurements
-    y0 <- rnorm(N, eta, sd=sd.vec[1])
+    ## Simulate random measurements
+    u <- c(0,cumsum(rnorm(N-1,mean=mu,sd=sd.vec[2])))
+    y0 <- u + rnorm(N,sd=sd.vec[1])
+   
     if(misp == 'overdispersion' | misp == 'misscov'| misp == 'mispomega') stop("Misspecification not available for random walk")
     if(misp == 'mu0'){
       y1 <- y0
