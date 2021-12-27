@@ -92,7 +92,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
   init.random <- mkTMBrandom(mod, misp, do.true)
   init.map <- mkTMBmap(init.par, mod, misp, true.parms$fam, do.true)
   mod.out <- osa.out <- dharma.out <- list(h0 = NULL, h1 = NULL)
-  pvals <- data.frame(type = character(), method = character(),
+  pvals <- data.frame(id = character(), type = character(), method = character(),
                       test = character(), version = character(),
                       pvalue = numeric())
   mles <-  r <- out <- list()
@@ -100,6 +100,9 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
   for(h in 1:2){
 
     message(ii, ": Optimizing two competing models...")
+    
+    id <- paste0(mod, '_', misp, '_', do.true, '_h', h-1, '_', ii)
+    
     init.obj <- list(data = init.dat[[h]], parameters = init.par[[h]], map = init.map[[h]], random = init.random[[h]], DLL = mod)
     mod.out[[h]] <- fit_tmb(obj.args = init.obj, control = list(run.model = !do.true, do.sdreport = TRUE))
     if(!do.true){
@@ -120,7 +123,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
       ## Save the true values and estimated ones to file
       mles[[h]] <- rbind(data.frame(h=h-1, type='true', par=names(tmp1), value=as.numeric(tmp1)),
                          data.frame(h=h-1, type='mle', par=names(tmp2), value=as.numeric(tmp2)))
-      mles[[h]] <- cbind(mles[[h]], replicate=ii,
+      mles[[h]] <- cbind(mles[[h]], id=id, replicate=ii,
                          do.true=do.true,  model=mod, misp=misp)
     } else {
       ## otherwise just NULL b/c nothing estimated
@@ -196,43 +199,45 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
         converge <- 1
       }
     }
-    r[[h]] <- data.frame(model=mod, replicate=ii, y=sim.dat[[h]],
-                         ypred=mod.out[[h]]$report$exp_val, version=names(mod.out)[h],
+    r[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
+                         replicate=ii, y=sim.dat[[h]],
+                         ypred=mod.out[[h]]$report$exp_val, 
                          osa.cdf = osa.out[[h]]$cdf, osa.gen = osa.out[[h]]$gen,
                          osa.fg=osa.out[[h]]$fg, osa.osg=osa.out[[h]]$osg,
                          osa.mcmc=osa.out[[h]]$mcmc,
                          sim_cond= dharma.out[[h]]$cond$resids,
                          sim_uncond=dharma.out[[h]]$uncond$resids)#,
                          # sim_parcond=dharma.out[[h]]$parcond$resids)
-    out[[h]] <- data.frame(model=mod, replicate = ii, version=names(mod.out)[h],
+    out[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
+                           replicate = ii, 
                            runtime_cond=dharma.out[[h]]$cond$runtime,
-                         runtime_uncond=dharma.out[[h]]$uncond$runtime,
-                        # runtime_parcond=dharma.out[[h]]$parcond$runtime,
-                         runtime.cdf=osa.out[[h]]$runtime.cdf,
-                         runtime.fg=osa.out[[h]]$runtime.fg,
-                         runtime.osg=osa.out[[h]]$runtime.osg,
-                         runtime.gen=osa.out[[h]]$runtime.gen,
-                         runtime.mcmc=osa.out[[h]]$runtime.mcmc,
-                         maxgrad=maxgrad, converge=converge,AIC=AIC, AICc=AICc)
+                           runtime_uncond=dharma.out[[h]]$uncond$runtime,
+                           # runtime_parcond=dharma.out[[h]]$parcond$runtime,
+                           runtime.cdf=osa.out[[h]]$runtime.cdf,
+                           runtime.fg=osa.out[[h]]$runtime.fg,
+                           runtime.osg=osa.out[[h]]$runtime.osg,
+                           runtime.gen=osa.out[[h]]$runtime.gen,
+                           runtime.mcmc=osa.out[[h]]$runtime.mcmc,
+                           maxgrad=maxgrad, converge=converge,
+                           AIC=AIC, AICc=AICc)
 
-    pvals <- rbind(pvals, calc.pvals( type = 'osa', method = osa.methods, mod = mod,
+    pvals <- rbind(pvals, cbind(id,calc.pvals( type = 'osa', method = osa.methods, mod = mod,
                                       res.obj = osa.out[[h]], version = names(mod.out)[h],
-                                      fam = true.parms$fam, do.true ))
-    pvals <- rbind(pvals, calc.pvals( type = 'sim', method = dharma.methods, mod = mod,
+                                      fam = true.parms$fam, do.true )))
+    pvals <- rbind(pvals, cbind(id,calc.pvals( type = 'sim', method = dharma.methods, mod = mod,
                                       res.obj = dharma.out[[h]], version = names(mod.out)[h],
-                                      fam = true.parms$fam, do.true ))
+                                      fam = true.parms$fam, do.true )))
     if(mod == 'spatial'){
       dmat <- as.matrix(dist(sim.dat$loc, upper = TRUE))
       wt <- 1/dmat;  diag(wt) <- 0
       for(m in 1:length(osa.methods)){
-        pvals <- rbind(pvals, data.frame(type='osa', method=osa.methods[m], model=mod, test='SAC', version = names(mod.out)[h],
-                       pvalue = calc.sac(osa.out[[h]][[osa.methods[m]]], wt)))
+        pvals <- rbind(pvals, cbind(id,data.frame(type='osa', method=osa.methods[m], model=mod, test='SAC', version = names(mod.out)[h],
+                       pvalue = calc.sac(osa.out[[h]][[osa.methods[m]]], wt))))
       }
       for(m in 1:length(osa.methods)){
-        pvals <- rbind(pvals, data.frame(type='sim', method=dharma.methods[m], model=mod, test='SAC', version = names(mod.out)[h],
-                       pvalue = calc.sac(dharma.out[[h]][[dharma.methods[m]]]$resids, wt)))
+        pvals <- rbind(pvals, cbind(id,data.frame(type='sim', method=dharma.methods[m], model=mod, test='SAC', version = names(mod.out)[h],
+                       pvalue = calc.sac(dharma.out[[h]][[dharma.methods[m]]]$resids, wt))))
       }
-
     }
   }
   resids <- rbind(r[[1]], r[[2]])

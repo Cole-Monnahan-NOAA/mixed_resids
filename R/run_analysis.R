@@ -48,9 +48,9 @@ run_model(reps, ng = 5, mod='simpleGLMM', misp='misscov', do.true = do.true)
 ## possible mispecifications: overdispersion, outliers, misscov, mispomega
 #Turn off generic method - takes too long
 osa.methods <- c('cdf', 'mcmc') #only 'cdf' and 'gen' suitable for discrete distributions
-run_model(reps, mod='spatial', misp='overdispersion', do.true = do.true)
-run_model(reps, mod='spatial', cov.mod = 'unif', misp='misscov', do.true = do.true)
-run_model(reps, mod='spatial', misp='mispomega', do.true = do.true)
+run_model(reps, n=200, mod='spatial', misp='overdispersion', do.true = do.true)
+run_model(reps, n=200, mod='spatial', cov.mod = 'unif', misp='misscov', do.true = do.true)
+run_model(reps, n=200, mod='spatial', misp='mispomega', do.true = do.true)
 
 # stop clusters
 # sfStop()
@@ -122,7 +122,8 @@ pvals %>% filter(test== 'GOF.ks' & do.true==TRUE) %>%
 ## Check for MLE consistency. True and estimated par names and lengths are
 ## different so need to hack this by assuming order is the same
 ## then calculating within a unique group
-g <- filter(mles, h==0) %>%
+nc_id <- stats[stats$converge==1|stats$maxgrad>0.1,]$id
+g <- filter(mles, h==0 & !(id %in% nc_id)) %>%
   mutate(value=if_else((grepl('ln', x=par)), exp(value), value)) %>%
   filter(par!='sp.parm') %>%
   group_by(type, h,  replicate, model, misp) %>%
