@@ -110,7 +110,12 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
      # warning("mesh failed in rep=", ii)
       return(NULL)
     }
-    Omega <- sim_omega(sp.parm,sd.vec[2]^2,dmat,method="TMB.spde",mesh=mesh)
+    Omega <- sim_omega(sp.parm,sd.vec[2]^2,dmat,method="R.matern",mesh=mesh)
+    if(length(Omega)>n){
+      omega <- Omega[mesh$idx$loc]
+    } else {
+      omega <- Omega
+    }
     v <- rep(0, n)
     if(misp == 'overdispersion'){
       set.seed(seed)
@@ -118,7 +123,7 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
       mu <- mu + v
     }
     set.seed(seed)
-    y0 <- sim_y(Eta = mu, omega=Omega[mesh$idx$loc],
+    y0 <- sim_y(Eta = mu, omega=omega,
                   parm=sd.vec[1], fam=fam, link=link)
 
 
@@ -128,7 +133,7 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
     }
     if(misp=='mispomega'){
       set.seed(seed)
-      y1 <- sim_y(Eta = mu, omega=exp(Omega[mesh$idx$loc]),
+      y1 <- sim_y(Eta = mu, omega=exp(omega),
                   parm=sd.vec, fam=fam, link=link)
     }
     random <- list(omega=Omega, v=v)
@@ -164,6 +169,12 @@ sim_omega <- function(Range, sig2, Dmat, Nu = 1, method, mesh){
   n <- dim(Dmat)[1]
 
   #Simulate random field and obs
+  if(method == 'R.matern'){
+    Sigma <- sig2 * cMatern(Dmat,1,Kappa)
+    omega <- t(mvtnorm::rmvnorm(1, rep(0,nrow(Sigma)), 
+                                sigma = Sigma, method = 'chol'))
+  }
+  
   if(method == 'TMB.matern'){
     #  dyn.load(dynlib('spatial'))
     dat <- list(y = rep(0,n), X = matrix(1, n,1),
