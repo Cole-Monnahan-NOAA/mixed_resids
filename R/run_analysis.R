@@ -29,8 +29,8 @@ packageVersion('DHARMa')                # 0.3.3.0
 reps <- 1:500
 
 do.true <- FALSE
-osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc')[-3]
-dharma.methods <- c('uncond', 'cond')
+osa.methods <- NULL#c('fg', 'osg', 'gen', 'cdf', 'mcmc')[-3]
+dharma.methods <- NULL#c('uncond', 'cond')
 
 ## Simple linear model as sanity check. Some resid methods not
 ## applicable b/c no random effects
@@ -123,18 +123,23 @@ pvals %>% filter(test== 'GOF.ks' & do.true==TRUE) %>%
 ## different so need to hack this by assuming order is the same
 ## then calculating within a unique group
 nc_id <- stats[stats$converge==1|stats$maxgrad>0.1,]$id
-g <- filter(mles, h==0 & !(id %in% nc_id)) %>%
-  mutate(value=if_else((grepl('ln', x=par)), exp(value), value)) %>%
-  filter(par!='sp.parm') %>%
-  group_by(type, h,  replicate, model, misp) %>%
-  mutate(parnum=1:n()) %>%
-  pivot_wider(id_cols=c(replicate, model, misp, parnum), names_from=type, values_from=value)%>%
-  mutate(abs_error=mle-true, rel_error=abs_error/true) %>% ungroup %>%
-  drop_na %>%
-  ggplot(aes(x=factor(parnum), rel_error)) +
-    facet_wrap(model~misp, scales='free_y') + geom_violin()
+g <- filter(mles, h==0 & !(id %in% nc_id) & do.true == FALSE) %>%
+  ggplot(., aes(x=par, y=rel_error)) + geom_violin() + 
+  facet_wrap(~model, ncol=1, scales = 'free_y')
 g
-filter(g$data, rel_error > 1000)
+
+# g <- filter(mles, h==0 & !(id %in% nc_id)) %>%
+#   mutate(value=if_else((grepl('ln', x=par)), exp(value), value)) %>%
+#   filter(par!='sp.parm') %>%
+#   group_by(type, h,  replicate, model, misp) %>%
+#   mutate(parnum=1:n()) %>%
+#   pivot_wider(id_cols=c(replicate, model, misp, parnum), names_from=type, values_from=value)%>%
+#   mutate(abs_error=mle-true, rel_error=abs_error/true) %>% ungroup %>%
+#   drop_na %>%
+#   ggplot(aes(x=factor(parnum), rel_error)) +
+#     facet_wrap(model~misp, scales='free_y') + geom_violin()
+# g
+# filter(g$data, rel_error > 1000)
 
 saveRDS(mles, 'mles.RDS')
 #! Not modified yet
