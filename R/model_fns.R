@@ -1,13 +1,21 @@
 setup_trueparms <- function(mod, misp){
+  rmse.comp <- list()
   if(mod=='linmod'){
     theta <- c(4,-5)
     sd.vec <- 1
+    rmse.comp[[1]] <- rmse.comp[[2]] <-
+      list(beta_1 = theta[1], beta_2 = theta[2], 
+                      ln_sig = log(sd.vec))
     sp.parm <- 0
     fam <- NULL
     link <- NULL
     if(misp == 'overdispersion'){
       #sd.vec <- c(sd.vec, sd.vec*log(4))
       sd.vec <- c(sd.vec, 1)
+    }
+    if(misp == 'misscov'){
+      rmse.comp[[2]] <- list(beta = theta[1],
+                          ln_sig = log(sd.vec[1]))
     }
   }
   if(mod=='randomwalk'){
@@ -16,6 +24,15 @@ setup_trueparms <- function(mod, misp){
     sp.parm <- 0
     fam <- NULL
     link <- NULL
+    rmse.comp[[1]] <- list(mu = theta, ln_sig = log(sd.vec[1]),
+           ln_tau = log(sd.vec[2]))
+    if(misp == 'mu0'){
+      rmse.comp[[2]] <- list(ln_sig = log(sd.vec[1]),
+                             ln_tau = log(sd.vec[2]))
+    }
+    if(misp == 'outliers'){
+      rmse.comp[[2]] <- rmse.comp[[1]]
+    }
   }
   if(mod=='simpleGLMM'){
     #parms when fam = 'Gaussian';link='identity'
@@ -34,10 +51,33 @@ setup_trueparms <- function(mod, misp){
     if(misp=='misscov'){
       #parms when fam = 'Gaussian';link='identity
        theta <- c(4,-5)
-     #  theta <- c(1.5,-2)
+       #theta <- c(1.5,-2)   
+       rmse.comp[[1]] <- list(beta_1 = theta[1], beta_2 = theta[2],
+                              ln_sig_y = log(sd.vec[1]),
+                              ln_sig_u = log(sd.vec[2]))
+       rmse.comp[[2]] <- list(beta = theta[1],
+                              ln_sig_y = log(sd.vec[1]),
+                              ln_sig_u = log(sd.vec[2]))
     }
     if(misp=='overdispersion') {
       sd.vec <- c(sd.vec, 1)
+      rmse.comp[[1]] <- list(beta_ = theta,
+                             ln_sig_y = log(sd.vec[1]),
+                             ln_sig_u = log(sd.vec[2]),
+                             ln_sig_v = log(sd.vec[3]))
+      rmse.comp[[2]] <- list(beta = theta[1],
+                             ln_sig_y = log(sd.vec[1]),
+                             ln_sig_u = log(sd.vec[2]))
+    }
+    if(misp == 'outliers'){
+      rmse.comp[[1]] <- rmse.comp[[2]] <- 
+        list(beta = theta[1],
+             ln_sig_y = log(sd.vec[1]),
+             ln_sig_u = log(sd.vec[2]))
+    }
+    if(fam == 'Poisson'){
+      rmse.comp[[1]]$ln_sig_y <- NULL
+      rmse.comp[[2]]$ln_sig_y <- NULL
     }
   }
   if(mod=='spatial'){
@@ -46,15 +86,34 @@ setup_trueparms <- function(mod, misp){
     sp.parm <- 20
     fam <- 'Poisson'
     link <- 'log'
+
+    rmse.comp[[1]] <- rmse.comp[[2]] <- 
+      list(beta = theta, theta = log(sd.vec[1]),
+           ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd)) 
+           ln_kappa = log(sqrt(8)/sp.parm))
+    
     if(misp=='misscov'){
       theta <- c(1,2)
+      rmse.comp[[1]] <- 
+        list(beta_1 = theta[1], beta_2 = theta[2], theta = log(sd.vec[1]),
+             ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd)) 
+             ln_kappa = log(sqrt(8)/sp.parm))
+      rmse.comp[[2]] <- 
+        list(beta = theta[1], theta = log(sd.vec[1]),
+             ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd)) 
+             ln_kappa = log(sqrt(8)/sp.parm))
     }
     if(misp=='overdispersion'){
-      sd.vec <- c(sd.vec, sd.vec[1]*2)
+      sd.vec <- c(sd.vec, sd.vec[2]*2)
+      rmse.comp[[1]]$ln_sig_v <- log(sd.vec[3])
+    }
+    if(fam == "Poisson"){
+      rmse.comp[[1]]$theta <- NULL
+      rmse.comp[[2]]$theta <- NULL
     }
   }
   true.pars <- list(theta=theta, sd.vec=sd.vec, sp.parm=sp.parm,
-                    fam=fam, link=link)
+                    fam=fam, link=link, rmse.comp=rmse.comp)
   return(true.pars)
 }
 
@@ -107,7 +166,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     mod.out[[h]] <- fit_tmb(obj.args = init.obj, control = list(run.model = !do.true, do.sdreport = TRUE))
     if(!do.true){
       ## if estimating, return MLE values
-      tmp1 <- true.parms;
+      tmp1 <- true.parms$rmse.comp[[h]]
       tmp2 <- mod.out[[h]]$opt$par
       stopifnot(length(tmp2)>0)
       ##if('fam' %in% names(tmp1)){
@@ -121,8 +180,9 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
         if(length(y)>1) paste(y, 1:length(y), sep="_") else y
       }))
       ## Save the true values and estimated ones to file
-      mles[[h]] <- rbind(data.frame(h=h-1, type='true', par=names(tmp1), value=as.numeric(tmp1)),
-                         data.frame(h=h-1, type='mle', par=names(tmp2), value=as.numeric(tmp2)))
+      mles[[h]] <- data.frame(h=h-1, par=names(tmp2), 
+                              value=as.numeric(tmp2),
+                              rel_error = (tmp2-tmp1)/tmp1)
       mles[[h]] <- cbind(mles[[h]], id=id, replicate=ii,
                          do.true=do.true,  model=mod, misp=misp)
     } else {
@@ -144,11 +204,19 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     expr <- expression(obj$simulate()$y)
     if('cond' %in% dharma.methods){
       dharma.out[[h]]$cond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], fpr=mod.out[[h]]$report$fpr)
+    } else {
+      dharma.out[[h]]$cond <- list()
+      dharma.out[[h]]$cond$resids <- NA
+      dharma.out[[h]]$cond$runtime <- NA
     }
 
     if('uncond' %in% dharma.methods){
       mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
       dharma.out[[h]]$uncond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], fpr=mod.out[[h]]$report$fpr)
+    } else {
+      dharma.out[[h]]$uncond <- list()
+      dharma.out[[h]]$uncond$resids <- NA
+      dharma.out[[h]]$uncond$runtime <- NA
     }
 
     ## only makes sense to run when MLE is estimated and there
@@ -193,10 +261,10 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     maxgrad <- ifelse(do.true,NA, max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) ) #!doesn't work if doTrue == TRUE
     converge <- NA
     if(!do.true){
-      if(mod.out[[h]]$opt$convergence == 0 & mod.out[[h]]$sdr$pdHess == TRUE){
-        converge <- 0
-      } else {
+      if(mod.out[[h]]$opt$convergence == 1 | mod.out[[h]]$sdr$pdHess == FALSE ){
         converge <- 1
+      } else {
+        converge <- 0
       }
     }
     r[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
@@ -230,13 +298,15 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     if(mod == 'spatial'){
       dmat <- as.matrix(dist(sim.dat$loc, upper = TRUE))
       wt <- 1/dmat;  diag(wt) <- 0
-      for(m in 1:length(osa.methods)){
-        pvals <- rbind(pvals, cbind(id,data.frame(type='osa', method=osa.methods[m], model=mod, test='SAC', version = names(mod.out)[h],
-                       pvalue = calc.sac(osa.out[[h]][[osa.methods[m]]], wt))))
-      }
-      for(m in 1:length(osa.methods)){
-        pvals <- rbind(pvals, cbind(id,data.frame(type='sim', method=dharma.methods[m], model=mod, test='SAC', version = names(mod.out)[h],
-                       pvalue = calc.sac(dharma.out[[h]][[dharma.methods[m]]]$resids, wt))))
+      if(!is.null(osa.methods)){
+        for(m in 1:length(osa.methods)){
+          pvals <- rbind(pvals, cbind(id,data.frame(type='osa', method=osa.methods[m], model=mod, test='SAC', version = names(mod.out)[h],
+                         pvalue = calc.sac(osa.out[[h]][[osa.methods[m]]], wt))))
+        }
+        for(m in 1:length(osa.methods)){
+          pvals <- rbind(pvals, cbind(id,data.frame(type='sim', method=dharma.methods[m], model=mod, test='SAC', version = names(mod.out)[h],
+                         pvalue = calc.sac(dharma.out[[h]][[dharma.methods[m]]]$resids, wt))))
+        }
       }
     }
   }
@@ -410,16 +480,18 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
 
   if(Mod == 'spatial'){
     if(doTrue){
+      omega.true <- rep(0, Dat$mesh$n)
+      omega.true[Dat$mesh$idx$loc] <- as.vector(Dat$random$omega)
       par0 <- list(beta = Pars$theta, theta = log(Pars$sd.vec[1]),
                    ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/Pars$sp.parm*sd.vec[2])),
                    ln_kappa = log(sqrt(8)/Pars$sp.parm),
                    ln_sig_v = numeric(0),
-                   omega = Dat$random$omega,
+                   omega = omega.true,
                    v = rep(0,length(Dat$y0)))
     } else {
       par0 <- list(beta = 0, theta = 0, ln_tau = 0, ln_kappa = 0,
                    ln_sig_v = numeric(0),
-                   omega = rep(0, length(Dat$random$omega)),
+                   omega = rep(0, Dat$mesh$n),
                    v = rep(0,length(Dat$y0)))
       if(Misp == 'misscov'){
         par0$beta <- c(0,0)
