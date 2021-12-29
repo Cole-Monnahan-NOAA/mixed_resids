@@ -205,78 +205,83 @@ calc.sac <- function(x, w){
 calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
   df <- data.frame(type = character(), method = character(), model = character(),
                    test = character(), version = character(), pvalue = numeric())
-  if(type == 'osa'){
-    for(m in 1:length(method)){
-      if(is.numeric(res.obj[[method[m]]])){
-        #outlier, disp, GOF.ad, GOF.ks !outlier test not available yet for osa
-
-        # if(doTrue){
-        #   ad <- goftest::ad.test(res.obj[[method[m]]],'pnorm', estimated = FALSE)$p.value #assume mean=0,sd=1?
-        # } else {
-        #   ad <- goftest::ad.test(res.obj[[method[m]]],'pnorm', mean=mean(res.obj[[method[m]]]),
-        #                          sd=sd(res.obj[[method[m]]]), estimated = TRUE)$p.value
-        # }
-        ks <- suppressWarnings(ks.test(res.obj[[method[m]]],'pnorm')$p.value)
-      #  df <- rbind(df, data.frame(type='osa', method=method[m], model=mod, test='GOF.ad', version = version, pvalue = ad))
-        df <- rbind(df, data.frame(type='osa', method=method[m], model=mod, test='GOF.ks', version = version, pvalue = ks))
+  if(!is.null(method)){
+    if(type == 'osa'){
+      for(m in 1:length(method)){
+        if(is.numeric(res.obj[[method[m]]])){
+          #outlier, disp, GOF.ad, GOF.ks !outlier test not available yet for osa
+  
+          # if(doTrue){
+          #   ad <- goftest::ad.test(res.obj[[method[m]]],'pnorm', estimated = FALSE)$p.value #assume mean=0,sd=1?
+          # } else {
+          #   ad <- goftest::ad.test(res.obj[[method[m]]],'pnorm', mean=mean(res.obj[[method[m]]]),
+          #                          sd=sd(res.obj[[method[m]]]), estimated = TRUE)$p.value
+          # }
+          ks <- suppressWarnings(ks.test(res.obj[[method[m]]],'pnorm')$p.value)
+        #  df <- rbind(df, data.frame(type='osa', method=method[m], model=mod, test='GOF.ad', version = version, pvalue = ad))
+          df <- rbind(df, data.frame(type='osa', method=method[m], model=mod, test='GOF.ks', version = version, pvalue = ks))
+        }
       }
-    }
-    if(!is.null(fam)){
-      if(fam == 'Poisson'){
-        disp <- 1 - pchisq(sum(res.obj$pears$resid), res.obj$pears$df)
-        df <- rbind(df, data.frame(type='osa', method='pears', model=mod, test='disp',
-                                   version = version, pvalue = disp))
+      if(!is.null(fam)){
+        if(fam == 'Poisson'){
+          disp <- 1 - pchisq(sum(res.obj$pears$resid), res.obj$pears$df)
+          df <- rbind(df, data.frame(type='osa', method='pears', model=mod, test='disp',
+                                     version = version, pvalue = disp))
+        }
       }
+  
     }
-
-  }
-  if(type == 'sim'){
-    alt <- 'two.sided'
-    marg <- 'both'
-    if(!is.null(fam)){
-      if(fam == 'Poisson' | fam == 'Gamma'){
-        alt <- 'greater'
-        marg <- 'upper'
+    if(type == 'sim'){
+      alt <- 'two.sided'
+      marg <- 'both'
+      if(!is.null(fam)){
+        if(fam == 'Poisson' | fam == 'Gamma'){
+          alt <- 'greater'
+          marg <- 'upper'
+        }
       }
-    }
-
-    for(m in 1:length(method)){
-      if(!is.na(res.obj[[method[m]]])){
-
-        if(!is.null(fam)){
-          if(fam == 'Poisson'){
-            disp <- testDispersion(res.obj[[method[m]]]$out, alternative = alt, plot=FALSE)$p.value
-
-            #outlier test type = 'bootstrap' when discrete
-            outlier <- testOutliers(res.obj[[method[m]]]$out, alternative = alt,
-                                    margin = marg, type='bootstrap', plot=FALSE)$p.value
-
-            df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='disp',version = version, pvalue = disp))
-            df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
+  
+      for(m in 1:length(method)){
+        if(!is.na(res.obj[[method[m]]])){
+  
+          if(!is.null(fam)){
+            if(fam == 'Poisson'){
+              disp <- testDispersion(res.obj[[method[m]]]$out, alternative = alt, plot=FALSE)$p.value
+  
+              #outlier test type = 'bootstrap' when discrete
+              outlier <- testOutliers(res.obj[[method[m]]]$out, alternative = alt,
+                                      margin = marg, type='bootstrap', plot=FALSE)$p.value
+  
+              df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='disp',version = version, pvalue = disp))
+              df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
+            } else {
+              #outlier test type = 'binomial' only appropriate for continuous distributions
+              outlier <- testOutliers(res.obj[[method[m]]]$out, alternative = alt,
+                                      margin = marg, type='binomial', plot=FALSE)$p.value
+              df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
+            }
           } else {
             #outlier test type = 'binomial' only appropriate for continuous distributions
             outlier <- testOutliers(res.obj[[method[m]]]$out, alternative = alt,
                                     margin = marg, type='binomial', plot=FALSE)$p.value
-            df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
+            df <- rbind(df,  data.frame(type='sim',method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
           }
-        } else {
-          #outlier test type = 'binomial' only appropriate for continuous distributions
-          outlier <- testOutliers(res.obj[[method[m]]]$out, alternative = alt,
-                                  margin = marg, type='binomial', plot=FALSE)$p.value
-          df <- rbind(df,  data.frame(type='sim',method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
+          
+          # if(doTrue){
+          #   ad <- goftest::ad.test(res.obj[[method[m]]]$out$scaledResiduals,'punif')$p.value #assume mean=0,sd=1?
+          # } else {
+          #   ad <- goftest::ad.test(res.obj[[method[m]]]$out$scaledResiduals,'punif', estimated = TRUE)$p.value
+          # }
+          ks <- suppressWarnings(ks.test(res.obj[[method[m]]]$out$scaledResiduals,'punif')$p.value)
+  
+       #   df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='GOF.ad', version = version, pvalue = ad))
+          df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='GOF.ks', version = version, pvalue = ks))
         }
-        
-        # if(doTrue){
-        #   ad <- goftest::ad.test(res.obj[[method[m]]]$out$scaledResiduals,'punif')$p.value #assume mean=0,sd=1?
-        # } else {
-        #   ad <- goftest::ad.test(res.obj[[method[m]]]$out$scaledResiduals,'punif', estimated = TRUE)$p.value
-        # }
-        ks <- suppressWarnings(ks.test(res.obj[[method[m]]]$out$scaledResiduals,'punif')$p.value)
-
-     #   df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='GOF.ad', version = version, pvalue = ad))
-        df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='GOF.ks', version = version, pvalue = ks))
       }
     }
+  } else {
+    df <- data.frame(type = NA, method = NA, model = NA,
+                     test = NA, version = NA, pvalue = NA)
   }
   return(df)
 }
