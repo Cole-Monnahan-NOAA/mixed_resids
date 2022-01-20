@@ -1,9 +1,9 @@
 setup_trueparms <- function(mod, misp){
-  rmse.comp <- list()
+  true.comp <- list()
   if(mod=='linmod'){
     theta <- c(4,-5)
     sd.vec <- 1
-    rmse.comp[[1]] <- rmse.comp[[2]] <-
+    true.comp[[1]] <- true.comp[[2]] <-
       list(beta_1 = theta[1], beta_2 = theta[2], 
                       ln_sig = log(sd.vec))
     sp.parm <- 0
@@ -14,24 +14,24 @@ setup_trueparms <- function(mod, misp){
       sd.vec <- c(sd.vec, 1)
     }
     if(misp == 'misscov'){
-      rmse.comp[[2]] <- list(beta = theta[1],
+      true.comp[[2]] <- list(beta = theta[1],
                           ln_sig = log(sd.vec[1]))
     }
   }
   if(mod=='randomwalk'){
-    theta <- .75
+    theta <- 2
     sd.vec <- c(1,1)
     sp.parm <- 0
     fam <- NULL
     link <- NULL
-    rmse.comp[[1]] <- list(mu = theta, ln_sig = log(sd.vec[1]),
+    true.comp[[1]] <- list(mu = theta, ln_sig = log(sd.vec[1]),
            ln_tau = log(sd.vec[2]))
     if(misp == 'mu0'){
-      rmse.comp[[2]] <- list(ln_sig = log(sd.vec[1]),
+      true.comp[[2]] <- list(ln_sig = log(sd.vec[1]),
                              ln_tau = log(sd.vec[2]))
     }
     if(misp == 'outliers'){
-      rmse.comp[[2]] <- rmse.comp[[1]]
+      true.comp[[2]] <- true.comp[[1]]
     }
   }
   if(mod=='simpleGLMM'){
@@ -52,68 +52,68 @@ setup_trueparms <- function(mod, misp){
       #parms when fam = 'Gaussian';link='identity
        theta <- c(4,-5)
        #theta <- c(1.5,-2)   
-       rmse.comp[[1]] <- list(beta_1 = theta[1], beta_2 = theta[2],
+       true.comp[[1]] <- list(beta_1 = theta[1], beta_2 = theta[2],
                               ln_sig_y = log(sd.vec[1]),
                               ln_sig_u = log(sd.vec[2]))
-       rmse.comp[[2]] <- list(beta = theta[1],
+       true.comp[[2]] <- list(beta = theta[1],
                               ln_sig_y = log(sd.vec[1]),
                               ln_sig_u = log(sd.vec[2]))
     }
     if(misp=='overdispersion') {
       sd.vec <- c(sd.vec, 1)
-      rmse.comp[[1]] <- list(beta_ = theta,
+      true.comp[[1]] <- list(beta_ = theta,
                              ln_sig_y = log(sd.vec[1]),
                              ln_sig_u = log(sd.vec[2]),
                              ln_sig_v = log(sd.vec[3]))
-      rmse.comp[[2]] <- list(beta = theta[1],
+      true.comp[[2]] <- list(beta = theta[1],
                              ln_sig_y = log(sd.vec[1]),
                              ln_sig_u = log(sd.vec[2]))
     }
     if(misp == 'outliers'){
-      rmse.comp[[1]] <- rmse.comp[[2]] <- 
+      true.comp[[1]] <- true.comp[[2]] <- 
         list(beta = theta[1],
              ln_sig_y = log(sd.vec[1]),
              ln_sig_u = log(sd.vec[2]))
     }
     if(fam == 'Poisson'){
-      rmse.comp[[1]]$ln_sig_y <- NULL
-      rmse.comp[[2]]$ln_sig_y <- NULL
+      true.comp[[1]]$ln_sig_y <- NULL
+      true.comp[[2]]$ln_sig_y <- NULL
     }
   }
   if(mod=='spatial'){
-    theta=2
-    sd.vec <- c(.5,sqrt(0.5))
-    sp.parm <- 20
+    theta=0.5
+    sd.vec <- c(.5,sqrt(3))
+    sp.parm <- 50
     fam <- 'Poisson'
     link <- 'log'
 
-    rmse.comp[[1]] <- rmse.comp[[2]] <- 
+    true.comp[[1]] <- true.comp[[2]] <- 
       list(beta = theta, theta = log(sd.vec[1]),
            ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd)) 
            ln_kappa = log(sqrt(8)/sp.parm))
     
     if(misp=='misscov'){
       theta <- c(1,2)
-      rmse.comp[[1]] <- 
+      true.comp[[1]] <- 
         list(beta_1 = theta[1], beta_2 = theta[2], theta = log(sd.vec[1]),
              ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd)) 
              ln_kappa = log(sqrt(8)/sp.parm))
-      rmse.comp[[2]] <- 
+      true.comp[[2]] <- 
         list(beta = theta[1], theta = log(sd.vec[1]),
              ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd)) 
              ln_kappa = log(sqrt(8)/sp.parm))
     }
     if(misp=='overdispersion'){
-      sd.vec <- c(sd.vec, sd.vec[2]*2)
-      rmse.comp[[1]]$ln_sig_v <- log(sd.vec[3])
+      sd.vec <- c(sd.vec, sd.vec[2]*.5) #overdispersion variance = 0.5*spatial variance
+      true.comp[[1]]$ln_sig_v <- log(sd.vec[3])
     }
     if(fam == "Poisson"){
-      rmse.comp[[1]]$theta <- NULL
-      rmse.comp[[2]]$theta <- NULL
+      true.comp[[1]]$theta <- NULL
+      true.comp[[2]]$theta <- NULL
     }
   }
   true.pars <- list(theta=theta, sd.vec=sd.vec, sp.parm=sp.parm,
-                    fam=fam, link=link, rmse.comp=rmse.comp)
+                    fam=fam, link=link, true.comp=true.comp)
   return(true.pars)
 }
 
@@ -163,151 +163,164 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     id <- paste0(mod, '_', misp, '_', do.true, '_h', h-1, '_', ii)
     
     init.obj <- list(data = init.dat[[h]], parameters = init.par[[h]], map = init.map[[h]], random = init.random[[h]], DLL = mod)
-    mod.out[[h]] <- fit_tmb(obj.args = init.obj, control = list(run.model = !do.true, do.sdreport = TRUE))
-    if(!do.true){
-      ## if estimating, return MLE values
-      tmp1 <- true.parms$rmse.comp[[h]]
-      tmp2 <- mod.out[[h]]$opt$par
-      stopifnot(length(tmp2)>0)
-      ##if('fam' %in% names(tmp1)){
-      tmp1$fam <- NULL
-      tmp1$link <- NULL
-      ##}
-      tmp1 <- unlist(tmp1)
-      ## super hacky way to get unique names when there are vectors
-      names(tmp2) <- unlist(sapply(unique(names(tmp2)), function(x) {
-        y <- names(tmp2)[names(tmp2)==x]
-        if(length(y)>1) paste(y, 1:length(y), sep="_") else y
-      }))
-      ## Save the true values and estimated ones to file
-      mles[[h]] <- data.frame(h=h-1, par=names(tmp2), 
-                              value=as.numeric(tmp2),
-                              rel_error = (tmp2-tmp1)/tmp1)
-      mles[[h]] <- cbind(mles[[h]], id=id, replicate=ii,
-                         do.true=do.true,  model=mod, misp=misp)
-    } else {
-      ## otherwise just NULL b/c nothing estimated
-      mles[[h]] <- NULL
-    }
-
-    message(ii, ": Calculating residuals..")
-    disc <- FALSE; ran <- c(-Inf,Inf)
-    if(!is.null(true.parms$fam)){
-      if(true.parms$fam == 'Poisson'){
-        disc <- TRUE
-        ran <- c(0,Inf)
-      }
-      if(true.parms$fam == 'Gamma') ran <- c(0,Inf)
-    }
-    osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, methods=osa.methods, observation.name='y', Discrete = disc, Range = ran)
-
-    expr <- expression(obj$simulate()$y)
-    if('cond' %in% dharma.methods){
-      dharma.out[[h]]$cond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], fpr=mod.out[[h]]$report$fpr)
-    } else {
-      dharma.out[[h]]$cond <- list()
-      dharma.out[[h]]$cond$resids <- NA
-      dharma.out[[h]]$cond$runtime <- NA
-    }
-
-    if('uncond' %in% dharma.methods){
-      mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
-      dharma.out[[h]]$uncond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], fpr=mod.out[[h]]$report$fpr)
-    } else {
-      dharma.out[[h]]$uncond <- list()
-      dharma.out[[h]]$uncond$resids <- NA
-      dharma.out[[h]]$uncond$runtime <- NA
-    }
-
-    ## only makes sense to run when MLE is estimated and there
-    ## are no RE
-    if('mcmc' %in% osa.methods & !do.true & Random ){
-      t0 <- Sys.time()
-      ## Build up TMB obj again
-      FE <- mod.out[[h]]$opt$par # estimated FE
-      ## make into list; https://stackoverflow.com/questions/46251725/convert-named-vector-to-list-in-r/46251794
-      FE <- split(unname(FE),names(FE))
-      MLE <- modifyList(init.par[[h]], FE) #
-      ## Get FE and map them off
-      xx <- names(MLE)[-which(names(MLE) %in% init.random[[h]])]
-      map <- lapply(names(FE), function(x) factor(FE[[x]]*NA))
-      names(map) <- names(FE)
-      map <- c(map, init.map[[h]])
-      ## Rebuild with original FE mapped off and RE as FE
-      objmle <- MakeADFun(data=init.dat[[h]], parameters=MLE,
-                          map=map, DLL=mod.out[[h]]$obj$env$DLL)
-      fitmle <- tmbstan::tmbstan(objmle, chains=1, warmup=300, iter=301, seed=ii, refresh=-1)
-      postmle <- as.numeric(as.matrix(fitmle)) ## single sample
-      postmle <- postmle[-length(postmle)] # drop lp__ value
-      ## Calculate residuals given the sample
-      tmp <- objmle$report(postmle)
-      if(mod=='spatial'){
-        Fx <- ppois(init.dat[[h]]$y, tmp$exp_val)
-        px <- dpois(init.dat[[h]]$y, tmp$exp_val)
-        u <- runif(length(Fx))
-        osa.out[[h]]$mcmc <- qnorm(Fx - u * px)
+    mod.out[[h]] <- try(
+      fit_tmb(
+        obj.args = init.obj, 
+        control = list(run.model = !do.true, do.sdreport = TRUE)
+        )
+    )
+    if(class(mod.out[[h]])!='try-error'){
+      if(!do.true){
+        ## if estimating, return MLE values
+        tmp1 <- true.parms$true.comp[[h]]
+        tmp2 <- mod.out[[h]]$opt$par
+        stopifnot(length(tmp2)>0)
+        ##if('fam' %in% names(tmp1)){
+        tmp1$fam <- NULL
+        tmp1$link <- NULL
+        ##}
+        tmp1 <- unlist(tmp1)
+        ## super hacky way to get unique names when there are vectors
+        names(tmp2) <- unlist(sapply(unique(names(tmp2)), function(x) {
+          y <- names(tmp2)[names(tmp2)==x]
+          if(length(y)>1) paste(y, 1:length(y), sep="_") else y
+        }))
+        ## Save the true values and estimated ones to file
+        mles[[h]] <- data.frame(h=h-1, par=names(tmp2), 
+                                mle=as.numeric(tmp2),
+                                true=as.numeric(tmp1),
+                                bias = tmp2-tmp1)
+        mles[[h]] <- cbind(mles[[h]], id=id, replicate=ii,
+                           do.true=do.true,  model=mod, misp=misp,
+                           n=n)
       } else {
-        sig <- if(is.null(tmp$sig)) tmp$sig_y else tmp$sig
-        Fx <- pnorm(q=init.dat[[h]]$y, mean= tmp$exp_val, sd=sig)
-        osa.out[[h]]$mcmc <-  qnorm(Fx)
+        ## otherwise just NULL b/c nothing estimated
+        mles[[h]] <- NULL
       }
-      osa.out[[h]]$runtime.mcmc <- as.numeric(Sys.time()-t0, 'secs')
-    } else {
-      osa.out[[h]]$mcmc <- osa.out[[h]]$runtime.mcmc <- NA
-    }
 
-    AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC) #!doesn't work if doTrue == TRUE
-    AICc <- ifelse(do.true, NA, mod.out[[h]]$aic$AICc) #!doesn't work if doTrue == TRUE
-    maxgrad <- ifelse(do.true,NA, max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) ) #!doesn't work if doTrue == TRUE
-    converge <- NA
-    if(!do.true){
-      if(mod.out[[h]]$opt$convergence == 1 | mod.out[[h]]$sdr$pdHess == FALSE ){
-        converge <- 1
-      } else {
-        converge <- 0
-      }
-    }
-    r[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
-                         replicate=ii, y=sim.dat[[h]],
-                         ypred=mod.out[[h]]$report$exp_val, 
-                         osa.cdf = osa.out[[h]]$cdf, osa.gen = osa.out[[h]]$gen,
-                         osa.fg=osa.out[[h]]$fg, osa.osg=osa.out[[h]]$osg,
-                         osa.mcmc=osa.out[[h]]$mcmc,
-                         sim_cond= dharma.out[[h]]$cond$resids,
-                         sim_uncond=dharma.out[[h]]$uncond$resids)#,
-                         # sim_parcond=dharma.out[[h]]$parcond$resids)
-    out[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
-                           replicate = ii, 
-                           runtime_cond=dharma.out[[h]]$cond$runtime,
-                           runtime_uncond=dharma.out[[h]]$uncond$runtime,
-                           # runtime_parcond=dharma.out[[h]]$parcond$runtime,
-                           runtime.cdf=osa.out[[h]]$runtime.cdf,
-                           runtime.fg=osa.out[[h]]$runtime.fg,
-                           runtime.osg=osa.out[[h]]$runtime.osg,
-                           runtime.gen=osa.out[[h]]$runtime.gen,
-                           runtime.mcmc=osa.out[[h]]$runtime.mcmc,
-                           maxgrad=maxgrad, converge=converge,
-                           AIC=AIC, AICc=AICc)
-
-    pvals <- rbind(pvals, cbind(id,calc.pvals( type = 'osa', method = osa.methods, mod = mod,
-                                      res.obj = osa.out[[h]], version = names(mod.out)[h],
-                                      fam = true.parms$fam, do.true )))
-    pvals <- rbind(pvals, cbind(id,calc.pvals( type = 'sim', method = dharma.methods, mod = mod,
-                                      res.obj = dharma.out[[h]], version = names(mod.out)[h],
-                                      fam = true.parms$fam, do.true )))
-    if(mod == 'spatial'){
-      dmat <- as.matrix(dist(sim.dat$loc, upper = TRUE))
-      wt <- 1/dmat;  diag(wt) <- 0
-      if(!is.null(osa.methods)){
-        for(m in 1:length(osa.methods)){
-          pvals <- rbind(pvals, cbind(id,data.frame(type='osa', method=osa.methods[m], model=mod, test='SAC', version = names(mod.out)[h],
-                         pvalue = calc.sac(osa.out[[h]][[osa.methods[m]]], wt))))
+      message(ii, ": Calculating residuals..")
+      disc <- FALSE; ran <- c(-Inf,Inf)
+      if(!is.null(true.parms$fam)){
+        if(true.parms$fam == 'Poisson'){
+          disc <- TRUE
+          ran <- c(0,Inf)
         }
-        for(m in 1:length(osa.methods)){
-          pvals <- rbind(pvals, cbind(id,data.frame(type='sim', method=dharma.methods[m], model=mod, test='SAC', version = names(mod.out)[h],
-                         pvalue = calc.sac(dharma.out[[h]][[dharma.methods[m]]]$resids, wt))))
+        if(true.parms$fam == 'Gamma') ran <- c(0,Inf)
+      }
+      osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, methods=osa.methods, observation.name='y', Discrete = disc, Range = ran)
+
+      expr <- expression(obj$simulate()$y)
+      if('cond' %in% dharma.methods){
+        dharma.out[[h]]$cond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], 
+                                                 fpr=mod.out[[h]]$report$fpr, int.resp = disc)
+      } else {
+        dharma.out[[h]]$cond <- list()
+        dharma.out[[h]]$cond$resids <- NA
+        dharma.out[[h]]$cond$runtime <- NA
+      }
+  
+      if('uncond' %in% dharma.methods){
+        mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
+        dharma.out[[h]]$uncond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], 
+                                                   fpr=mod.out[[h]]$report$fpr, int.resp = disc)
+      } else {
+        dharma.out[[h]]$uncond <- list()
+        dharma.out[[h]]$uncond$resids <- NA
+        dharma.out[[h]]$uncond$runtime <- NA
+      }
+
+      ## only makes sense to run when MLE is estimated and there
+      ## are no RE
+      if('mcmc' %in% osa.methods & !do.true & Random ){
+        t0 <- Sys.time()
+        ## Build up TMB obj again
+        FE <- mod.out[[h]]$opt$par # estimated FE
+        ## make into list; https://stackoverflow.com/questions/46251725/convert-named-vector-to-list-in-r/46251794
+        FE <- split(unname(FE),names(FE))
+        MLE <- modifyList(init.par[[h]], FE) #
+        ## Get FE and map them off
+        xx <- names(MLE)[-which(names(MLE) %in% init.random[[h]])]
+        map <- lapply(names(FE), function(x) factor(FE[[x]]*NA))
+        names(map) <- names(FE)
+        map <- c(map, init.map[[h]])
+        ## Rebuild with original FE mapped off and RE as FE
+        objmle <- MakeADFun(data=init.dat[[h]], parameters=MLE,
+                            map=map, DLL=mod.out[[h]]$obj$env$DLL)
+        fitmle <- tmbstan::tmbstan(objmle, chains=1, warmup=600, iter=601, seed=ii, refresh=-1)
+        postmle <- as.numeric(as.matrix(fitmle)) ## single sample
+        postmle <- postmle[-length(postmle)] # drop lp__ value
+        ## Calculate residuals given the sample
+        tmp <- objmle$report(postmle)
+        if(mod=='spatial'){
+          Fx <- ppois(init.dat[[h]]$y, tmp$exp_val)
+          px <- dpois(init.dat[[h]]$y, tmp$exp_val)
+          u <- runif(length(Fx))
+          osa.out[[h]]$mcmc <- qnorm(Fx - u * px)
+        } else {
+          sig <- if(is.null(tmp$sig)) tmp$sig_y else tmp$sig
+          Fx <- pnorm(q=init.dat[[h]]$y, mean= tmp$exp_val, sd=sig)
+          osa.out[[h]]$mcmc <-  qnorm(Fx)
+        }
+        osa.out[[h]]$runtime.mcmc <- as.numeric(Sys.time()-t0, 'secs')
+      } else {
+        osa.out[[h]]$mcmc <- osa.out[[h]]$runtime.mcmc <- NA
+      }
+  
+      AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC) #!doesn't work if doTrue == TRUE
+      AICc <- ifelse(do.true, NA, mod.out[[h]]$aic$AICc) #!doesn't work if doTrue == TRUE
+      maxgrad <- ifelse(do.true,NA, max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) ) #!doesn't work if doTrue == TRUE
+      converge <- NA
+      if(!do.true){
+        if(mod.out[[h]]$opt$convergence == 1 | mod.out[[h]]$sdr$pdHess == FALSE ){
+          converge <- 1
+        } else {
+          converge <- 0
         }
       }
+      r[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
+                           replicate=ii, y=sim.dat[[h]],
+                           ypred=mod.out[[h]]$report$exp_val, 
+                           osa.cdf = osa.out[[h]]$cdf, osa.gen = osa.out[[h]]$gen,
+                           osa.fg=osa.out[[h]]$fg, osa.osg=osa.out[[h]]$osg,
+                           osa.mcmc=osa.out[[h]]$mcmc,
+                           sim_cond= dharma.out[[h]]$cond$resids,
+                           sim_uncond=dharma.out[[h]]$uncond$resids)#,
+                           # sim_parcond=dharma.out[[h]]$parcond$resids)
+      out[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
+                             replicate = ii, 
+                             runtime_cond=dharma.out[[h]]$cond$runtime,
+                             runtime_uncond=dharma.out[[h]]$uncond$runtime,
+                             # runtime_parcond=dharma.out[[h]]$parcond$runtime,
+                             runtime.cdf=osa.out[[h]]$runtime.cdf,
+                             runtime.fg=osa.out[[h]]$runtime.fg,
+                             runtime.osg=osa.out[[h]]$runtime.osg,
+                             runtime.gen=osa.out[[h]]$runtime.gen,
+                             runtime.mcmc=osa.out[[h]]$runtime.mcmc,
+                             maxgrad=maxgrad, converge=converge,
+                             AIC=AIC, AICc=AICc)
+  
+      pvals <- rbind(pvals, cbind(id,calc.pvals( type = 'osa', method = osa.methods, mod = mod,
+                                        res.obj = osa.out[[h]], version = names(mod.out)[h],
+                                        fam = true.parms$fam, do.true )))
+      pvals <- rbind(pvals, cbind(id,calc.pvals( type = 'sim', method = dharma.methods, mod = mod,
+                                        res.obj = dharma.out[[h]], version = names(mod.out)[h],
+                                        fam = true.parms$fam, do.true )))
+      if(mod == 'spatial'){
+        dmat <- as.matrix(dist(sim.dat$loc, upper = TRUE))
+        wt <- 1/dmat;  diag(wt) <- 0
+        if(!is.null(osa.methods)){
+          for(m in 1:length(osa.methods)){
+            pvals <- rbind(pvals, cbind(id,data.frame(type='osa', method=osa.methods[m], model=mod, test='SAC', version = names(mod.out)[h],
+                           pvalue = calc.sac(osa.out[[h]][[osa.methods[m]]], wt))))
+          }
+          for(m in 1:length(osa.methods)){
+            pvals <- rbind(pvals, cbind(id,data.frame(type='sim', method=dharma.methods[m], model=mod, test='SAC', version = names(mod.out)[h],
+                           pvalue = calc.sac(dharma.out[[h]][[dharma.methods[m]]]$resids, wt))))
+          }
+        }
+      }
+    } else {
+      pvals
     }
   }
   resids <- rbind(r[[1]], r[[2]])
@@ -450,6 +463,9 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
       par0 <- list(u = rep(1, length(Dat$random$u)), mu = 0, ln_sig = 0, ln_tau = 0)
     }
     par1 <- par0
+    if(Misp == 'mu0'){
+      par1$mu = 0
+    }
   }
 
   if(Mod == 'simpleGLMM'){
