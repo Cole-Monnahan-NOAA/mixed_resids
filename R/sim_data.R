@@ -100,22 +100,31 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
   if(mod == 'spatial'){
     ## Simulate spatial random effects
     set.seed(seed)
-    Loc <- matrix(runif(N*2,0,N),ncol=2)
-    dmat <- as.matrix(dist(Loc))
+    Loc <- matrix(runif(1000*2,0,100),ncol=2)
+    dmat <-  as.matrix(dist(Loc))
+    Sigma <- sd.vec[2]^2 * cMatern(dmat,1,sqrt(8)/sp.parm)
+    Omega <- t(mvtnorm::rmvnorm(1, rep(0,nrow(Sigma)), 
+                                sigma = Sigma, method = 'chol'))
+    samp.idx <- sample(1:1000, N)
+    loc <- Loc[samp.idx,]
+    omega <- Omega[samp.idx]
+    
     mesh <- try(
-      R.utils::withTimeout( INLA::inla.mesh.2d(Loc, max.edge = c(sp.parm/3, sp.parm), offset = c(2, sp.parm*.75)),
-                   timeout = 30, onTimeout = 'silent' ))
+      R.utils::withTimeout( 
+        INLA::inla.mesh.2d(loc, max.edge = c(sp.parm/3,sp.parm), 
+                           offset = c(sp.parm/10,sp.parm*5), min.angle = 26),
+                    timeout = 30, onTimeout = 'silent' ))
     if(is.character(mesh)){
       system("Taskkill /IM fmesher.exe /F")
      # warning("mesh failed in rep=", ii)
       return(NULL)
     }
-    Omega <- sim_omega(sp.parm,sd.vec[2]^2,dmat,method="R.matern",mesh=mesh)
-    if(length(Omega)>n){
-      omega <- Omega[mesh$idx$loc]
-    } else {
-      omega <- Omega
-    }
+    # Omega <- sim_omega(sp.parm,sd.vec[2]^2,dmat,method="R.matern",mesh=mesh)
+    # if(length(Omega)>n){
+    #   omega <- Omega[mesh$idx$loc]
+    # } else {
+    #   omega <- Omega
+    # }
     v <- rep(0, n)
     if(misp == 'overdispersion'){
       set.seed(seed)
@@ -136,7 +145,7 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
       y1 <- sim_y(Eta = mu, omega=exp(omega),
                   parm=sd.vec, fam=fam, link=link)
     }
-    random <- list(omega=Omega, v=v)
+    random <- list(omega=omega, v=v)
   }
 
   if(misp == 'outliers'){
@@ -149,7 +158,7 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
 
   dat.out <- list(y0=y0, y1=y1, x=X, random=random)
   if(mod == 'spatial'){
-    dat.out$loc = Loc
+    dat.out$loc = loc
     dat.out$mesh = mesh
   }
   return(dat.out)
@@ -213,7 +222,7 @@ sim_omega <- function(Range, sig2, Dmat, Nu = 1, method, mesh){
 
 # Simulate data
 sim_y <- function(Eta, omega, parm, fam, link){
-   Eta <- Eta + omega
+  Eta <- Eta + omega
   N <- nrow(Eta)
   if(link == 'identity'){
     mu <- Eta
