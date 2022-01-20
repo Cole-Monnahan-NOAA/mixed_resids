@@ -81,11 +81,12 @@ calculate.osa <- function(obj, methods, observation.name,
               runtime.osg=runtime.osg, runtime.cdf=runtime.cdf))
 }
 
-calculate.dharma <- function(obj, expr, N=1000, obs, fpr){
+calculate.dharma <- function(obj, expr, N=1000, obs, fpr, int.resp){
   #alternative <- match.arg(alternative)
   t0 <- Sys.time()
   tmp <- replicate(N, eval(expr))
-  dharma <- createDHARMa(tmp, obs, fittedPredictedResponse = fpr)
+  dharma <- createDHARMa(tmp, obs, fittedPredictedResponse = fpr,
+                         integerResponse = int.resp)
   resids <- residuals(dharma, quantileFunction = qnorm,
                       outlierValues = c(-7,7))
   runtime <- as.numeric(Sys.time()-t0, 'secs')
