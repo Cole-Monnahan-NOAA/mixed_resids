@@ -3,7 +3,7 @@ calculate.osa <- function(obj, methods, observation.name,
                           Range = c(-Inf,Inf), Discrete = NULL,
                           Subset = NULL){
   ## OSA residuals
-  fg <- osg <- cdf <- gen <- NA
+  fg <- osg <- cdf <- gen <- pears <- NA
   runtime.fg <- runtime.osg <- runtime.cdf <- runtime.gen <- NA
   if('fg' %in% methods){
     t0 <- Sys.time()
@@ -68,15 +68,21 @@ calculate.osa <- function(obj, methods, observation.name,
       gen <- NA; runtime.gen <- NA
     }
   }
-  #Calculate Pearson's residuals for overdispersion test if Poisson
-  pears <- NA
-  if(Discrete == TRUE){
-    if(obj$env$data$family == 200){#Poisson model
-      pears <- list(resid = (obj$env$data$y - obj$report()$exp_val)^2/obj$report()$exp_val)
-      pears$df <- length(obj$env$data$y) - length(obj$par)
+  #Calculate Pearson's residuals 
+  pears.df <- length(obj$env$data$y) - length(obj$par)
+  if('pears' %in% methods){
+    report <- obj$report()
+    if(Discrete == TRUE){
+      if(obj$env$data$family == 200){#Poisson model
+        pears <- (obj$env$data$y - report$exp_val)/sqrt(report$exp_val)
+      }
+    } else {
+      sig <- if(is.null(report$sig)) report$sig_y else report$sig
+      pears <- (obj$env$data$y - report$exp_val)/sig
     }
   }
-  return(list(gen=gen, fg=fg, osg=osg, cdf=cdf, pears = pears,
+  return(list(gen=gen, fg=fg, osg=osg, cdf=cdf, 
+              pears = pears, pears.df = pears.df,
               runtime.gen=runtime.gen, runtime.fg=runtime.fg,
               runtime.osg=runtime.osg, runtime.cdf=runtime.cdf))
 }
@@ -225,7 +231,7 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
       }
       if(!is.null(fam)){
         if(fam == 'Poisson'){
-          disp <- 1 - pchisq(sum(res.obj$pears$resid), res.obj$pears$df)
+          disp <- 1 - pchisq(sum(res.obj$pears^2), res.obj$pears.df)
           df <- rbind(df, data.frame(type='osa', method='pears', model=mod, test='disp',
                                      version = version, pvalue = disp))
         }
