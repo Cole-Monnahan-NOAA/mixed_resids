@@ -38,8 +38,8 @@ setup_trueparms <- function(mod, misp){
     #parms when fam = 'Gaussian';link='identity'
     theta <- 4
     sd.vec <- sqrt(c(.5,10))
-    fam <- 'Gaussian'
-    link <- 'identity'
+    fam <- 'Gamma'
+    link <- 'log'
 
     #parms when fam = 'Poisson'; link = 'log'
     # theta <- 1.5
@@ -49,9 +49,9 @@ setup_trueparms <- function(mod, misp){
 
     sp.parm <- 0
     if(misp=='misscov'){
-      #parms when fam = 'Gaussian';link='identity
-       theta <- c(4,-5)
-       #theta <- c(1.5,-2)   
+       #parms when fam = 'Gaussian';link='identity
+       #theta <- c(4,-5)
+       theta <- c(4,-.4)   
        true.comp[[1]] <- list(beta_1 = theta[1], beta_2 = theta[2],
                               ln_sig_y = log(sd.vec[1]),
                               ln_sig_u = log(sd.vec[2]))
@@ -82,7 +82,7 @@ setup_trueparms <- function(mod, misp){
   }
   if(mod=='spatial'){
     theta=0.5
-    sd.vec <- c(.5,sqrt(3))
+    sd.vec <- c(.5,sqrt(2))
     sp.parm <- 50
     fam <- 'Poisson'
     link <- 'log'
@@ -246,20 +246,32 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
         ## Rebuild with original FE mapped off and RE as FE
         objmle <- MakeADFun(data=init.dat[[h]], parameters=MLE,
                             map=map, DLL=mod.out[[h]]$obj$env$DLL)
-        fitmle <- tmbstan::tmbstan(objmle, chains=1, warmup=600, iter=601, seed=ii, refresh=-1)
+        fitmle <- tmbstan::tmbstan(objmle, chains=1, warmup=300, iter=301, seed=ii, refresh=-1)
         postmle <- as.numeric(as.matrix(fitmle)) ## single sample
         postmle <- postmle[-length(postmle)] # drop lp__ value
         ## Calculate residuals given the sample
         tmp <- objmle$report(postmle)
-        if(mod=='spatial'){
-          Fx <- ppois(init.dat[[h]]$y, tmp$exp_val)
-          px <- dpois(init.dat[[h]]$y, tmp$exp_val)
-          u <- runif(length(Fx))
-          osa.out[[h]]$mcmc <- qnorm(Fx - u * px)
-        } else {
+        if(is.null(true.parms$fam)){
           sig <- if(is.null(tmp$sig)) tmp$sig_y else tmp$sig
           Fx <- pnorm(q=init.dat[[h]]$y, mean= tmp$exp_val, sd=sig)
           osa.out[[h]]$mcmc <-  qnorm(Fx)
+        } else {
+          if(true.parms$fam == 'Poisson'){
+            Fx <- ppois(init.dat[[h]]$y, tmp$exp_val)
+            px <- dpois(init.dat[[h]]$y, tmp$exp_val)
+            u <- runif(length(Fx))
+            osa.out[[h]]$mcmc <- qnorm(Fx - u * px)
+          }
+          if(true.parms$fam == 'Gamma'){
+            sig <- if(is.null(tmp$sig)) tmp$sig_y else tmp$sig
+            Fx <- pgamma(init.dat[[h]]$y, shape = 1/sig^2, scale = tmp$exp_val*sig^2)
+            osa.out[[h]]$mcmc <-  qnorm(Fx)
+          }
+          if(true.parms$fam == 'Gaussian'){
+            sig <- if(is.null(tmp$sig)) tmp$sig_y else tmp$sig
+            Fx <- pnorm(q=init.dat[[h]]$y, mean= tmp$exp_val, sd=sig)
+            osa.out[[h]]$mcmc <-  qnorm(Fx)
+          }
         }
         osa.out[[h]]$runtime.mcmc <- as.numeric(Sys.time()-t0, 'secs')
       } else {
@@ -282,7 +294,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
                            ypred=mod.out[[h]]$report$exp_val, 
                            osa.cdf = osa.out[[h]]$cdf, osa.gen = osa.out[[h]]$gen,
                            osa.fg=osa.out[[h]]$fg, osa.osg=osa.out[[h]]$osg,
-                           osa.mcmc=osa.out[[h]]$mcmc,
+                           osa.mcmc=osa.out[[h]]$mcmc, pears=osa.out[[h]]$pears,
                            sim_cond= dharma.out[[h]]$cond$resids,
                            sim_uncond=dharma.out[[h]]$uncond$resids)#,
                            # sim_parcond=dharma.out[[h]]$parcond$resids)
@@ -320,7 +332,27 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
         }
       }
     } else {
-      pvals
+      r[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
+                           replicate=ii, y=sim.dat[[h]],
+                           ypred=NA, 
+                           osa.cdf = NA, osa.gen = NA,
+                           osa.fg=NA, osa.osg=NA,
+                           osa.mcmc=NA, pears=NA,
+                           sim_cond= NA,
+                           sim_uncond=NA)#,
+      # sim_parcond=dharma.out[[h]]$parcond$resids)
+      out[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
+                             replicate = ii, 
+                             runtime_cond=NA,
+                             runtime_uncond=NA,
+                             # runtime_parcond=dharma.out[[h]]$parcond$runtime,
+                             runtime.cdf=NA,
+                             runtime.fg=NA,
+                             runtime.osg=NA,
+                             runtime.gen=NA,
+                             runtime.mcmc=NA,
+                             maxgrad=NA, converge=1,
+                             AIC=NA, AICc=NA)
     }
   }
   resids <- rbind(r[[1]], r[[2]])
