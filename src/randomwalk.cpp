@@ -59,7 +59,7 @@ Type objective_function<Type>::operator()()
   
   vector<Type> fpr(y.size());
   for(int i=0; i<y.size(); i++) fpr(i) = mu;
-  vector<Type> exp_val = ypred;
+  vector<Type> exp_val = u;
   
   REPORT(u);
   REPORT(exp_val);
