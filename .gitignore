@@ -6,12 +6,16 @@ models/*.dll
 results/spatial*_pvals
 results/spatial*_resids
 results/spatial*_mles
+results/spatial*_stats
 results/randomwalk*_pvals
 results/randomwalk*_resids
 results/randomwalk*_mles
+results/randomwalk*_stats
 results/simpleGLMM*_pvals
 results/simpleGLMM*_resids
 results/simpleGLMM*_mles
+results/simpleGLMM*_stats
 results/linmod*_pvals
 results/linmod*_resids
 results/linmod*_mles
+results/linmod*_stats
