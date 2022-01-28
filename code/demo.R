@@ -44,14 +44,18 @@ for(step in 1:3){
         box()
       }
       if(i<j){
-        plot(draws[,i], draws[,j], ann=FALSE, pch=16, cex=.25, col=rgb(0,0,0,.5))
+        if(step==1){
+          plot(draws[,i], draws[,j], ann=FALSE, pch=16, cex=.25, col=rgb(0,0,0,.5))
+        }
         if(step==2){
+          plot(draws.bad[,i], draws.bad[,j], ann=FALSE, pch=16, cex=.25, col=rgb(0,0,0,.5))
           arrows(draws[1:tmp, i], draws[1:tmp,j], draws.bad[1:tmp,i],
                  draws.bad[1:tmp,j], length=.05, col=4, lwd=1.5)
           arrows(obs[i], obs[j], obs.bad[i], obs.bad[j], length=.05,
                  col=2, lwd=1.5)
         }
         if(step==3){
+          plot(draws.rotated[,i], draws.rotated[,j], ann=FALSE, pch=16, cex=.25, col=rgb(0,0,0,.5))
           arrows(draws[1:tmp, i], draws[1:tmp,j], draws.rotated[1:tmp,i],
                  draws.rotated[1:tmp,j], length=.05, col=4,
                  lwd=1.5)
