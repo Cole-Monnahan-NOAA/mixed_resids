@@ -26,7 +26,7 @@ packageVersion('DHARMa')                # 0.3.3.0
 ##   conditioned on data)
 
 (cpus <- parallel::detectCores()-2)
-reps <- 1:500
+reps <- 501:1000
 
 do.true <- FALSE
 ## Set osa.methods and dharma.methods to NULL to turn off
@@ -68,6 +68,12 @@ resids <- lapply(list.files('results', pattern='_resids.RDS',
 
 stats <- lapply(list.files('results', pattern='_stats.RDS',
                            full.names=TRUE), readRDS) %>% bind_rows
+
+## check on if runs worked out
+group_by(pvals, model, version) %>% summarize(count=length(unique(replicate)))
+goodreps <- filter(pvals, model=='spatial' & version=='h1') %>%
+  summarize(replicate=unique(replicate)) %>% pull(replicate)
+which(! (1:500 %in% goodreps))
 
 ## Effect of do.true for true model
 filter(pvals, version=='h0' &  test=='GOF.ks') %>%
@@ -117,11 +123,11 @@ sp.pvals %>% filter(do.true==FALSE & test == 'outliers') %>%
 ##   ggplot(., aes(x=par, y=value)) + geom_violin() +
 ##   geom_hline(yintercept = -2) + geom_hline(yintercept = 1)
 
-## Check for MLE consistency. 
+## Check for MLE consistency.
 nc_id <- stats[stats$converge==1|stats$maxgrad>0.1,]$id
 
 g <- filter(mles, h==0 & !(id %in% nc_id) & do.true == FALSE) %>%
-  ggplot(., aes(x=par, y=bias)) + geom_violin() + 
+  ggplot(., aes(x=par, y=bias)) + geom_violin() +
   facet_wrap(~model, nrow=1, scales = 'free_x')
 g
 
