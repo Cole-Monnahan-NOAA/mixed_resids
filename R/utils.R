@@ -109,4 +109,5 @@ run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = 
   fs <- list.files(paste0('results/',mod, '_', misp,'_stats/'), full.names=TRUE)
   stats <- lapply(fs, readRDS) %>% bind_rows
   saveRDS(stats, file=paste0('results/',mod, '_', misp,'_stats.RDS'))
+  return(results)
 }
