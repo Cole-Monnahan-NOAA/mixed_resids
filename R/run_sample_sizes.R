@@ -57,19 +57,19 @@ get.value <- function(x, val, nobs){
 
 
 cpus <- parallel::detectCores()-1
+sfInit( parallel=cpus>1, cpus=cpus )
 Nreps <- 10
 do.true <- FALSE
-osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 'pears')[-c(2,3,5)]
+osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 'pears')[-c(2,3,6)]
 dharma.methods <- c('uncond', 'cond')
 
 ## bunch of machinery here to look at more than runtimes which is
 ## turned off for now
 
-### linmod
+### linmod -- probably doesn't make sense to include these?
 runtimes <- mles <- pvals <- list(); k <- 1
-(nobsvec <- 2^c(4:8))
+(nobsvec <- 2^c(4:9))
 for(nobs in nobsvec){
-  sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
   tmp <- sfLapply(1:Nreps, function(ii)
     run_iter(ii, n=nobs, ng, mod='linmod', cov.mod='norm', misp='overdispersion', do.true=do.true, savefiles=FALSE))
@@ -82,7 +82,7 @@ results.linmod <- process_results(mles, runtimes, pvals, model='linmod')
 ## plot_sample_sizes(results.linmod)
 
 runtimes <- mles <- pvals <- list(); k <- 1
-(nobsvec <- 2^c(4:8))
+(nobsvec <- 2^c(4:10))
 for(nobs in nobsvec){
   sfExportAll()
   tmp <- sfLapply(1:Nreps, function(ii)
@@ -94,11 +94,11 @@ for(nobs in nobsvec){
   k <- k+1
 }
 results.randomwalk <- process_results(mles, runtimes, pvals, model='randomwalk')
-plot_sample_sizes(results.randomwalk)
+## plot_sample_sizes(results.randomwalk)
 
 
 runtimes <- mles <- pvals <- list(); k <- 1
-(nobsvec <- 2^c(6:7))
+(nobsvec <- 2^c(6:11))
 for(nobs in nobsvec){
   sfExportAll()
   tmp <- sfLapply(1:Nreps, function(ii)
@@ -118,7 +118,9 @@ results.spatial <- process_results(mles, runtimes, pvals, model='spatial')
 ## from the residual standpoint I think it's ngroups*nobs that
 ## matters
 runtimes <- mles <- pvals <- list(); k <- 1
-(ngroupsvec <- 2^c(4:6))
+(ngroupsvec <- 2^c(3:8))
+## CDF method seems broken for these?
+osa.methods <- c('fg', 'mcmc')
 for(ngroups in ngroupsvec){
   nobs <- ngroups*10
   sfExportAll()
@@ -140,14 +142,15 @@ results.simpleGLMM <- readRDS('results/simpleGLMM_sample_sizes.RDS')
 results.linmod <- readRDS('results/linmod_sample_sizes.RDS')
 results.randomwalk <- readRDS('results/randomwalk_sample_sizes.RDS')
 results.spatial <- readRDS('results/spatial_sample_sizes.RDS')
-
 runtimes.all <- rbind(results.simpleGLMM$runtimes,
                       results.linmod$runtimes,
                       results.randomwalk$runtimes,
                       results.spatial$runtimes)
+## runtimes.all <- rbind(results.linmod, results.randomwalk,
+##                       results.spatial, results.simpleGLMM)
 
-runtimes.all <- rbind(results.linmod, results.randomwalk,
-                      results.spatial, results.simpleGLMM) %>% filter(!is.na(med))
+runtimes.all <- runtimes.all %>% filter(!is.na(med))
+
 g <- ggplot(runtimes.all,
             aes(nobs, med, ymin=lwr, ymax=upr,  color=type)) +
   geom_line()+
