@@ -4,7 +4,7 @@ setup_trueparms <- function(mod, misp){
     theta <- c(4,-5)
     sd.vec <- 1
     true.comp[[1]] <- true.comp[[2]] <-
-      list(beta_1 = theta[1], beta_2 = theta[2], 
+      list(beta_1 = theta[1], beta_2 = theta[2],
                       ln_sig = log(sd.vec))
     sp.parm <- 0
     fam <- NULL
@@ -51,7 +51,7 @@ setup_trueparms <- function(mod, misp){
     if(misp=='misscov'){
        #parms when fam = 'Gaussian';link='identity
        #theta <- c(4,-5)
-       theta <- c(4,-.4)   
+       theta <- c(4,-.4)
        true.comp[[1]] <- list(beta_1 = theta[1], beta_2 = theta[2],
                               ln_sig_y = log(sd.vec[1]),
                               ln_sig_u = log(sd.vec[2]))
@@ -70,7 +70,7 @@ setup_trueparms <- function(mod, misp){
                              ln_sig_u = log(sd.vec[2]))
     }
     if(misp == 'outliers'){
-      true.comp[[1]] <- true.comp[[2]] <- 
+      true.comp[[1]] <- true.comp[[2]] <-
         list(beta = theta[1],
              ln_sig_y = log(sd.vec[1]),
              ln_sig_u = log(sd.vec[2]))
@@ -87,20 +87,20 @@ setup_trueparms <- function(mod, misp){
     fam <- 'Poisson'
     link <- 'log'
 
-    true.comp[[1]] <- true.comp[[2]] <- 
+    true.comp[[1]] <- true.comp[[2]] <-
       list(beta = theta, theta = log(sd.vec[1]),
-           ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd)) 
+           ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd))
            ln_kappa = log(sqrt(8)/sp.parm))
-    
+
     if(misp=='misscov'){
       theta <- c(1,2)
-      true.comp[[1]] <- 
+      true.comp[[1]] <-
         list(beta_1 = theta[1], beta_2 = theta[2], theta = log(sd.vec[1]),
-             ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd)) 
+             ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd))
              ln_kappa = log(sqrt(8)/sp.parm))
-      true.comp[[2]] <- 
+      true.comp[[2]] <-
         list(beta = theta[1], theta = log(sd.vec[1]),
-             ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd)) 
+             ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd))
              ln_kappa = log(sqrt(8)/sp.parm))
     }
     if(misp=='overdispersion'){
@@ -159,13 +159,13 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
   for(h in 1:2){
 
     message(ii, ": Optimizing two competing models...")
-    
+
     id <- paste0(mod, '_', misp, '_', do.true, '_h', h-1, '_', ii)
-    
+
     init.obj <- list(data = init.dat[[h]], parameters = init.par[[h]], map = init.map[[h]], random = init.random[[h]], DLL = mod)
     mod.out[[h]] <- try(
       fit_tmb(
-        obj.args = init.obj, 
+        obj.args = init.obj,
         control = list(run.model = !do.true, do.sdreport = TRUE)
         )
     )
@@ -186,7 +186,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
           if(length(y)>1) paste(y, 1:length(y), sep="_") else y
         }))
         ## Save the true values and estimated ones to file
-        mles[[h]] <- data.frame(h=h-1, par=names(tmp2), 
+        mles[[h]] <- data.frame(h=h-1, par=names(tmp2),
                                 mle=as.numeric(tmp2),
                                 true=as.numeric(tmp1),
                                 bias = tmp2-tmp1)
@@ -211,17 +211,17 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
 
       expr <- expression(obj$simulate()$y)
       if('cond' %in% dharma.methods){
-        dharma.out[[h]]$cond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], 
+        dharma.out[[h]]$cond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]],
                                                  fpr=mod.out[[h]]$report$fpr, int.resp = disc)
       } else {
         dharma.out[[h]]$cond <- list()
         dharma.out[[h]]$cond$resids <- NA
         dharma.out[[h]]$cond$runtime <- NA
       }
-  
+
       if('uncond' %in% dharma.methods){
         mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
-        dharma.out[[h]]$uncond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], 
+        dharma.out[[h]]$uncond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]],
                                                    fpr=mod.out[[h]]$report$fpr, int.resp = disc)
       } else {
         dharma.out[[h]]$uncond <- list()
@@ -277,7 +277,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
       } else {
         osa.out[[h]]$mcmc <- osa.out[[h]]$runtime.mcmc <- NA
       }
-  
+
       AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC) #!doesn't work if doTrue == TRUE
       AICc <- ifelse(do.true, NA, mod.out[[h]]$aic$AICc) #!doesn't work if doTrue == TRUE
       maxgrad <- ifelse(do.true,NA, max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) ) #!doesn't work if doTrue == TRUE
@@ -291,7 +291,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
       }
       r[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
                            replicate=ii, y=sim.dat[[h]],
-                           ypred=mod.out[[h]]$report$exp_val, 
+                           ypred=mod.out[[h]]$report$exp_val,
                            osa.cdf = osa.out[[h]]$cdf, osa.gen = osa.out[[h]]$gen,
                            osa.fg=osa.out[[h]]$fg, osa.osg=osa.out[[h]]$osg,
                            osa.mcmc=osa.out[[h]]$mcmc, pears=osa.out[[h]]$pears,
@@ -299,7 +299,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
                            sim_uncond=dharma.out[[h]]$uncond$resids)#,
                            # sim_parcond=dharma.out[[h]]$parcond$resids)
       out[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
-                             replicate = ii, 
+                             replicate = ii,
                              runtime_cond=dharma.out[[h]]$cond$runtime,
                              runtime_uncond=dharma.out[[h]]$uncond$runtime,
                              # runtime_parcond=dharma.out[[h]]$parcond$runtime,
@@ -310,7 +310,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
                              runtime.mcmc=osa.out[[h]]$runtime.mcmc,
                              maxgrad=maxgrad, converge=converge,
                              AIC=AIC, AICc=AICc)
-  
+
       pvals <- rbind(pvals, cbind(id,calc.pvals( type = 'osa', method = osa.methods, mod = mod,
                                         res.obj = osa.out[[h]], version = names(mod.out)[h],
                                         fam = true.parms$fam, do.true )))
@@ -334,7 +334,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     } else {
       r[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
                            replicate=ii, y=sim.dat[[h]],
-                           ypred=NA, 
+                           ypred=NA,
                            osa.cdf = NA, osa.gen = NA,
                            osa.fg=NA, osa.osg=NA,
                            osa.mcmc=NA, pears=NA,
@@ -342,7 +342,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
                            sim_uncond=NA)#,
       # sim_parcond=dharma.out[[h]]$parcond$resids)
       out[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
-                             replicate = ii, 
+                             replicate = ii,
                              runtime_cond=NA,
                              runtime_uncond=NA,
                              # runtime_parcond=dharma.out[[h]]$parcond$runtime,
@@ -430,7 +430,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
 #       facet_grid(version~method)
 #     g <- g+geom_jitter(alpha=.5, width=.2, data=rbind(data.frame(dat0), data.frame(dat1)))
 #     ggsave('plots/simpleGLMM_simdata.png', g, width=9, height=6)
-  return(invisible(list(pvals=pvals, resids=resids, mles=mles)))
+  return(invisible(list(pvals=pvals, resids=resids, mles=mles, stats=stats)))
 }
 
 mkTMBdat <- function(Dat, Pars, Mod, Misp){
