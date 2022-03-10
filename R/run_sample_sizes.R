@@ -17,8 +17,8 @@ process_results <- function(mles, runtimes, pvals, model){
     mutate(type=gsub('runtime.|runtime_', '', type)) %>%
     group_by(nobs, model, version, type) %>%
     summarize(med=median(runtime, na.rm=TRUE),
-              lwr=quantile(runtime, .1, na.rm=TRUE),
-              upr=quantile(runtime, .9, na.rm=TRUE),
+              lwr=quantile(runtime, .25, na.rm=TRUE),
+              upr=quantile(runtime, .75, na.rm=TRUE),
               pct.na=sum(is.na(runtime)),
               n=length(runtime), .groups='drop')
   if(!is.null(pvals))
@@ -58,7 +58,7 @@ get.value <- function(x, val, nobs){
 
 cpus <- parallel::detectCores()-1
 sfInit( parallel=cpus>1, cpus=cpus )
-Nreps <- 10
+Nreps <- 20
 do.true <- FALSE
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 'pears')[-c(2,3,6)]
 dharma.methods <- c('uncond', 'cond')
@@ -68,21 +68,21 @@ dharma.methods <- c('uncond', 'cond')
 
 ### linmod -- probably doesn't make sense to include these?
 runtimes <- mles <- pvals <- list(); k <- 1
-(nobsvec <- 2^c(4:9))
+(nobsvec <- 2^c(4:12))
 for(nobs in nobsvec){
   sfExportAll()
   tmp <- sfLapply(1:Nreps, function(ii)
     run_iter(ii, n=nobs, ng, mod='linmod', cov.mod='norm', misp='overdispersion', do.true=do.true, savefiles=FALSE))
   pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nobs))
   mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nobs))
-  runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'runtimes', nobs))
+  runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'stats', nobs))
   k <- k+1
+  results.linmod <- process_results(mles, runtimes, pvals, model='linmod')
 }
-results.linmod <- process_results(mles, runtimes, pvals, model='linmod')
 ## plot_sample_sizes(results.linmod)
 
 runtimes <- mles <- pvals <- list(); k <- 1
-(nobsvec <- 2^c(4:10))
+(nobsvec <- 2^c(4:12))
 for(nobs in nobsvec){
   sfExportAll()
   tmp <- sfLapply(1:Nreps, function(ii)
@@ -92,13 +92,32 @@ for(nobs in nobsvec){
   mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nobs))
   runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'stats', nobs))
   k <- k+1
+  results.randomwalk <- process_results(mles, runtimes, pvals, model='randomwalk')
 }
-results.randomwalk <- process_results(mles, runtimes, pvals, model='randomwalk')
 ## plot_sample_sizes(results.randomwalk)
 
+## this one is a bit different since it has ngroups and nobs per
+## group. Just increasing ngroups and leaving nobs the same (10), but
+## from the residual standpoint I think it's ngroups*nobs that
+## matters
+runtimes <- mles <- pvals <- list(); k <- 1
+(ngroupsvec <- 2^c(4:11))
+for(ngroups in ngroupsvec){
+  nobs <- ngroups*10
+  sfExportAll()
+  tmp <- sfLapply(1:Nreps, function(ii)
+    run_iter(ii, n=10, ng=ngroups, mod='simpleGLMM', cov.mod='norm',
+             misp='misscov', do.true=do.true, savefiles=FALSE))
+  pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nobs))
+  mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nobs))
+  runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'stats', nobs))
+  k <- k+1
+  results.simpleGLMM <- process_results(mles, runtimes, pvals, model='simpleGLMM')
+}
+##plot_sample_sizes(results.simpleGLMM)
 
 runtimes <- mles <- pvals <- list(); k <- 1
-(nobsvec <- 2^c(6:11))
+(nobsvec <- 2^c(6:10))
 for(nobs in nobsvec){
   sfExportAll()
   tmp <- sfLapply(1:Nreps, function(ii)
@@ -108,32 +127,11 @@ for(nobs in nobsvec){
   mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nobs))
   runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'stats', nobs))
   k <- k+1
+  results.spatial <- process_results(mles, runtimes, pvals, model='spatial')
 }
-results.spatial <- process_results(mles, runtimes, pvals, model='spatial')
 #plot_sample_sizes(results.spatial)
 
 
-## this one is a bit different since it has ngroups and nobs per
-## group. Just increasing ngroups and leaving nobs the same (10), but
-## from the residual standpoint I think it's ngroups*nobs that
-## matters
-runtimes <- mles <- pvals <- list(); k <- 1
-(ngroupsvec <- 2^c(3:8))
-## CDF method seems broken for these?
-osa.methods <- c('fg', 'mcmc')
-for(ngroups in ngroupsvec){
-  nobs <- ngroups*10
-  sfExportAll()
-  tmp <- sfLapply(1:Nreps, function(ii)
-    run_iter(ii, n=nobs, ng=10, mod='simpleGLMM', cov.mod='norm',
-             misp='misscov', do.true=do.true, savefiles=FALSE))
-  pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nobs))
-  mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nobs))
-  runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'stats', nobs))
-  k <- k+1
-}
-results.simpleGLMM <- process_results(mles, runtimes, pvals, model='simpleGLMM')
-##plot_sample_sizes(results.simpleGLMM)
 
 
 
@@ -143,12 +141,11 @@ results.linmod <- readRDS('results/linmod_sample_sizes.RDS')
 results.randomwalk <- readRDS('results/randomwalk_sample_sizes.RDS')
 results.spatial <- readRDS('results/spatial_sample_sizes.RDS')
 runtimes.all <- rbind(results.simpleGLMM$runtimes,
-                      results.linmod$runtimes,
+                     ## results.linmod$runtimes,
                       results.randomwalk$runtimes,
                       results.spatial$runtimes)
 ## runtimes.all <- rbind(results.linmod, results.randomwalk,
 ##                       results.spatial, results.simpleGLMM)
-
 runtimes.all <- runtimes.all %>% filter(!is.na(med))
 
 g <- ggplot(runtimes.all,
