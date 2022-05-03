@@ -26,9 +26,9 @@ packageVersion('DHARMa')                # 0.3.3.0
 ##   conditioned on data)
 
 (cpus <- parallel::detectCores()-2)
-reps <- 501:1000
+reps <- 1:500
 
-do.true <- FALSE
+do.true <- TRUE
 ## Set osa.methods and dharma.methods to NULL to turn off
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 'pears')[-3]
 dharma.methods <- c('uncond', 'cond')
@@ -69,25 +69,43 @@ resids <- lapply(list.files('results', pattern='_resids.RDS',
 stats <- lapply(list.files('results', pattern='_stats.RDS',
                            full.names=TRUE), readRDS) %>% bind_rows
 
+pvals <- pvals[!(pvals$model=='linmod'&pvals$method=='uncond'),]
 ## check on if runs worked out
 group_by(pvals, model, version) %>% summarize(count=length(unique(replicate)))
 goodreps <- filter(pvals, model=='spatial' & version=='h1') %>%
   summarize(replicate=unique(replicate)) %>% pull(replicate)
 which(! (1:500 %in% goodreps))
-
+library(viridis)
+pvals$method <- factor(pvals$method, levels = c('fg', 'osg','cdf','mcmc',
+                                                'cond','uncond','pears'))
 ## Effect of do.true for true model
+png(filename='plots/h0_TF.png', width=2600, height=1500,res=300)
 filter(pvals, version=='h0' &  test=='GOF.ks') %>%
   ggplot(aes(pvalue, fill=do.true, color=do.true)) +
-  facet_grid(model~method, scales = "free_y") + geom_histogram(position='identity', alpha=.5)
+  facet_grid(model~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))# + 
+  #scale_x_continuous(labels = scales::number_format(accuracy = 0.1))
+dev.off()
 
+png(filename='plots/h1_TF.png', width=2600, height=1500,res=300)
 filter(pvals, version=='h1' &  test=='GOF.ks'& do.true == FALSE) %>%
-  ggplot(aes(pvalue)) +
-  facet_grid(model~method, scales = "free_y") + geom_histogram(position='identity', alpha=.5)
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(model~method, scales = "free_y") + geom_histogram(position='identity', alpha=.5)+
+  scale_fill_viridis_d(labels = c('estimated'), name = 'GOF p-value')+
+  scale_color_viridis_d(labels = c('estimated'), name = 'GOF p-value') +
+  theme(axis.text=element_text(size=6))
+dev.off()
 
 ## Model version for KS test
+png(filename='plots/h0h1_F.png', width=2600, height=1500,res=300)
 pvals %>% filter(test== 'GOF.ks' & do.true==FALSE) %>%
   ggplot(aes(pvalue, fill=version)) +
-  facet_grid(model~method, scales = "free_y") + geom_histogram(position='identity', alpha=.5)
+  facet_grid(model~method, scales = "free_y") + geom_histogram(position='identity', alpha=.5) +
+  theme(axis.text=element_text(size=6))
+dev.off()
 
 ## KS vs AD for true model - delete create new plots for each test
 #pvals %>% filter(version=='h0'& test!= 'outlier' & do.true==TRUE) %>%
