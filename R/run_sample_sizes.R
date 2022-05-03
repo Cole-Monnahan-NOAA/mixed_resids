@@ -152,10 +152,10 @@ g <- ggplot(runtimes.all,
             aes(nobs, med, ymin=lwr, ymax=upr,  color=type)) +
   geom_line()+
   geom_pointrange(fatten=2) + scale_y_log10()+ scale_x_log10()+
-  facet_wrap('model', scales='free')+
+  facet_wrap('model', scales='free', ncol=1)+
   labs(y='runtime (s)')
 g
 
 
-ggsave('plots/runtimes.png', g, width=7, height=5)
+ggsave('plots/runtimes.png', g, width=5, height=7)
 
