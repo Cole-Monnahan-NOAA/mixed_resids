@@ -76,6 +76,8 @@ Type objective_function<Type>::operator() ()
   Type kappa = exp(ln_kappa);
   Type marg_sp_sd = 1/(2*sqrt(M_PI)*kappa*tau);
   Type Range= sqrt(8)/kappa;
+  Type sig_v= 0;
+  Type total_lnvar = 0;
 
   Type nll = 0.0;
 
@@ -97,6 +99,7 @@ Type objective_function<Type>::operator() ()
         REPORT(omega);
       }
     }
+    total_lnvar += pow(marg_sp_sd,2);
   }
   if(reStruct==10){
     SparseMatrix<Type> Q = Q_spde(spde,kappa);
@@ -109,10 +112,11 @@ Type objective_function<Type>::operator() ()
       }
     }
     REPORT(Q);
+    total_lnvar += pow(marg_sp_sd,2);
   }
   if(v_flag){
     // RE contribution for overdispersion
-    Type sig_v=exp(ln_sig_v(0));
+    sig_v=exp(ln_sig_v(0));
     nll -= dnorm(v, Type(0), sig_v, true).sum();
     if(sim_re == 1){
       SIMULATE{
@@ -120,6 +124,7 @@ Type objective_function<Type>::operator() ()
         REPORT(v);
       }
     }
+    total_lnvar += pow(sig_v,2);
   }
 
   
@@ -187,6 +192,8 @@ Type objective_function<Type>::operator() ()
   REPORT(mu);
   REPORT(fpr);
   REPORT(exp_val);
+  REPORT(sig_v);
+  REPORT(total_lnvar);
   REPORT(nll);
 
   return nll;
