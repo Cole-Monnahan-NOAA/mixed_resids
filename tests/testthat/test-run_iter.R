@@ -7,10 +7,15 @@ source('../../R/utils.R')
 library(TMB)
 library(INLA)
 library(DHARMa)
+dyn.load(dynlib(paste0('../../src/linmod')))
+dyn.load(dynlib(paste0('../../src/randomwalk')))
+dyn.load(dynlib(paste0('../../src/simpleGLMM')))
+dyn.load(dynlib(paste0('../../src/spatial')))
 
 ## Test model in = model out
 run_iter_test <- function(ii, n, ng=0, mod, cov.mod = 'norm', misp, fit.true = FALSE, savefiles=TRUE){
   dyn.load(dynlib(paste0('../../src/',mod)))
+  #dyn.load(dynlib(paste0('src/',mod)))
   true.parms <- setup_trueparms(mod,misp)
   
   ## simulate data with these parameters
@@ -80,9 +85,9 @@ for(m in 1:length(mods)){
     expect_equal(dat$x, mod.true$h0$obj$env$data$X)
     expect_equal(dat$x, mod.true$h1$obj$env$data$X)
     expect_equal(dat$random$u, mod.true$h0$obj$env$parList()$u)
-    expect_equal(dat$random$omega,mod.true$h0$obj$env$parList()$omega)
+    expect_equal(dat$random$omega,mod.true$h0$obj$env$parList()$omega[dat$mesh$idx$loc])
     expect_equal(dat$random$u, mod.true$h1$obj$env$parList()$u)
-    expect_equal(dat$random$omega, mod.true$h1$obj$env$parList()$omega)
+    expect_equal(dat$random$omega, mod.true$h1$obj$env$parList()$omega[dat$mesh$idx$loc])
     if(mods[m] == 'linmod'){
       expect_equal(NULL, mod.true$h0$obj$env$parList()$v)
       expect_equal(NULL, mod.true$h1$obj$env$parList()$v)
@@ -94,7 +99,7 @@ for(m in 1:length(mods)){
 }
 
 context('outliers test')
-mods <- c('linmod', 'randomwalk', 'simpleGLMM', 'spatial')
+mods <- c('linmod', 'randomwalk')
 for(m in 1:length(mods)){ 
   test_that(paste0(mods[m], ' outliers'),{
     N <- 100; Ng <- 10 #Ng only used if mod == 'simpleGLMM'
@@ -146,9 +151,9 @@ for(m in 1:length(mods)){
       expect_equal(dat$x, mod.true$h1$obj$env$data$X)
     }
     expect_equal(dat$random$u, mod.true$h0$obj$env$parList()$u)
-    expect_equal(dat$random$omega,mod.true$h0$obj$env$parList()$omega)
+    expect_equal(dat$random$omega,mod.true$h0$obj$env$parList()$omega[dat$mesh$idx$loc])
     expect_equal(dat$random$u, mod.true$h1$obj$env$parList()$u)
-    expect_equal(dat$random$omega, mod.true$h1$obj$env$parList()$omega)
+    expect_equal(dat$random$omega, mod.true$h1$obj$env$parList()$omega[dat$mesh$idx$loc])
     expect_equal(dat$random$v, mod.true$h0$obj$env$parList()$v)
     expect_equal(dat$random$v, mod.true$h1$obj$env$parList()$v)
     
@@ -203,9 +208,9 @@ for(m in 1:length(mods)){
     expect_equal(dat$x, mod.true$h0$obj$env$data$X)
     expect_equal(as.matrix(dat$x[,1]), mod.true$h1$obj$env$data$X)
     expect_equal(dat$random$u, mod.true$h0$obj$env$parList()$u)
-    expect_equal(dat$random$omega,mod.true$h0$obj$env$parList()$omega)
+    expect_equal(dat$random$omega,mod.true$h0$obj$env$parList()$omega[dat$mesh$idx$loc])
     expect_equal(dat$random$u, mod.true$h1$obj$env$parList()$u)
-    expect_equal(dat$random$omega, mod.true$h1$obj$env$parList()$omega)
+    expect_equal(dat$random$omega, mod.true$h1$obj$env$parList()$omega[dat$mesh$idx$loc])
     expect_equal(dat$random$v, mod.true$h0$obj$env$parList()$v)
     expect_equal(dat$random$v, mod.true$h1$obj$env$parList()$v)
     
@@ -254,24 +259,26 @@ test_that('spatial, mispomega',{
   expect_equal(dat$x, mod.true$h0$obj$env$data$X)
   expect_equal(dat$x, mod.true$h1$obj$env$data$X)
   expect_equal(dat$random$u, mod.true$h0$obj$env$parList()$u)
-  expect_equal(dat$random$omega,mod.true$h0$obj$env$parList()$omega)
+  expect_equal(dat$random$omega,mod.true$h0$obj$env$parList()$omega[dat$mesh$idx$loc])
   expect_equal(dat$random$u, mod.true$h1$obj$env$parList()$u)
-  expect_equal(dat$random$omega, mod.true$h1$obj$env$parList()$omega)
+  expect_equal(dat$random$omega, mod.true$h1$obj$env$parList()$omega[dat$mesh$idx$loc])
   expect_equal(dat$random$v, mod.true$h0$obj$env$parList()$v)
   expect_equal(dat$random$v, mod.true$h1$obj$env$parList()$v)
   
 })
 
+## all tests below fail when run from testthat due to directory mismatch; can be run from main
+source("R/startup.R")
 context('functional test on run_iter') #verify all combinations work: model x do.true x method x version
 mod.misp <- list(linmod = c('overdispersion', 'outliers', 'misscov'),
                  randomwalk = c('mu0', 'outliers'),
-                 simpleGLMM = c('overdispersion', 'outliers', 'misscov'),
-                 spatial = c('overdispersion', 'outliers', 'misscov', 'mispomega'))
+                 simpleGLMM = c('overdispersion', 'misscov'),
+                 spatial = c('overdispersion', 'misscov', 'mispomega', 'dropRE'))
 osa.methods <- c('fg', 'osg', 'gen', 'cdf')
 dharma.methods <- c('uncond', 'cond')
 for(m in 1:4){
   if(m==3) N <- 20 else N <- 100
-  if(names(mod.misp[m]) == 'spatial') osa.methods <- c('cdf')
+  if(names(mod.misp[m]) == 'spatial' | names(mod.misp[m]) == 'simpleGLMM') osa.methods <- c('cdf')
   n.misp <- length(mod.misp[[m]])
   for(n in 1:n.misp){
     out.true <- run_iter(ii=1, n=N, ng=5, mod=names(mod.misp)[m], 
@@ -279,8 +286,8 @@ for(m in 1:4){
     out.false <- run_iter(ii=1, n=N, ng=5, mod=names(mod.misp)[m], 
                          misp=mod.misp[[m]][n], do.true = FALSE, savefiles=FALSE)
     test_that(paste0('model: ', names(mod.misp)[m], ', mis-specification: ', mod.misp[[m]][n]),{
-      expect_equal(c('pvals', 'resids', 'mles'), names(out.true))
-      expect_equal(c('pvals', 'resids', 'mles'), names(out.false))
+      expect_equal(c('pvals', 'resids', 'mles', 'stats'), names(out.true))
+      expect_equal(c('pvals', 'resids', 'mles', 'stats'), names(out.false))
       expect_true(all(osa.methods %in% out.true$pvals$method))
       expect_true(all(osa.methods %in% out.false$pvals$method))
       expect_true(all(dharma.methods %in% out.true$pvals$method))
@@ -290,6 +297,148 @@ for(m in 1:4){
       expect_equal(2*(length(osa.methods) + length(dharma.methods)), sum(out.false$pvals$test == 'GOF.ks')) 
     })
     rm(out.true, out.false)
+  }
+}
+
+context("test null mreremington red
+        ethods")
+mod.misp <- list(linmod = c('overdispersion', 'outliers', 'misscov'),
+                 randomwalk = c('mu0', 'outliers'),
+                 simpleGLMM = c('overdispersion', 'misscov'),
+                 spatial = c('overdispersion', 'misscov', 'mispomega', 'dropRE'))
+osa.methods <- NULL
+dharma.methods <- NULL
+for(m in 1:4){
+  if(m==4) N <- 200 else N <- 100
+  n.misp <- length(mod.misp[[m]])
+  for(n in 1:n.misp){
+    test_that(paste('test null',names(mod.misp)[m], mod.misp[[m]][n]), {
+      out.true <- run_iter(ii=1, n=N, ng=5, mod=names(mod.misp)[m], 
+                           misp=mod.misp[[m]][n], do.true = TRUE, savefiles=FALSE)
+      out.false <- run_iter(ii=1, n=N, ng=5, mod=names(mod.misp)[m], 
+                            misp=mod.misp[[m]][n], do.true = FALSE, savefiles=FALSE)
+      expect_equal(TRUE, all(is.na(out.true$pvals$pvalue)))
+      expect_equal(TRUE, all(is.na(out.false$pvals$pvalue)))
+      expect_equal(TRUE, all(is.na(out.true$resids[,8:15])))
+      expect_equal(TRUE, all(is.na(out.false$resids[,8:15])))
+      expect_equal(2, nrow(out.true$stats))
+      expect_equal(2, nrow(out.false$stats))
+      expect_equal(TRUE, all(is.na(out.true$stats[,6:12])))
+      expect_equal(TRUE, all(is.na(out.false$stats[,6:12])))
+    })
+  }
+}
+
+context("test re_mcmc methods")
+mod.misp <- list(linmod = c('overdispersion', 'outliers', 'misscov'),
+                 randomwalk = c('mu0', 'outliers'),
+                 simpleGLMM = c('overdispersion', 'misscov'),
+                 spatial = c('overdispersion',  'misscov', 'mispomega', 'dropRE'))
+osa.methods <- c('mcmc', 're_mcmc')
+dharma.methods <- NULL
+for(m in 1:length(mod.misp)){
+  n.misp <- length(mod.misp[[m]])
+  if( m == 4) N <- 200 else N <- 100
+  for(n in 1:n.misp){
+    test_that(paste('test re_mcmc',names(mod.misp)[m], mod.misp[[m]][n]), {
+      out.true <- run_iter(ii=1, n=N, ng=5, mod=names(mod.misp)[m], 
+                           misp=mod.misp[[m]][n], do.true = TRUE, savefiles=FALSE)
+      out.false <- run_iter(ii=1, n=N, ng=5, mod=names(mod.misp)[m], 
+                            misp=mod.misp[[m]][n], do.true = FALSE, savefiles=FALSE)
+     
+      if (m == 1) {
+        expect_equal(TRUE, all(is.na(out.true$pvals$pvalue)))
+        expect_equal(TRUE, all(is.na(out.false$pvals$pvalue)))
+        expect_equal(TRUE, all(is.na(out.true$resids[,8:15])))
+        expect_equal(TRUE, all(is.na(out.false$resids[,8:15])))
+        expect_equal(2, nrow(out.true$stats))
+        expect_equal(2, nrow(out.false$stats))
+        expect_equal(TRUE, all(is.na(out.true$stats[,6:12])))
+        expect_equal(TRUE, all(is.na(out.false$stats[,6:12])))
+      }
+      
+      if (m > 1) {
+        expect_equal(TRUE, all(is.na(out.true$pvals$pvalue)))
+        expect_equal(TRUE, all(is.na(out.true$resids[,8:15])))
+        expect_equal(2, nrow(out.true$stats))
+        expect_equal(TRUE, all(is.na(out.true$stats[,6:12])))
+        
+        out.pval <- dplyr::filter(out.false$pvals, 
+                                  (method == 'mcmc' | method == 're_mcmc') &
+                                    ( test == 'GOF' | test == 'SAC' ))
+        expect_equal(TRUE, all(!is.na(out.pval$pvalue)))
+        out.pval <-  dplyr::filter(out.false$pvals, type == 'sim')
+        expect_equal(TRUE, all(is.na(out.pval$pvalue)))
+      }
+      
+      if ( mod.misp[[m]][n] == 'overdispersion' & 
+           names(mod.misp)[m] != 'linmod' ) {
+        out.pval <- dplyr::filter(out.false$pvals, 
+                                  (method == 'mcmc' | method == 're_mcmc') &
+                                    ( test == 'GOF' | test == 'SAC' ))
+        expect_equal(TRUE, all(!is.na(out.pval$pvalue)))
+      }
+      
+      
+      
+     # expect_equal(TRUE, is.null(dplyr::filter(out.false$pvals, method == 're_obs_mcmc')))
+     # expect_equal(TRUE, is.null(dplyr::filter(out.false$pvals, method == 're_mcmc_v')))
+   
+      
+    })
+  }
+}
+
+context("test re_uncond methods")
+mod.misp <- list(linmod = c('overdispersion', 'outliers', 'misscov'),
+                 randomwalk = c('mu0', 'outliers'),
+                 simpleGLMM = c('overdispersion', 'misscov'),
+                 spatial = c('overdispersion',  'misscov', 'mispomega', 'dropRE'))
+osa.methods <- NULL
+dharma.methods <- c('re_uncond')
+for(m in 1:length(mod.misp)){
+  n.misp <- length(mod.misp[[m]])
+  if( m == 4) N <- 200 else N <- 100
+  for(n in 1:n.misp){
+    test_that(paste('test re_uncond',names(mod.misp)[m], mod.misp[[m]][n]), {
+      out.true <- run_iter(ii=1, n=N, ng=5, mod=names(mod.misp)[m], 
+                           misp=mod.misp[[m]][n], do.true = TRUE, savefiles=FALSE)
+      out.false <- run_iter(ii=1, n=N, ng=5, mod=names(mod.misp)[m], 
+                            misp=mod.misp[[m]][n], do.true = FALSE, savefiles=FALSE)
+      
+      if (m == 1) {
+        expect_equal(TRUE, all(is.na(out.true$pvals$pvalue)))
+        expect_equal(TRUE, all(is.na(out.false$pvals$pvalue)))
+        expect_equal(TRUE, all(is.na(out.true$resids[,8:15])))
+        expect_equal(TRUE, all(is.na(out.false$resids[,8:15])))
+        expect_equal(2, nrow(out.true$stats))
+        expect_equal(2, nrow(out.false$stats))
+        expect_equal(TRUE, all(is.na(out.true$stats[,6:12])))
+        expect_equal(TRUE, all(is.na(out.false$stats[,6:12])))
+      }
+      
+      if (m > 1) {
+        expect_equal(TRUE, all(!is.na(dplyr::filter(out.true$pvals, method == 're_uncond'))))
+        expect_equal(TRUE, all(!is.na(dplyr::filter(out.false$pvals, method == 're_uncond'))))
+        # out.pval <-  dplyr::filter(out.false$pvals, type == 'sim')
+        # expect_equal(TRUE, all(is.na(out.pval$pvalue)))
+      }
+      
+      # if ( mod.misp[[m]][n] == 'overdispersion' & 
+      #      names(mod.misp)[m] != 'linmod' ) {
+      #   out.pval <- dplyr::filter(out.false$pvals, 
+      #                             (method == 'mcmc' | method == 're_mcmc') &
+      #                               ( test == 'GOF' | test == 'SAC' ))
+      #   expect_equal(TRUE, all(!is.na(out.pval$pvalue)))
+      # }
+      
+      
+      
+      # expect_equal(TRUE, is.null(dplyr::filter(out.false$pvals, method == 're_obs_mcmc')))
+      # expect_equal(TRUE, is.null(dplyr::filter(out.false$pvals, method == 're_mcmc_v')))
+      
+      
+    })
   }
 }
 
