@@ -30,29 +30,35 @@ reps <- 1:500
 
 do.true <- TRUE
 ## Set osa.methods and dharma.methods to NULL to turn off
-osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 'pears')[-3]
+osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'pears')[-3]
 dharma.methods <- c('uncond', 'cond')
 
 ## Simple linear model as sanity check. Some resid methods not
 ## applicable b/c no random effects
-
 ## possible mispecifications: overdispersion, outliers, misscov
-
 run_model(reps, mod='linmod', misp='overdispersion', do.true = do.true)
+
 ## Random walk from the paper
 ## possible mispecifications: mu0, outliers
+osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 're_mcmc', 'pears')[-3]
+dharma.methods <- c('uncond', 'cond', 're_uncond')
 run_model(reps, mod='randomwalk', misp='mu0', do.true = do.true)
+
 ## Andrea's simple GLMM with 5 groups
-## possible mispecifications: overdispersion, outliers, misscov
-osa.methods <- c('cdf', 'mcmc', 'pears')
+## possible mispecifications: overdispersion,  misscov - outliers not set up correctly when distribution not normal (lognormal better misp?)
+osa.methods <- c('cdf', 'mcmc', 're_mcmc', 'pears')
+dharma.methods <- c('uncond', 'cond', 're_uncond')
 run_model(reps, ng = 5, mod='simpleGLMM', misp='misscov', cov.mod = 'unif', do.true = do.true)
+
 ## Simple spatial SPDE model
-## possible mispecifications: overdispersion, outliers, misscov, mispomega
+## possible mispecifications: overdispersion, misscov, mispomega, dropRE - outliers not set up correctly when distribution not normal
 #Turn off generic method - takes too long
-osa.methods <- c('cdf', 'mcmc', 'pears') #only 'cdf' and 'gen' suitable for discrete distributions
-#run_model(reps, n=200, mod='spatial', misp='overdispersion', do.true = do.true)
-#run_model(reps, n=200, mod='spatial', cov.mod = 'unif', misp='misscov', do.true = do.true)
+osa.methods <- c('cdf', 'mcmc', 're_mcmc', 'pears', 'gen') #only 'cdf' and 'gen' suitable for discrete distributions
+dharma.methods <- c('uncond', 'cond', 're_uncond')
+run_model(reps, n=200, mod='spatial', misp='overdispersion', do.true = do.true)
+run_model(reps, n=200, mod='spatial', cov.mod = 'unif', misp='misscov', do.true = do.true)
 run_model(reps, n=200, mod='spatial', misp='mispomega', do.true = do.true)
+run_model(reps, n=200, mod='spatial', misp='dropRE', do.true = do.true)
 
 # stop clusters
 # sfStop()
@@ -69,15 +75,40 @@ resids <- lapply(list.files('results', pattern='_resids.RDS',
 stats <- lapply(list.files('results', pattern='_stats.RDS',
                            full.names=TRUE), readRDS) %>% bind_rows
 
-pvals <- pvals[!(pvals$model=='linmod'&pvals$method=='uncond'),]
 ## check on if runs worked out
-group_by(pvals, model, version) %>% summarize(count=length(unique(replicate)))
+check_runs <- group_by(pvals, model, misp, version, do.true) %>% summarize(count=length(unique(replicate)))
+check_runs[1:8,]
+check_runs[9:12,]
+check_runs[13:24,]
+
+## Check for MLE consistency.
+nc_id <- stats[stats$converge==1|stats$maxgrad>0.1,]$id
+#only use spatial misp = dropRE
+mles <- mles[!(mles$misp == "mispomega"),]
+mles <- mles[!(mles$model == "spatial" & mles$misp == "overdispersion"),]
+mles <- mles[!(mles$model == "spatial" & mles$misp == "misscov"),]
+g <- filter(mles, h==0 & !(id %in% nc_id) & do.true == FALSE) %>%
+  ggplot(., aes(x=par, y=bias)) + geom_violin() +
+  facet_wrap(~model, nrow=1, scales = 'free_x')
+g
+
+#filter before plotting
+pvals <- pvals[!(pvals$model=='linmod'&pvals$method=='uncond'),]
+#only use spatial misp == dropRE for main plot and drop method == 'gen'
+pvals <- pvals[pvals$method != "gen",]
+pvals <- pvals[pvals$method != "pears.adj",]
+pvals <- pvals[!(pvals$misp == "mispomega"),]
+pvals <- pvals[!(pvals$model == "spatial" & pvals$misp == "overdispersion"),]
+pvals <- pvals[!(pvals$model == "spatial" & pvals$misp == "misscov"),]
+
 goodreps <- filter(pvals, model=='spatial' & version=='h1') %>%
   summarize(replicate=unique(replicate)) %>% pull(replicate)
 which(! (1:500 %in% goodreps))
 library(viridis)
-pvals$method <- factor(pvals$method, levels = c('fg', 'osg','cdf','mcmc',
-                                                'cond','uncond','pears'))
+pvals$method <- factor(pvals$method, 
+                       levels = c('fg', 'osg','cdf', 'mcmc',  're_mcmc', 
+                                  're_obs_mcmc','cond','uncond', 
+                                  're_uncond', 'pears'))
 ## Effect of do.true for true model
 png(filename='plots/h0_TF.png', width=2600, height=1500,res=300)
 filter(pvals, version=='h0' &  test=='GOF.ks') %>%
@@ -111,27 +142,48 @@ dev.off()
 #pvals %>% filter(version=='h0'& test!= 'outlier' & do.true==TRUE) %>%
 #  ggplot(aes(pvalue, fill=test)) +
 #  facet_grid(model~method) + geom_histogram(position='identity', alpha=.5)
+
+
+pvals <- lapply(list.files('results', pattern='_pvals.RDS',
+                           full.names=TRUE), readRDS) %>% bind_rows
 sp.pvals <- pvals[pvals$model=='spatial',]
 sp.stats <- stats[stats$model=='spatial',]
 nc.reps <- filter(sp.stats, !is.na(converge) & converge == 1)$replicate
 # filter out models that didn't converge
 sp.pvals <- sp.pvals[!(sp.pvals$replicate %in% nc.reps),]
+sp.pvals <- sp.pvals[sp.pvals$method != 'pears.adj',]
 
-sp.pvals %>% filter(do.true==TRUE) %>%
-  ggplot(aes(pvalue, fill=version)) +
-  facet_grid(test~method) + geom_histogram(position='identity', alpha=.5)
+# sp.pvals %>% filter(do.true==TRUE) %>%
+#   ggplot(aes(pvalue, fill=version)) +
+#   facet_grid(test~method) + geom_histogram(position='identity', alpha=.5)
+# 
+# sp.pvals %>% filter(do.true==FALSE) %>%
+#   ggplot(aes(pvalue, fill=version)) +
+#   facet_grid(test~method, scales = "free_y") + geom_histogram(position='identity', alpha=.5)
 
-sp.pvals %>% filter(do.true==FALSE) %>%
+sp.pvals %>% filter(do.true==FALSE & test == 'GOF.ks') %>%
   ggplot(aes(pvalue, fill=version)) +
-  facet_grid(test~method, scales = "free_y") + geom_histogram(position='identity', alpha=.5)
+  facet_grid(misp~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d()
+
+# sp.pvals %>% filter(do.true==FALSE & test == 'outliers') %>%
+#   ggplot(aes(pvalue, fill=version)) +
+#   facet_grid(misp~method, scales = "free_y") + 
+#   geom_histogram(position='identity', alpha=.5) +
+#   scale_fill_viridis_d()
 
 sp.pvals %>% filter(do.true==FALSE & test == 'SAC') %>%
   ggplot(aes(pvalue, fill=version)) +
-  facet_grid(misp~method, scales = "free_y") + geom_histogram(position='identity', alpha=.5)
+  facet_grid(misp~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d()
 
-sp.pvals %>% filter(do.true==FALSE & test == 'outliers') %>%
+sp.pvals %>% filter(do.true==FALSE & test == 'disp') %>%
   ggplot(aes(pvalue, fill=version)) +
-  facet_grid(misp~method, scales = "free_y") + geom_histogram(position='identity', alpha=.5)
+  facet_grid(misp~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d()
 
 
 
