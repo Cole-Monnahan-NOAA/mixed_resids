@@ -198,15 +198,56 @@ calculate.jp <- function(obj, sdr, opt, obs, data.name, fpr, N=1000, random = TR
 }
 
 
-calc.sac <- function(x, w){
-  y <- NA
-  if(is.numeric(x)){
-    ## only test for positive correlationa
-    y <- ape::Moran.I(x, w, alternative = 'greater')$p.value
+calc.sac <- function(type, dat, res.obj, version){
+  
+  if(type == 'osa'){
+    res.names <- c('cdf', 'gen', 'fg', 'mcmc', 'osg',
+                   'pears', 're_mcmc', 're_mcmc_obs')
   }
-  return(y)
-}
+  if(type == 'sim'){
+    res.names <- c('cond', 're_uncond', 're_uncond_obs', 'uncond')
+  }
+  
+  df <- data.frame(type = character(), method = character(), model = character(),
+                   test = character(), version = character(), pvalue = numeric())
+  
+  dmat.obs <- as.matrix(dist(dat$loc, upper = TRUE))
+  wt.obs<- 1/dmat.obs; diag(wt.obs) <- 0
+  dmat.all <- as.matrix(dist(dat$mesh$loc[,1:2], upper = TRUE))
+  wt.all <- 1/dmat.all; diag(wt.all) <- 0
 
+ # y <- NA
+  
+  for(m in 1:length(res.obj)){
+    nms <- names(res.obj)[m]
+    x <- res.obj[[m]]
+    if (nms %in% res.names) {
+      if ( (nms == 're_mcmc') |
+           (nms == 're_uncond') ){
+        wt <- wt.all
+      } else {
+        wt <- wt.obs
+      }
+      if(is.numeric(x)){
+        ## only test for positive correlationa
+        y <- ape::Moran.I(x, wt, alternative = 'greater')$p.value
+        df <- rbind(df,data.frame(type= type, 
+                         method = names(res.obj)[m], 
+                         model='spatial', 
+                         test='SAC', 
+                         version = version,
+                         pvalue = y))
+      } 
+    }
+  }
+  if(nrow(df) == 0){
+    df <- data.frame(type = type, method = NA, model = NA,
+                     test = 'SAC', version = version, pvalue = NA)
+  }
+
+   return(df)
+  
+}
 
 
 calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
@@ -230,7 +271,7 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
         }
       }
       if(!is.null(fam)){
-        if(fam == 'Poisson'){
+        if(fam == 'Poisson' & !is.na(res.obj$pears)){
           disp <- 1 - pchisq(sum(res.obj$pears^2), res.obj$pears.df)
           df <- rbind(df, data.frame(type='osa', method='pears', model=mod, test='disp',
                                      version = version, pvalue = disp))
@@ -249,7 +290,7 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
       }
   
       for(m in 1:length(method)){
-        if(!is.na(res.obj[[method[m]]])){
+        if( all( !is.na(res.obj[[method[m]]]) ) ) {
   
           if(!is.null(fam)){
             if(fam == 'Poisson'){
@@ -286,9 +327,10 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
         }
       }
     }
-  } else {
-    df <- data.frame(type = NA, method = NA, model = NA,
-                     test = NA, version = NA, pvalue = NA)
+  } 
+  if(is.null(method) | nrow(df) == 0){
+    df <- data.frame(type = type, method = NA, model = NA,
+                     test = NA, version = version, pvalue = NA)
   }
   return(df)
 }
