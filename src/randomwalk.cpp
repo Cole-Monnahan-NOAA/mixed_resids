@@ -28,6 +28,9 @@ Type objective_function<Type>::operator()()
   vector<Type> ypred(u.size());
   ypred.setZero();
   ypred(0) = u(0);
+  SIMULATE{
+    u(0) = rnorm(u(0), tau); 
+  }
   for (int i = 1; i < u.size(); ++i){
     ypred(i) = u(i - 1) + mu;
     nll -= dnorm(u(i), ypred(i), tau, true);
@@ -64,6 +67,7 @@ Type objective_function<Type>::operator()()
   REPORT(u);
   REPORT(exp_val);
   REPORT(fpr);
+  REPORT(ypred);
   REPORT(tau);
   REPORT(sig);
   REPORT(nll);
