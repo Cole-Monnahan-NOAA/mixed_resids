@@ -107,6 +107,12 @@ setup_trueparms <- function(mod, misp){
       sd.vec <- c(sd.vec, sd.vec[2]*.5) #overdispersion variance = 0.5*spatial variance
       true.comp[[1]]$ln_sig_v <- log(sd.vec[3])
     }
+    if(misp == 'dropRE'){
+      true.comp[[2]] <- list(beta = theta, theta = log(sd.vec[1]))
+    }
+    if(misp == 'mispomega'){
+      sd.vec[2] <- sd.vec[2]/3
+    }
     if(fam == "Poisson"){
       true.comp[[1]]$theta <- NULL
       true.comp[[2]]$theta <- NULL
@@ -152,8 +158,8 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
   init.map <- mkTMBmap(init.par, mod, misp, true.parms$fam, do.true)
   mod.out <- osa.out <- dharma.out <- list(h0 = NULL, h1 = NULL)
   pvals <- data.frame(id = character(), type = character(), method = character(),
-                      test = character(), version = character(),
-                      pvalue = numeric())
+                      model = character(), test = character(), 
+                      version = character(), pvalue = numeric())
   mles <-  r <- out <- list()
 
   for(h in 1:2){
@@ -163,6 +169,9 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
     id <- paste0(mod, '_', misp, '_', do.true, '_h', h-1, '_', ii)
 
     init.obj <- list(data = init.dat[[h]], parameters = init.par[[h]], map = init.map[[h]], random = init.random[[h]], DLL = mod)
+    
+    if(is.null(init.random[[h]])) Random <- FALSE
+    
     mod.out[[h]] <- try(
       fit_tmb(
         obj.args = init.obj,
@@ -228,6 +237,23 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
         dharma.out[[h]]$uncond$resids <- NA
         dharma.out[[h]]$uncond$runtime <- NA
       }
+      
+      if('re_uncond' %in% dharma.methods & mod != 'linmod' & Random ){
+        mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
+        if(mod == 'spatial'){
+          expr <- expression(obj$simulate()$omega)  
+          obs <- mod.out[[h]]$obj$env$parList()$omega
+        } else {
+          expr <- expression(obj$simulate()$u)
+          obs <- mod.out[[h]]$obj$env$parList()$u
+        }
+        dharma.out[[h]]$re_uncond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=obs,
+                                                 fpr=rep(0,length(obs)), int.resp = disc)
+      } else {
+        dharma.out[[h]]$re_uncond <- list()
+        dharma.out[[h]]$re_uncond$resids <- NA
+        dharma.out[[h]]$re_uncond$runtime <- NA
+      }
 
       ## only makes sense to run when MLE is estimated and there
       ## are no RE
@@ -274,10 +300,59 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
           }
         }
         osa.out[[h]]$runtime.mcmc <- as.numeric(Sys.time()-t0, 'secs')
+        
+        if('re_mcmc' %in% osa.methods){
+          if(mod == "randomwalk"){
+            sig <- tmp$tau
+            mu <- tmp$ypred
+            Fx <- pnorm(q = postmle, mean = mu, sd = sig) #needs rotation?
+            osa.out[[h]]$re_mcmc <- qnorm(Fx)
+          } 
+          if(mod == "simpleGLMM"){
+            u.idx <- grep('u', names(objmle$par))
+            sig <- tmp$sig_u
+            mu <- rep(0,length(u.idx))
+            Fx <- pnorm(q = postmle[u.idx], mean = mu, sd = sig) 
+            osa.out[[h]]$re_mcmc <- qnorm(Fx)
+          }
+          if(mod == "spatial"){
+            omega.idx <- grep('omega', names(objmle$par))
+            mu <- rep(0, length(postmle[omega.idx]))
+            #rotation using spatial covariance matrix
+            Sig <- solve(tmp$Q * exp(2 * FE$ln_tau))
+            r1 <- as.vector(solve(t(chol(Sig)), postmle[omega.idx]))
+            Fx <- pnorm(q = r1, mean = mu, sd = 1) 
+            osa.out[[h]]$re_mcmc <- qnorm(Fx)
+          }
+          if(mod == "spatial"){#filter on omegas associated with obs
+            omega.idx <- omega.idx[init.dat[[h]]$mesh_i+1]
+            r2 <- r1[omega.idx]
+            mu <- rep(0,length(omega.idx))
+            Fx <- pnorm(q = r2, mean = mu, sd = 1)
+            osa.out[[h]]$re_obs_mcmc <- qnorm(Fx)
+            if(h==1) osa.methods <- c(osa.methods, 're_obs_mcmc')
+          } else {
+            osa.out[[h]]$re_obs_mcmc <- NA
+          }
+          
+          if(misp == 'overdispersion' & mod != 'linmod' & h == 1){
+            mu <- rep(0, n)
+            sig <- tmp$sig_v
+            Fx <- pnorm(q = postmle[grep('v', names(objmle$par))], 
+                        mean = mu, sd = sig)
+            osa.out[[h]]$re_mcmc_v <- qnorm(Fx)
+            osa.methods <- c(osa.methods, 're_mcmc_v')
+          } else {
+            osa.out[[h]]$re_mcmc_v <- NA
+          }
+        }
+        
       } else {
         osa.out[[h]]$mcmc <- osa.out[[h]]$runtime.mcmc <- NA
+        osa.out[[h]]$re_mcmc <- NA
+        osa.out[[h]]$re_obs_mcmc <- NA
       }
-
+    
       AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC) #!doesn't work if doTrue == TRUE
       AICc <- ifelse(do.true, NA, mod.out[[h]]$aic$AICc) #!doesn't work if doTrue == TRUE
       maxgrad <- ifelse(do.true,NA, max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) ) #!doesn't work if doTrue == TRUE
@@ -292,12 +367,16 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
       r[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
                            replicate=ii, y=sim.dat[[h]],
                            ypred=mod.out[[h]]$report$exp_val,
-                           osa.cdf = osa.out[[h]]$cdf, osa.gen = osa.out[[h]]$gen,
-                           osa.fg=osa.out[[h]]$fg, osa.osg=osa.out[[h]]$osg,
-                           osa.mcmc=osa.out[[h]]$mcmc, pears=osa.out[[h]]$pears,
+                           osa.cdf = osa.out[[h]]$cdf, 
+                           osa.gen = osa.out[[h]]$gen,
+                           osa.fg=osa.out[[h]]$fg, 
+                           osa.osg=osa.out[[h]]$osg,
+                           osa.mcmc=osa.out[[h]]$mcmc, 
+                           pears=osa.out[[h]]$pears,
+                          # osa.re_mcmc=osa.out[[h]]$re_mcmc, #difficult to include b/c diff dimension from data
                            sim_cond= dharma.out[[h]]$cond$resids,
                            sim_uncond=dharma.out[[h]]$uncond$resids)#,
-                           # sim_parcond=dharma.out[[h]]$parcond$resids)
+                           #sim_re_uncond=dharma.out[[h]]$re_uncond$resids) #difficult to include b/c diff dimension from data
       out[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
                              replicate = ii,
                              runtime_cond=dharma.out[[h]]$cond$runtime,
@@ -318,41 +397,16 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
                                         res.obj = dharma.out[[h]], version = names(mod.out)[h],
                                         fam = true.parms$fam, do.true )))
       if(mod == 'spatial'){
-        dmat <- as.matrix(dist(sim.dat$loc, upper = TRUE))
-        wt <- 1/dmat;  diag(wt) <- 0
         if(!is.null(osa.methods)){
-          for(m in 1:length(osa.methods)){
-            pvals <- rbind(pvals, cbind(id,data.frame(type='osa', method=osa.methods[m], model=mod, test='SAC', version = names(mod.out)[h],
-                           pvalue = calc.sac(osa.out[[h]][[osa.methods[m]]], wt))))
-          }
-          for(m in 1:length(osa.methods)){
-            pvals <- rbind(pvals, cbind(id,data.frame(type='sim', method=dharma.methods[m], model=mod, test='SAC', version = names(mod.out)[h],
-                           pvalue = calc.sac(dharma.out[[h]][[dharma.methods[m]]]$resids, wt))))
-          }
-        }
+          sac.pvals <- calc.sac( type = 'osa', 
+                                 dat = sim.dat, 
+                                 res.obj = osa.out[[h]],
+                                 version = names(mod.out)[h])
+          pvals <- rbind(pvals, cbind(id, sac.pvals))
+        }    
       }
-    } else {
-      r[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
-                           replicate=ii, y=sim.dat[[h]],
-                           ypred=NA,
-                           osa.cdf = NA, osa.gen = NA,
-                           osa.fg=NA, osa.osg=NA,
-                           osa.mcmc=NA, pears=NA,
-                           sim_cond= NA,
-                           sim_uncond=NA)#,
-      # sim_parcond=dharma.out[[h]]$parcond$resids)
-      out[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
-                             replicate = ii,
-                             runtime_cond=NA,
-                             runtime_uncond=NA,
-                             # runtime_parcond=dharma.out[[h]]$parcond$runtime,
-                             runtime.cdf=NA,
-                             runtime.fg=NA,
-                             runtime.osg=NA,
-                             runtime.gen=NA,
-                             runtime.mcmc=NA,
-                             maxgrad=NA, converge=1,
-                             AIC=NA, AICc=NA)
+          
+         
     }
   }
   resids <- rbind(r[[1]], r[[2]])
@@ -469,6 +523,9 @@ mkTMBdat <- function(Dat, Pars, Mod, Misp){
   if(Misp=='misscov'){
     dat1$X <- as.matrix(dat1$X[,1])
   }
+  if(Misp=='dropRE'){
+    dat1$reStruct = 20 #do not fit spatial likelihood
+  }
   out = list(h0 = dat0, h1 = dat1)
   return(out)
 }
@@ -558,6 +615,10 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
     if(Misp == 'misscov'){
       par1$beta <- par1$beta[1]
     }
+    if(Misp == 'dropRE'){
+      par1$ln_tau = 0
+      par1$ln_kappa = 0
+    }
   }
   out = list(h0 = par0, h1 = par1)
   return(out)
@@ -587,6 +648,9 @@ mkTMBrandom <- function(Mod, Misp, doTrue){
     } else {
       Random.h0 <- 'omega'
     }
+    if(Misp == 'dropRE'){
+      Random.h1 <- c()
+    }
   }
   out <- list(h0 = Random.h0, h1 = Random.h1)
   return(out)
@@ -615,6 +679,11 @@ mkTMBmap <- function(Pars, Mod, Misp, Fam, doTrue){
     if(Fam == "Poisson"){
       map.h0$theta <- factor(NA)
       map.h1$theta <- factor(NA)
+    }
+    if(Misp == 'dropRE'){
+      map.h1$ln_kappa = factor(NA)
+      map.h1$ln_tau = factor(NA)
+      map.h1$omega <- rep(factor(NA), length(Pars$h1$omega))
     }
   }
   out <- list(h0 = map.h0, h1 = map.h1)
