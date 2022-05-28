@@ -63,6 +63,7 @@ Type objective_function<Type>::operator()()
   Type nll = 0;
   //only fit overdispersion if ln_sig_v isn't null
   bool v_flag = (ln_sig_v.size()>0);
+  Type sig_v= 0;
 
   Type cdf;
 
@@ -77,7 +78,7 @@ Type objective_function<Type>::operator()()
   }
   // Probability of observation-level random effects
   if(v_flag){
-    Type sig_v = exp(ln_sig_v(0));
+    sig_v = exp(ln_sig_v(0));
     for(int j=0; j<v.size(); j++){
       nll -= dnorm(v(j), Type(0), sig_v, true);
       if(sim_re == 1){
@@ -149,6 +150,7 @@ Type objective_function<Type>::operator()()
   REPORT(v);
   REPORT(sig_y);
   REPORT(sig_u);
+  REPORT(sig_v);
 
   return(nll);
 }
