@@ -28,7 +28,7 @@
 simdat <- function(n, ng=0, mod, cov.mod = 'norm',
                    trueparms = list(theta, sd.vec, sp.parm, fam, link),
                    misp, seed){
-  if(!(misp %in% c('outliers', 'misscov', 'overdispersion', 'mu0', 'mispomega'))) stop('incorrect mis-specification name')
+  if(!(misp %in% c('outliers', 'misscov', 'overdispersion', 'mu0', 'mispomega', 'dropRE'))) stop('incorrect mis-specification name')
   if(!(mod %in% c('linmod', 'randomwalk', 'simpleGLMM', 'spatial'))) stop('incorrect model name')
 
   list2env(trueparms, envir = environment(simdat))
@@ -137,7 +137,7 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
 
 
     if(misp == 'mu0') stop("Misspecification not available for spatial")
-    if(misp == 'misscov' | misp == 'overdispersion'){
+    if(misp == 'misscov' | misp == 'overdispersion' | misp == 'dropRE'){
       y1 <- y0
     }
     if(misp=='mispomega'){
