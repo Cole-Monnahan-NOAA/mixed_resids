@@ -278,11 +278,12 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
       }
 
       ## only makes sense to run when MLE is estimated and there
-      ## are no RE
-      if('mcmc' %in% osa.methods & !do.true & Random ){
+      ## are RE - turning on when do.true == TRUE (AMH, 6/3/2022)
+      if('mcmc' %in% osa.methods & Random ){
         t0 <- Sys.time()
         ## Build up TMB obj again
-        FE <- mod.out[[h]]$opt$par # estimated FE
+        if(do.true)  FE <- mod.out[[h]]$obj$par # true FE
+        if(!do.true) FE <- mod.out[[h]]$opt$par # estimated FE
         ## make into list; https://stackoverflow.com/questions/46251725/convert-named-vector-to-list-in-r/46251794
         FE <- split(unname(FE),names(FE))
         MLE <- modifyList(init.par[[h]], FE) #
