@@ -5,7 +5,8 @@ enum valid_family{
   Gamma_family = 100,
   Poisson_family = 200,
   lognormal_family = 300,
-  Tweedie_family = 400
+  Tweedie_family = 400,
+  Delta_Gamma_family = 500
 };
 
 enum  valid_link{
@@ -59,7 +60,17 @@ Type objective_function<Type>::operator()()
 
   Type sig_u = exp(ln_sig_u);
   Type sig_y;
-  if(ln_sig_y.size()>0)  sig_y = exp(ln_sig_y(0));
+  Type power = 0;
+  Type pz = 0;
+  if(ln_sig_y.size()>0) sig_y = exp(ln_sig_y(0));
+  if(ln_sig_y.size() == 2){
+    if( family == 400 ){
+      power = invlogit(ln_sig_y(1)) + Type(1); //tweedie power parameter
+    }
+    if( family == 500 ){
+      pz = invlogit(ln_sig_y(1)); //prob zero in delta model
+    }
+  } 
   Type nll = 0;
   //only fit overdispersion if ln_sig_v isn't null
   bool v_flag = (ln_sig_v.size()>0);
@@ -128,6 +139,29 @@ Type objective_function<Type>::operator()()
           y(i) = rpois(mu(i));
         }
         break;
+      case Tweedie_family:
+        nll -= keep(i) * dtweedie(y(i), mu(i), sig_y, power, true);
+        //cdf method not possible as no qtweedie in TMB
+        SIMULATE{
+          y(i) = rtweedie(mu(i), sig_y, power);
+        }
+        break;
+      case Delta_Gamma_family:
+        if(y(i) == 0){
+          //log(pz)
+          nll -= keep(i) * dbinom(Type(0), Type(1), 1-pz, true);
+        }
+        if(y(i) > 0){
+          //log(1-pz) + log(dgamma())
+          nll -= keep(i) * ( dbinom(Type(1), Type(1), 1-pz, true) +
+            //shape = 1/CV^2; scale = mean*CV^2
+            dgamma(y(i), 1/pow(sig_y,2), mu(i)*pow(sig_y,2), true) );
+        }
+        SIMULATE{
+          y(i) = rbinom(Type(1), 1-pz) * 
+            rgamma(1/pow(sig_y,2), mu(i)*pow(sig_y,2));
+        }
+        break;
       default:
         error("Family not supported");
     }
@@ -151,6 +185,8 @@ Type objective_function<Type>::operator()()
   REPORT(sig_y);
   REPORT(sig_u);
   REPORT(sig_v);
+  REPORT(power);
+  REPORT(pz);
 
   return(nll);
 }

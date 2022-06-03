@@ -28,7 +28,10 @@
 simdat <- function(n, ng=0, mod, cov.mod = 'norm',
                    trueparms = list(theta, sd.vec, sp.parm, fam, link),
                    misp, seed){
-  if(!(misp %in% c('outliers', 'misscov', 'overdispersion', 'mu0', 'mispomega', 'dropRE'))) stop('incorrect mis-specification name')
+  if(!(misp %in% c('outliers', 'misscov', 'overdispersion', 
+                   'mu0', 'mispomega', 'dropRE', 'deltagamma'))){
+    stop('incorrect mis-specification name')
+  } 
   if(!(mod %in% c('linmod', 'randomwalk', 'simpleGLMM', 'spatial'))) stop('incorrect model name')
 
   list2env(trueparms, envir = environment(simdat))
@@ -86,10 +89,13 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
       v <- rnorm(n,0,sd.vec[3]) #sd.vec[3] = 1
     }
     set.seed(seed*2)
+    inits <- sd.vec[1]
     for(j in 1:ng){
       for(i in 1:n){
         eta[i,j] <- mu[i] + u[j] + v[i]
-        y0[i,j] <- sim_y(as.matrix(eta[i,j]), 0, parm=sd.vec[1], fam=fam, link=link)
+        # will not work if Tweedie and misp = overdispersion
+        if(fam == 'Tweedie') inits <- c(inits, sd.vec[3])
+        y0[i,j] <- sim_y(as.matrix(eta[i,j]), 0, parm=inits, fam=fam, link=link)
       }
     }
     y0 <- as.vector(y0)
@@ -237,7 +243,7 @@ sim_y <- function(Eta, omega, parm, fam, link){
     Y <- rpois(N, mu)
   }
   if(fam == 'Tweedie'){
-    Y <- tweedie::rtweedie(N, mean, parm[1], parm[2])
+    Y <- tweedie::rtweedie(N, mu = mu, phi = parm[1], power = parm[2])
   }
   if(fam == 'Gaussian'){
     ## assuming parm[1] is SD of sampling process

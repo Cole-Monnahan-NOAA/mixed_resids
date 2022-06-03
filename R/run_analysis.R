@@ -45,10 +45,12 @@ dharma.methods <- c('uncond', 'cond', 're_uncond')
 run_model(reps, mod='randomwalk', misp='mu0', do.true = do.true)
 
 ## Andrea's simple GLMM with 5 groups
-## possible mispecifications: overdispersion,  misscov - outliers not set up correctly when distribution not normal (lognormal better misp?)
-osa.methods <- c('cdf', 'mcmc', 're_mcmc', 'pears')
+## possible mispecifications: overdispersion,  misscov 
+##! outliers not set up correctly when distribution not normal (lognormal better misp?)
+##! misp cannot be overdispersion when fam = Tweedie
+osa.methods <- c('mcmc', 're_mcmc', 'pears')
 dharma.methods <- c('uncond', 'cond', 're_uncond')
-run_model(reps, ng = 5, mod='simpleGLMM', misp='misscov', cov.mod = 'unif', do.true = do.true)
+run_model(reps, ng = 5, mod='simpleGLMM', misp='deltagamma', do.true = do.true)
 
 ## Simple spatial SPDE model
 ## possible mispecifications: overdispersion, misscov, mispomega, dropRE - outliers not set up correctly when distribution not normal

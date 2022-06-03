@@ -36,9 +36,10 @@ setup_trueparms <- function(mod, misp){
   }
   if(mod=='simpleGLMM'){
     #parms when fam = 'Gaussian';link='identity'
-    theta <- 4
-    sd.vec <- sqrt(c(.5,10))
-    fam <- 'Gamma'
+    theta <- 1
+    sd.vec <- sqrt(c(2,10))
+    fam <- 'Tweedie'
+    pow <- 1.5
     link <- 'log'
 
     #parms when fam = 'Poisson'; link = 'log'
@@ -61,7 +62,7 @@ setup_trueparms <- function(mod, misp){
     }
     if(misp=='overdispersion') {
       sd.vec <- c(sd.vec, 1)
-      true.comp[[1]] <- list(beta_ = theta,
+      true.comp[[1]] <- list(beta = theta,
                              ln_sig_y = log(sd.vec[1]),
                              ln_sig_u = log(sd.vec[2]),
                              ln_sig_v = log(sd.vec[3]))
@@ -78,6 +79,26 @@ setup_trueparms <- function(mod, misp){
     if(fam == 'Poisson'){
       true.comp[[1]]$ln_sig_y <- NULL
       true.comp[[2]]$ln_sig_y <- NULL
+    }
+    if(fam == 'Tweedie'){
+      sd.vec[3] <- pow
+      if(misp == 'deltagamma'){
+        #convert sd of tweedie to sd of gamma, tweedie: var(y) = mu^pow*phi
+        sd.y <- sqrt(theta^pow*sd.vec[1]) 
+        true.comp[[1]] <- list(beta = theta,
+                               ln_sig_y = log(sd.vec[1]),
+                               ln_sig_u = log(sd.vec[2]))
+        true.comp[[2]] <- list(beta = theta,
+                               ln_sig_y = log(sd.y/theta), #cv
+                               ln_sig_u = log(sd.vec[2]))
+      }
+      true.comp[[1]]$ln_sig_y[2] <- log((pow-1)/(2-pow))
+      #lambda definition based on Compound Poisson-Gamma relationship to Tweedie
+      #Prob(Y==0) = exp(-lambda) based on Poisson 
+      lambda <- (exp(theta)^(2 - pow))/((2-pow)*sd.vec[1])
+      pz <- exp(-lambda)
+      #logit transform of the probability of zero
+      true.comp[[2]]$ln_sig_y[2] <- log(pz/(1-pz))
     }
   }
   if(mod=='spatial'){
@@ -131,6 +152,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
   library(tidyr)
   library(R.utils)
   library(goftest)
+  library(tweedie)
 
   if(mod == 'linmod'){
     Random <- FALSE
@@ -297,6 +319,35 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
             sig <- if(is.null(tmp$sig)) tmp$sig_y else tmp$sig
             Fx <- pnorm(q=init.dat[[h]]$y, mean= tmp$exp_val, sd=sig)
             osa.out[[h]]$mcmc <-  qnorm(Fx)
+          }
+          if(init.dat[[h]]$family == 400){
+            grp.idx <- init.dat[[h]]$group + 1
+            res <- NULL
+            p <- tmp$power
+            phi <- tmp$sig_y
+            #calculate by group as ptweedie relies on pop min/max
+            for(j in 1:ng){
+              idx <- which(grp.idx == j)
+              y <- init.dat[[h]]$y[idx]
+              mu <- tmp$exp_val[idx]
+              Fx <- ptweedie(q = y, mu = mu, 
+                             phi = phi, power = p)
+              zero.idx <- which(y == 0)
+              #as implemented in statmod::qres.tweedie
+              Fx[zero.idx] <- runif(length(zero.idx), 0, Fx[zero.idx])
+              res <- c(res, qnorm(Fx))
+            }
+            osa.out[[h]]$mcmc <- res
+          }
+          if(init.dat[[h]]$family == 500){
+            zero.idx <- which(init.dat[[h]]$y == 0)
+            pos.idx <- which(init.dat[[h]]$y > 0)
+            sig <- tmp$sig_y
+            Fx <- rep(0,length(init.dat[[h]]$y))
+            Fx[pos.idx] <- pgamma(init.dat[[h]]$y[pos.idx], shape = 1/sig^2, 
+                                     scale = tmp$exp_val[pos.idx]*sig^2)
+            Fx[zero.idx] <- runif(length(zero.idx), 0, 1)
+            osa.out[[h]]$mcmc <- qnorm(Fx)
           }
         }
         osa.out[[h]]$runtime.mcmc <- as.numeric(Sys.time()-t0, 'secs')
@@ -507,6 +558,9 @@ mkTMBdat <- function(Dat, Pars, Mod, Misp){
                  sim_re = 0)
     dat1 <- dat0
     dat1$y = Dat$y1
+    if(Misp=="deltagamma"){
+      dat1$family = fam_enum("Delta_Gamma")
+    }
   }
   if(Mod == 'spatial'){
     loc <- Dat$loc
@@ -559,13 +613,21 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
 
   if(Mod == 'simpleGLMM'){
     if(doTrue){
-      par0 <- list(beta = Pars$theta, ln_sig_y = log(Pars$sd.vec[1]),
+      par0 <- list(beta = Pars$theta, 
+                   ln_sig_y = log(Pars$sd.vec[1]),
                    ln_sig_u = log(Pars$sd.vec[2]), ln_sig_v = numeric(0),
                    u = Dat$random$u, v = rep(0,length(Dat$y0)/length(Dat$random$u)))
+      if(Pars$fam == 'Tweedie'){
+        par0$ln_sig_y <- c(par0$ln_sig_y, 
+                           log((Pars$sd.vec[3]-1)/(2-Pars$sd.vec[3])))
+      }
     } else {
       par0 <- list(beta = 0, ln_sig_y = 0, ln_sig_u = 0, ln_sig_v = numeric(0),
                    u = rep(0, length(Dat$random$u)),
                    v = rep(0, length(Dat$y0)/length(Dat$random$u)))
+      if(Pars$fam == 'Tweedie'){
+        par0$ln_sig_y <- c(0,0)
+      }
     }
     if(Pars$fam == "Poisson") par0$ln_sig_y = numeric(0)
     par1 <- par0
@@ -697,7 +759,7 @@ fam_enum <- function(fam){
   if(fam == 'Poisson') out <- 200
   if(fam == 'lognormal') out <- 300
   if(fam == 'Tweedie') out <- 400
-  if(fam == 'Binomial') out <- 500
+  if(fam == 'Delta_Gamma') out <- 500
   return(out)
 }
 
