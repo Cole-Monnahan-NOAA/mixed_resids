@@ -230,7 +230,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
       }
 
       message(ii, ": Calculating residuals..")
-      disc <- FALSE; ran <- c(-Inf,Inf)
+      disc <- FALSE; ran <- c(-Inf,Inf); rot <- NULL
       if(!is.null(true.parms$fam)){
         if(true.parms$fam == 'Poisson'){
           disc <- TRUE
@@ -238,22 +238,41 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
         }
         if(true.parms$fam == 'Gamma') ran <- c(0,Inf)
       }
+      if(mod == 'randomwalk' | mod == 'spatial') rot <- "estimated"
+      
       osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, methods=osa.methods, observation.name='y', Discrete = disc, Range = ran)
 
       expr <- expression(obj$simulate()$y)
+     
       if('cond' %in% dharma.methods){
-        dharma.out[[h]]$cond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]],
-                                                 fpr=mod.out[[h]]$report$fpr, int.resp = disc)
+        dharma.out[[h]]$cond <- 
+          calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]],
+                           fpr=mod.out[[h]]$report$fpr, 
+                           int.resp = disc, rot = NULL)
       } else {
         dharma.out[[h]]$cond <- list()
         dharma.out[[h]]$cond$resids <- NA
         dharma.out[[h]]$cond$runtime <- NA
       }
+      
+      if('uncond_nrot' %in% dharma.methods){
+        mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
+        dharma.out[[h]]$uncond_nrot <- 
+          calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], 
+                           fpr=mod.out[[h]]$report$fpr, 
+                           int.resp = disc, rot = NULL)
+      } else {
+        dharma.out[[h]]$uncond_nrot <- list()
+        dharma.out[[h]]$uncond_nrot$resids <- NA
+        dharma.out[[h]]$uncond_nrot$runtime <- NA
+      }
 
       if('uncond' %in% dharma.methods){
         mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
-        dharma.out[[h]]$uncond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]],
-                                                   fpr=mod.out[[h]]$report$fpr, int.resp = disc)
+        dharma.out[[h]]$uncond <- 
+          calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], 
+                           fpr=mod.out[[h]]$report$fpr, 
+                           int.resp = disc, rot = rot)
       } else {
         dharma.out[[h]]$uncond <- list()
         dharma.out[[h]]$uncond$resids <- NA
@@ -266,15 +285,49 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
           expr <- expression(obj$simulate()$omega)  
           obs <- mod.out[[h]]$obj$env$parList()$omega
         } else {
-          expr <- expression(obj$simulate()$u)
+          #center simulation and obs
+          expr <- expression(obj$simulate()$u )
           obs <- mod.out[[h]]$obj$env$parList()$u
         }
-        dharma.out[[h]]$re_uncond <- calculate.dharma(mod.out[[h]]$obj, expr, obs=obs,
-                                                 fpr=rep(0,length(obs)), int.resp = disc)
+        if(mod == 'randomwalk'){
+          fpr <- mod.out[[h]]$report$ypred
+        } else {
+          fpr <- rep(0, length(obs))
+        }
+        dharma.out[[h]]$re_uncond <- 
+          calculate.dharma(mod.out[[h]]$obj, expr, obs=obs, 
+                           fpr = fpr, 
+                           int.resp = disc, rot = rot)
       } else {
         dharma.out[[h]]$re_uncond <- list()
         dharma.out[[h]]$re_uncond$resids <- NA
         dharma.out[[h]]$re_uncond$runtime <- NA
+      }
+      
+      if('re_uncond_nrot' %in% dharma.methods & mod != 'linmod' & Random ){
+        mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
+        if(mod == 'spatial'){
+          expr <- expression(obj$simulate()$omega)  
+          obs <- mod.out[[h]]$obj$env$parList()$omega
+          fpr <- rep(0, length(obs))
+        } else {
+          #center simulation and obs
+          expr <- expression(obj$simulate()$u )
+          obs <- mod.out[[h]]$obj$env$parList()$u
+          if(mod == 'randomwalk'){
+            fpr <- mod.out[[h]]$report$ypred
+          } else {
+            fpr <- rep(0, length(obs))
+          }
+        }
+        dharma.out[[h]]$re_uncond_nrot <- 
+          calculate.dharma(mod.out[[h]]$obj, expr, obs=obs, 
+                           fpr = fpr, 
+                           int.resp = disc, rot = NULL)
+      } else {
+        dharma.out[[h]]$re_uncond_nrot <- list()
+        dharma.out[[h]]$re_uncond_nrot$resids <- NA
+        dharma.out[[h]]$re_uncond_nrot$runtime <- NA
       }
 
       ## only makes sense to run when MLE is estimated and there

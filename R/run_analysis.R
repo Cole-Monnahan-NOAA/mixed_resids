@@ -40,8 +40,9 @@ run_model(reps, mod='linmod', misp='overdispersion', do.true = do.true)
 
 ## Random walk from the paper
 ## possible mispecifications: mu0, outliers
-osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 're_mcmc', 'pears')[-3]
-dharma.methods <- c('uncond', 'cond', 're_uncond')
+osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 're_mcmc', 'pears')
+dharma.methods <- c('uncond', 'cond', 're_uncond', 
+                    'uncond_nrot', 'cond_nrot', 're_uncond_nrot' )
 run_model(reps, mod='randomwalk', misp='mu0', do.true = do.true)
 
 ## Andrea's simple GLMM with 5 groups
@@ -49,7 +50,7 @@ run_model(reps, mod='randomwalk', misp='mu0', do.true = do.true)
 ##! outliers not set up correctly when distribution not normal (lognormal better misp?)
 ##! misp cannot be overdispersion when fam = Tweedie
 osa.methods <- c('mcmc', 're_mcmc', 'pears')
-dharma.methods <- c('uncond', 'cond', 're_uncond')
+dharma.methods <- c('uncond', 'cond', 're_uncond' )
 run_model(reps, ng = 5, mod='simpleGLMM', misp='deltagamma', do.true = do.true)
 
 ## Simple spatial SPDE model
@@ -110,7 +111,9 @@ library(viridis)
 pvals$method <- factor(pvals$method, 
                        levels = c('fg', 'osg','cdf', 'mcmc',  're_mcmc', 
                                   're_obs_mcmc','cond','uncond', 
-                                  're_uncond', 'pears'))
+                                  're_uncond', 
+                                 # 'uncond_nrot', 'cond_nrot', 're_uncond_nrot',
+                                  'pears'))
 ## Effect of do.true for true model
 png(filename='plots/h0_TF.png', width=2600, height=1500,res=300)
 filter(pvals, version=='h0' &  test=='GOF.ks') %>%
