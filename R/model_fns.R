@@ -37,12 +37,12 @@ setup_trueparms <- function(mod, misp){
   if(mod=='simpleGLMM'){
     #parms when fam = 'Gaussian';link='identity'
     theta <- 1
-    sd.vec <- sqrt(c(2,10))
+    sd.vec <- sqrt(c(2,4))
     fam <- 'Tweedie'
     pow <- 1.5
     link <- 'log'
 
-    #parms when fam = 'Poisson'; link = 'log'
+    # parms when fam = 'Poisson'; link = 'log'
     # theta <- 1.5
     # sd.vec <- sqrt(c(.5,2))
     # fam <- 'Poisson'
@@ -237,8 +237,13 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
           ran <- c(0,Inf)
         }
         if(true.parms$fam == 'Gamma') ran <- c(0,Inf)
+        if(true.parms$fam == 'Tweedie'){
+          disc <- TRUE
+          ran <- c(0,Inf)
+        }
+          
       }
-      if(mod == 'randomwalk' | mod == 'spatial') rot <- "estimated"
+      if(mod == 'randomwalk' | mod == 'spatial' | mod == 'simpleGLMM') rot <- "estimated"
       
       osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, methods=osa.methods, observation.name='y', Discrete = disc, Range = ran)
 
@@ -786,13 +791,11 @@ mkTMBmap <- function(Pars, Mod, Misp, Fam, doTrue){
     }
   }
   if(Mod == 'simpleGLMM' | Mod == 'spatial'){
-    map.h1 <- list(v = rep(factor(NA), length(Pars$h1$v)))
+    map.h0 <- map.h1 <- list(v = rep(factor(NA), length(Pars$h1$v)))
     if(Misp == 'overdispersion'){
-      map.h0 <- list()
-    } else {
       map.h0 <- list(v = rep(factor(NA), length(Pars$h0$v)))
     }
-    if(Fam == "Poisson"){
+    if(Fam == "Poisson" & Mod == 'spatial'){
       map.h0$theta <- factor(NA)
       map.h1$theta <- factor(NA)
     }
