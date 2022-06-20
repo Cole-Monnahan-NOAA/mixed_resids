@@ -46,7 +46,7 @@ L <- t(chol(C))
 r1 <- solve(L, obs)
 qqnorm(r1, main="OSA")
 abline(0,1)
-ad.test(r1, 'pnorm')$p.value
+ks.test(r1, 'pnorm')$p.value
 
 n.sim <- 1000
 y.sim <- t(rmvnorm(n.sim,sigma=C))
