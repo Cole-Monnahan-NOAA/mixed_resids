@@ -17,7 +17,7 @@ stats <- lapply(list.files('results', pattern='_stats.RDS',
 check_runs <- group_by(pvals, model, misp, version, do.true) %>% summarize(count=length(unique(replicate)))
 check_runs[1:8,]
 check_runs[9:12,]
-check_runs[13:24,]
+check_runs[13:16,]
 
 ## Check for MLE consistency.
 nc_id <- stats[stats$converge==1|stats$maxgrad>0.1,]$id
@@ -181,7 +181,21 @@ source("code/make_plots.R")
 ##   facet_grid(Nreps~test, scales='free_y')
 ## ggsave('plots/ks_vs_ad.png', g, width=7, height=5)
 
-#Single instance plots
+#Single instance plots =====================================
+#randomwalk
+pvals <- lapply(list.files('results', pattern='_pvals.RDS',
+                           full.names=TRUE), readRDS) %>% bind_rows
+pvals <- pvals[pvals$model == 'randomwalk' & pvals$misp == 'mu0',]
+pvals <- pvals[pvals$method == 'cond' | pvals$method == 'uncond',]
+filter(pvals, version=='h0' &  test=='GOF.ks') %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_wrap(~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+
+
 #simpleGLMM
 pvals <- lapply(list.files('results', pattern='_pvals.RDS',
                            full.names=TRUE), readRDS) %>% bind_rows
