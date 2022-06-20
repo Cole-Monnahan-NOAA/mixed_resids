@@ -22,8 +22,8 @@ setupTMB <- function(dll.name, comp=FALSE){
 #' @return Fitted objective function, nlminb output, reported values from model, sdreport if true
 #'
 #' @noRd
-fit_tmb <- function(obj.args, opt.args = list(control = list(iter = 800, eval = 800),
-                                              hessian = NULL, scale = 1,
+fit_tmb <- function(obj.args, opt.args = list(control = list(iter = 800, eval = 800), 
+                                              scale = 1,
                                               lower = -Inf, upper = Inf ),
                     control = list(run.model = TRUE, do.sdreport = TRUE)){
   obj <- do.call(MakeADFun, obj.args)
@@ -111,3 +111,28 @@ run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = 
   saveRDS(stats, file=paste0('results/',mod, '_', misp,'_stats.RDS'))
   return(results)
 }
+
+
+#' Extract marginal precision matrix for subset
+#'
+#' @param Q spHess object from TMB
+#' @param i index of subset
+#' @param ... additional arguments
+#'
+#' @return marginal Precision matrix
+#' @export
+#'
+#' @examples
+GMRFmarginal <- function(Q, i, ...) {
+  ind <- 1:nrow(Q)
+  i1 <- (ind)[i]
+  i0 <- setdiff(ind, i1)
+  if (length(i0) == 0)
+    return(Q)
+  Q0 <- as(Q[i0, i0, drop = FALSE], "symmetricMatrix")
+  L0 <- Cholesky(Q0, ...)
+  ans <- Q[i1, i1, drop = FALSE] - Q[i1, i0, drop = FALSE] %*%
+    solve(Q0, Q[i0, i1, drop = FALSE])
+  ans
+}
+
