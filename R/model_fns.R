@@ -190,9 +190,12 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
 
     id <- paste0(mod, '_', misp, '_', do.true, '_h', h-1, '_', ii)
 
-    init.obj <- list(data = init.dat[[h]], parameters = init.par[[h]], map = init.map[[h]], random = init.random[[h]], DLL = mod)
+    init.obj <- list(data = init.dat[[h]], parameters = init.par[[h]], 
+                     map = init.map[[h]], random = init.random[[h]], DLL = mod)
     
     if(is.null(init.random[[h]])) Random <- FALSE
+    
+    if(Random) init.obj$hessian <- TRUE
     
     mod.out[[h]] <- try(
       fit_tmb(
@@ -253,11 +256,22 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
         dharma.out[[h]]$cond <- 
           calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]],
                            fpr=mod.out[[h]]$report$fpr, 
-                           int.resp = disc, rot = NULL)
+                           int.resp = disc, rot = rot)
       } else {
         dharma.out[[h]]$cond <- list()
         dharma.out[[h]]$cond$resids <- NA
         dharma.out[[h]]$cond$runtime <- NA
+      }
+      
+      if('cond_nrot' %in% dharma.methods){
+        dharma.out[[h]]$cond_nrot <- 
+          calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]],
+                           fpr=mod.out[[h]]$report$fpr, 
+                           int.resp = disc, rot = NULL)
+      } else {
+        dharma.out[[h]]$cond_nrot <- list()
+        dharma.out[[h]]$cond_nrot$resids <- NA
+        dharma.out[[h]]$cond_nrot$runtime <- NA
       }
       
       if('uncond_nrot' %in% dharma.methods){
@@ -335,7 +349,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
         dharma.out[[h]]$re_uncond_nrot$runtime <- NA
       }
 
-      ## only makes sense to run when MLE is estimated and there
+       ## only makes sense to run when MLE is estimated and there
       ## are RE - turning on when do.true == TRUE (AMH, 6/3/2022)
       if('mcmc' %in% osa.methods & Random ){
         t0 <- Sys.time()
@@ -414,9 +428,16 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
         if('re_mcmc' %in% osa.methods){
           if(mod == "randomwalk"){
             sig <- tmp$tau
-            mu <- tmp$ypred
-            Fx <- pnorm(q = postmle, mean = mu, sd = sig) #needs rotation?
-            osa.out[[h]]$re_mcmc <- qnorm(Fx)
+            mode <- c(tmp$ypred, unlist(FE))
+            Hess <- mod.out[[h]]$obj$env$spHess(mode, random = TRUE)
+            idx <- which(names(mod.out[[1]]$obj$env$par) == "u")
+            Sigma <- solve(as.matrix(GMRFmarginal(Hess, idx)))
+            res <- postmle - mode[idx]
+            L <- t(chol(Sigma))
+            osa.out[[h]]$re_mcmc <- as.vector(solve(L, res))
+            # 
+            # Fx <- pnorm(q = postmle, mean = mu, sd = sig) #needs rotation?
+            # osa.out[[h]]$re_mcmc <- qnorm(Fx)
           } 
           if(mod == "simpleGLMM"){
             u.idx <- grep('u', names(objmle$par))
@@ -429,10 +450,10 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
             omega.idx <- grep('omega', names(objmle$par))
             mu <- rep(0, length(postmle[omega.idx]))
             #rotation using spatial covariance matrix
-            Sig <- solve(tmp$Q * exp(2 * FE$ln_tau))
-            r1 <- as.vector(solve(t(chol(Sig)), postmle[omega.idx]))
-            Fx <- pnorm(q = r1, mean = mu, sd = 1) 
-            osa.out[[h]]$re_mcmc <- qnorm(Fx)
+            Sigma <- solve(tmp$Q * exp(2 * FE$ln_tau))
+            res <- postmle[omega.idx] #mode of GMRF is 0
+            L <- t(chol(Sigma))
+            osa.out[[h]]$re_mcmc <- as.vector(solve(L, res))
           }
           if(mod == "spatial"){#filter on omegas associated with obs
             omega.idx <- omega.idx[init.dat[[h]]$mesh_i+1]
