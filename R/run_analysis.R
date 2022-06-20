@@ -42,7 +42,7 @@ run_model(reps, mod='linmod', misp='overdispersion', do.true = do.true)
 ## possible mispecifications: mu0, outliers
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 're_mcmc', 'pears')
 dharma.methods <- c('uncond', 'cond', 're_uncond', 
-                    'uncond_nrot', 're_uncond_nrot' )
+                    'cond_nrot', 'uncond_nrot', 're_uncond_nrot' )
 run_model(reps, mod='randomwalk', misp='mu0', do.true = do.true)
 
 ## Andrea's simple GLMM with 5 groups
@@ -50,7 +50,7 @@ run_model(reps, mod='randomwalk', misp='mu0', do.true = do.true)
 ##! outliers not set up correctly when distribution not normal (lognormal better misp?)
 ##! misp cannot be overdispersion when fam = Tweedie
 osa.methods <- c('mcmc', 're_mcmc', 'pears')
-dharma.methods <- c('uncond', 'uncond_nrot', 're_uncond_nrot' )
+dharma.methods <- c('uncond', 'uncond_nrot', 're_uncond_nrot', 'cond', 'cond_nrot' )
 run_model(reps, ng = 5, mod='simpleGLMM', misp='deltagamma', do.true = do.true)
 
 ## Simple spatial SPDE model
