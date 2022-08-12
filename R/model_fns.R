@@ -102,11 +102,15 @@ setup_trueparms <- function(mod, misp){
     }
   }
   if(mod=='spatial'){
-    theta=0.5
-    sd.vec <- c(.5,sqrt(2))
+    #theta=0.5
+    #sd.vec <- c(.5,sqrt(2))
     sp.parm <- 50
-    fam <- 'Poisson'
-    link <- 'log'
+    # fam <- 'Poisson'
+    # link <- 'log'
+    fam <- 'Gaussian'
+    link <- 'identity'
+    theta=1
+    sd.vec <- c(1,sqrt(4))
 
     true.comp[[1]] <- true.comp[[2]] <-
       list(beta = theta, theta = log(sd.vec[1]),
@@ -131,9 +135,9 @@ setup_trueparms <- function(mod, misp){
     if(misp == 'dropRE'){
       true.comp[[2]] <- list(beta = theta, theta = log(sd.vec[1]))
     }
-    if(misp == 'mispomega'){
-      sd.vec[2] <- sd.vec[2]/3
-    }
+    # if(misp == 'mispomega'){
+    #   sd.vec[2] <- sd.vec[2]/3
+    # }
     if(fam == "Poisson"){
       true.comp[[1]]$theta <- NULL
       true.comp[[2]]$theta <- NULL
@@ -255,7 +259,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
       if('cond' %in% dharma.methods){
         dharma.out[[h]]$cond <- 
           calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]],
-                           fpr=mod.out[[h]]$report$fpr, 
+                           idx = 1:n, fpr=mod.out[[h]]$report$fpr, 
                            int.resp = disc, rot = rot)
       } else {
         dharma.out[[h]]$cond <- list()
@@ -266,7 +270,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
       if('cond_nrot' %in% dharma.methods){
         dharma.out[[h]]$cond_nrot <- 
           calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]],
-                           fpr=mod.out[[h]]$report$fpr, 
+                           idx = 1:n, fpr=mod.out[[h]]$report$fpr, 
                            int.resp = disc, rot = NULL)
       } else {
         dharma.out[[h]]$cond_nrot <- list()
@@ -278,7 +282,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
         mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
         dharma.out[[h]]$uncond_nrot <- 
           calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], 
-                           fpr=mod.out[[h]]$report$fpr, 
+                           idx = 1:n, fpr=mod.out[[h]]$report$fpr, 
                            int.resp = disc, rot = NULL)
       } else {
         dharma.out[[h]]$uncond_nrot <- list()
@@ -290,7 +294,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
         mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
         dharma.out[[h]]$uncond <- 
           calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], 
-                           fpr=mod.out[[h]]$report$fpr, 
+                           idx = 1:n, fpr=mod.out[[h]]$report$fpr, 
                            int.resp = disc, rot = rot)
       } else {
         dharma.out[[h]]$uncond <- list()
@@ -302,11 +306,13 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
         mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
         if(mod == 'spatial'){
           expr <- expression(obj$simulate()$omega)  
-          obs <- mod.out[[h]]$obj$env$parList()$omega
+          idx <- init.dat[[h]]$mesh_i+1
+          obs <- mod.out[[h]]$obj$env$parList()$omega[idx]
         } else {
           #center simulation and obs
           expr <- expression(obj$simulate()$u )
           obs <- mod.out[[h]]$obj$env$parList()$u
+          idx <- 1:n
         }
         if(mod == 'randomwalk'){
           fpr <- mod.out[[h]]$report$ypred
@@ -314,9 +320,13 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
           fpr <- rep(0, length(obs))
         }
         dharma.out[[h]]$re_uncond <- 
-          calculate.dharma(mod.out[[h]]$obj, expr, obs=obs, 
+          calculate.dharma(mod.out[[h]]$obj, 
+                           expr,
+                           obs=obs, 
+                           idx = idx,
                            fpr = fpr, 
-                           int.resp = disc, rot = rot)
+                           int.resp = disc, 
+                           rot = rot)
       } else {
         dharma.out[[h]]$re_uncond <- list()
         dharma.out[[h]]$re_uncond$resids <- NA
@@ -327,12 +337,14 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
         mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
         if(mod == 'spatial'){
           expr <- expression(obj$simulate()$omega)  
-          obs <- mod.out[[h]]$obj$env$parList()$omega
+          idx <- init.dat[[h]]$mesh_i+1
+          obs <- mod.out[[h]]$obj$env$parList()$omega[idx]
           fpr <- rep(0, length(obs))
         } else {
           #center simulation and obs
           expr <- expression(obj$simulate()$u )
           obs <- mod.out[[h]]$obj$env$parList()$u
+          idx <- 1:n
           if(mod == 'randomwalk'){
             fpr <- mod.out[[h]]$report$ypred
           } else {
@@ -340,7 +352,9 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
           }
         }
         dharma.out[[h]]$re_uncond_nrot <- 
-          calculate.dharma(mod.out[[h]]$obj, expr, obs=obs, 
+          calculate.dharma(mod.out[[h]]$obj, expr, 
+                           obs=obs, 
+                           idx = idx,
                            fpr = fpr, 
                            int.resp = disc, rot = NULL)
       } else {
@@ -446,24 +460,30 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
             Fx <- pnorm(q = postmle[u.idx], mean = mu, sd = sig) 
             osa.out[[h]]$re_mcmc <- qnorm(Fx)
           }
-          if(mod == "spatial"){
+          # if(mod == "spatial"){
+          #   omega.idx <- grep('omega', names(objmle$par))
+          #   mu <- rep(0, length(postmle[omega.idx]))
+          #   #rotation using spatial covariance matrix
+          #   Sigma <- solve(tmp$Q * exp(2 * FE$ln_tau))
+          #   res <- postmle[omega.idx] #mode of GMRF is 0
+          #   L <- t(chol(Sigma))
+          #   r1 <- as.vector(solve(L, res))
+          #   osa.out[[h]]$re_mcmc <- r1
+          # }
+          if(mod == "spatial"){#filter on omegas associated with obs
             omega.idx <- grep('omega', names(objmle$par))
-            mu <- rep(0, length(postmle[omega.idx]))
-            #rotation using spatial covariance matrix
-            Sigma <- solve(tmp$Q * exp(2 * FE$ln_tau))
+            omega.idx <- omega.idx[init.dat[[h]]$mesh_i+1]
+            mu <- rep(0,length(omega.idx))
+            Q <- tmp$Q * exp(2 * FE$ln_tau)
+            Sigma <- solve(as.matrix(GMRFmarginal(Q, omega.idx)))
             res <- postmle[omega.idx] #mode of GMRF is 0
             L <- t(chol(Sigma))
-            osa.out[[h]]$re_mcmc <- as.vector(solve(L, res))
-          }
-          if(mod == "spatial"){#filter on omegas associated with obs
-            omega.idx <- omega.idx[init.dat[[h]]$mesh_i+1]
-            r2 <- r1[omega.idx]
-            mu <- rep(0,length(omega.idx))
-            Fx <- pnorm(q = r2, mean = mu, sd = 1)
-            osa.out[[h]]$re_obs_mcmc <- qnorm(Fx)
-            if(h==1) osa.methods <- c(osa.methods, 're_obs_mcmc')
+            r1 <- as.vector(solve(L, res))
+            osa.out[[h]]$re_mcmc <- r1
+            #if(h==1) osa.methods <- c(osa.methods, 're_obs_mcmc')
           } else {
-            osa.out[[h]]$re_obs_mcmc <- NA
+            #osa.out[[h]]$re_obs_mcmc <- NA
+            osa.out[[h]]$re_mcmc <- NA
           }
           
           if(misp == 'overdispersion' & mod != 'linmod' & h == 1){
@@ -481,7 +501,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
       } else {
         osa.out[[h]]$mcmc <- osa.out[[h]]$runtime.mcmc <- NA
         osa.out[[h]]$re_mcmc <- NA
-        osa.out[[h]]$re_obs_mcmc <- NA
+        #osa.out[[h]]$re_obs_mcmc <- NA
       }
     
       AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC) #!doesn't work if doTrue == TRUE
@@ -534,7 +554,14 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
                                  res.obj = osa.out[[h]],
                                  version = names(mod.out)[h])
           pvals <- rbind(pvals, cbind(id, sac.pvals))
-        }    
+        } 
+        if(!is.null(dharma.methods)){
+          sac.pvals <- calc.sac( type = 'sim', 
+                                 dat = sim.dat, 
+                                 res.obj = dharma.out[[h]],
+                                 version = names(mod.out)[h])
+          pvals <- rbind(pvals, cbind(id, sac.pvals))
+        } 
       }
           
          
@@ -653,6 +680,12 @@ mkTMBdat <- function(Dat, Pars, Mod, Misp){
     dat0$spde <-  INLA::inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
     dat1 <- dat0
     dat1$y <- Dat$y1
+    
+    if(Misp == "aniso"){
+      mesh <- Dat$mesh.aniso
+      dat1$mesh_i <- mesh$idx$loc-1
+      dat1$spde <-  INLA::inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
+    }
   }
   if(Misp=='misscov'){
     dat1$X <- as.matrix(dat1$X[,1])
@@ -760,6 +793,9 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
     if(Misp == 'dropRE'){
       par1$ln_tau = 0
       par1$ln_kappa = 0
+    }
+    if(Misp == "aniso"){
+      par1$omega = rep(0, Dat$mesh.aniso$n)
     }
   }
   out = list(h0 = par0, h1 = par1)
