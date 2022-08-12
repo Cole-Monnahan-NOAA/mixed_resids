@@ -76,7 +76,10 @@ Type objective_function<Type>::operator() ()
   Type kappa = exp(ln_kappa);
   Type marg_sp_sd = 1/(2*sqrt(M_PI)*kappa*tau);
   Type Range= sqrt(8)/kappa;
-  Type sig_v= 0;
+  Type sig_y = 0;
+  Type sig_v = 0;
+  vector<Type> sig2;
+  sig2.setZero();
   Type total_lnvar = 0;
 
   Type nll = 0.0;
@@ -149,6 +152,7 @@ Type objective_function<Type>::operator() ()
       case Gamma_family:
         //shape = 1/CV^2; scale = mean*CV^2
         nll -= keep(i) * dgamma( y(i), 1/exp(2*theta), mu(i)*exp(2*theta), true);
+        sig2(i) = exp(2*theta) * pow(mu(i),2);
         cdf = squeeze( pgamma(y(i), 1/exp(2*theta), mu(i)*exp(2*theta)) );
         nll -= keep.cdf_lower(i) * log( cdf );
         nll -= keep.cdf_upper(i) * log( 1.0 - cdf );
@@ -182,6 +186,8 @@ Type objective_function<Type>::operator() ()
   SIMULATE{
     REPORT(y);
   }
+  
+  if(family <= 100) sig_y = exp(theta);
 
   vector<Type> fpr = X * beta;
   vector<Type> exp_val = mu;
@@ -192,6 +198,8 @@ Type objective_function<Type>::operator() ()
   REPORT(mu);
   REPORT(fpr);
   REPORT(exp_val);
+  REPORT(sig_y);
+  REPORT(sig2);
   REPORT(sig_v);
   REPORT(total_lnvar);
   REPORT(nll);
