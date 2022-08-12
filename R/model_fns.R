@@ -1,4 +1,4 @@
-setup_trueparms <- function(mod, misp){
+setup_trueparms <- function(mod, misp, fam, link){
   true.comp <- list()
   if(mod=='linmod'){
     theta <- c(4,-5)
@@ -7,8 +7,6 @@ setup_trueparms <- function(mod, misp){
       list(beta_1 = theta[1], beta_2 = theta[2],
                       ln_sig = log(sd.vec))
     sp.parm <- 0
-    fam <- NULL
-    link <- NULL
     if(misp == 'overdispersion'){
       #sd.vec <- c(sd.vec, sd.vec*log(4))
       sd.vec <- c(sd.vec, 1)
@@ -22,8 +20,6 @@ setup_trueparms <- function(mod, misp){
     theta <- 2
     sd.vec <- c(1,1)
     sp.parm <- 0
-    fam <- NULL
-    link <- NULL
     true.comp[[1]] <- list(mu = theta, ln_sig = log(sd.vec[1]),
            ln_tau = log(sd.vec[2]))
     if(misp == 'mu0'){
@@ -35,18 +31,15 @@ setup_trueparms <- function(mod, misp){
     }
   }
   if(mod=='simpleGLMM'){
-    #parms when fam = 'Gaussian';link='identity'
     theta <- 1
     sd.vec <- sqrt(c(2,4))
-    fam <- 'Tweedie'
-    pow <- 1.2
-    link <- 'log'
-
-    # parms when fam = 'Poisson'; link = 'log'
-    # theta <- 1.5
-    # sd.vec <- sqrt(c(.5,2))
-    # fam <- 'Poisson'
-    # link <- 'log'
+    if(fam == "Tweedie"){
+      pow <- 1.2
+    }
+    if(fam == "Poisson"){
+      theta <- 1.5
+      sd.vec <- sqrt(c(.5,2))
+    }
 
     sp.parm <- 0
     if(misp=='misscov'){
@@ -102,15 +95,18 @@ setup_trueparms <- function(mod, misp){
     }
   }
   if(mod=='spatial'){
-    #theta=0.5
-    #sd.vec <- c(.5,sqrt(2))
     sp.parm <- 50
-    # fam <- 'Poisson'
-    # link <- 'log'
-    fam <- 'Gaussian'
-    link <- 'identity'
-    theta=1
-    sd.vec <- c(1,sqrt(4))
+    if(fam == "Poisson"){
+      theta <- 0.5
+      sd.vec <- c(0.5, sqrt(2))
+    }
+
+    if(fam == 'Gaussian'){
+      theta <- 1
+      sd.vec <- c(1,sqrt(4))
+    }
+
+    
 
     true.comp[[1]] <- true.comp[[2]] <-
       list(beta = theta, theta = log(sd.vec[1]),
@@ -148,7 +144,8 @@ setup_trueparms <- function(mod, misp){
   return(true.pars)
 }
 
-run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FALSE, savefiles=TRUE){
+run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, 
+                     family, link, do.true = FALSE, savefiles=TRUE){
   library(TMB)
   library(DHARMa)
   library(INLA)
@@ -157,15 +154,26 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
   library(R.utils)
   library(goftest)
   library(tweedie)
+  
+  res.name <- paste0('results/', mod, '_', misp)
 
   if(mod == 'linmod'){
     Random <- FALSE
   } else {
     Random <- TRUE
   }
+  
+  if(misp == "missnormcov"){
+    cov.mod <- "norm"
+    misp <- "misscov"
+  }
+  if(misp == "missunifcov"){
+    cov.mod <- "unif"
+    misp <- "misscov"
+  }
 
   setupTMB(mod)
-  true.parms <- setup_trueparms(mod,misp)
+  true.parms <- setup_trueparms(mod, misp, family, link)
 
   ## simulate data with these parameters
   message(ii, ": Simulating data...")
@@ -255,6 +263,10 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
       osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, methods=osa.methods, observation.name='y', Discrete = disc, Range = ran)
 
       expr <- expression(obj$simulate()$y)
+      
+      if(mod == 'simpleGLMM' & h == 1){
+        n <- n*ng
+      }
      
       if('cond' %in% dharma.methods){
         dharma.out[[h]]$cond <- 
@@ -312,7 +324,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
           #center simulation and obs
           expr <- expression(obj$simulate()$u )
           obs <- mod.out[[h]]$obj$env$parList()$u
-          idx <- 1:n
+          idx <- 1:length(obs)
         }
         if(mod == 'randomwalk'){
           fpr <- mod.out[[h]]$report$ypred
@@ -344,7 +356,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
           #center simulation and obs
           expr <- expression(obj$simulate()$u )
           obs <- mod.out[[h]]$obj$env$parList()$u
-          idx <- 1:n
+          idx <- 1:length(obs)
           if(mod == 'randomwalk'){
             fpr <- mod.out[[h]]$report$ypred
           } else {
@@ -578,16 +590,16 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FAL
   mles <- do.call(rbind, mles)
   if(savefiles){
     if(do.true) mod <- paste0(mod, "_true")
-    dir.create(paste0('results/', mod, '_', misp, '_pvals'), showWarnings=FALSE)
-    dir.create(paste0('results/', mod, '_', misp, '_resids'), showWarnings=FALSE)
-    saveRDS(pvals, file=paste0('results/', mod, '_', misp, '_pvals/pvals_', ii, '.RDS'))
-    saveRDS(resids, file=paste0('results/', mod, '_', misp, '_resids/resids_', ii, '.RDS'))
+    dir.create(paste0(res.name, '_pvals'), showWarnings=FALSE)
+    dir.create(paste0(res.name, '_resids'), showWarnings=FALSE)
+    saveRDS(pvals, file=paste0(res.name, '_pvals/pvals_', ii, '.RDS'))
+    saveRDS(resids, file=paste0(res.name, '_resids/resids_', ii, '.RDS'))
     if(length(mles)>0){
-      dir.create(paste0('results/', mod, '_', misp, '_mles'), showWarnings=FALSE)
-      saveRDS(mles, file=paste0('results/', mod, '_', misp, '_mles/mles_', ii, '.RDS'))
+      dir.create(paste0(res.name, '_mles'), showWarnings=FALSE)
+      saveRDS(mles, file=paste0(res.name, '_mles/mles_', ii, '.RDS'))
     }
-    dir.create(paste0('results/', mod, '_', misp, '_stats'), showWarnings=FALSE)
-    saveRDS(stats, file=paste0('results/', mod, '_', misp, '_stats/stats_', ii, '.RDS'))
+    dir.create(paste0(res.name, '_stats'), showWarnings=FALSE)
+    saveRDS(stats, file=paste0(res.name, '_stats/stats_', ii, '.RDS'))
   }
 
 
