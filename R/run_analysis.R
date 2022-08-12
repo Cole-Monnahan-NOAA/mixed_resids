@@ -25,45 +25,65 @@ packageVersion('DHARMa')                # 0.3.3.0
 ##   random draws from the joint precision matrix (fixed + RE,
 ##   conditioned on data)
 
-(cpus <- parallel::detectCores()-2)
+(cpus <- parallel::detectCores()-1)
 reps <- 1:500
 
 do.true <- TRUE
+
 ## Set osa.methods and dharma.methods to NULL to turn off
-osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'pears')[-3]
-dharma.methods <- c('uncond', 'cond')
+osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'pears')
+dharma.methods <- c('uncond_nrot', 'cond_nrot')
+
+## LM =========================================================================
 
 ## Simple linear model as sanity check. Some resid methods not
 ## applicable b/c no random effects
 ## possible mispecifications: overdispersion, outliers, misscov
 run_model(reps, mod='linmod', misp='overdispersion', do.true = do.true)
 
-## Random walk from the paper
-## possible mispecifications: mu0, outliers
+## Random walk from the paper =================================================
+
+## possible mispecifications: mu0, outliers, normal
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 're_mcmc', 'pears')
 dharma.methods <- c('uncond', 'cond', 're_uncond', 
-                    'cond_nrot', 'uncond_nrot', 're_uncond_nrot' )
+                    'uncond_nrot', 'cond_nrot',  're_uncond_nrot' )
+#LMM example
 run_model(reps, mod='randomwalk', misp='mu0', do.true = do.true)
 
-## Andrea's simple GLMM with 5 groups
-## possible mispecifications: overdispersion,  misscov 
+## simpleGLMM with 5 groups===================================================
+
+## possible mispecifications: overdispersion,  missnormcov, missunifcov, deltagamma 
 ##! outliers not set up correctly when distribution not normal (lognormal better misp?)
 ##! misp cannot be overdispersion when fam = Tweedie
-osa.methods <- c('mcmc', 're_mcmc', 'pears')
-dharma.methods <- c('uncond', 'uncond_nrot', 're_uncond_nrot', 'cond', 'cond_nrot' )
-run_model(reps, ng = 5, mod='simpleGLMM', misp='deltagamma', do.true = do.true)
 
-## Simple spatial SPDE model
-## possible mispecifications: overdispersion, misscov, mispomega, dropRE - outliers not set up correctly when distribution not normal
-#Turn off generic method - takes too long
-osa.methods <- c('cdf', 'mcmc', 're_mcmc', 'pears', 'gen') #only 'cdf' and 'gen' suitable for discrete distributions
+#LMM examples
+osa.methods <- c('fg', 'osg', 'cdf', 'mcmc', 're_mcmc', 'pears')
+dharma.methods <- c('uncond_nrot', 'cond_nrot',  're_uncond_nrot' )
+run_model(reps, ng = 5, mod='simpleGLMM', misp='missnormcov', do.true = do.true)
+run_model(reps, ng = 5, mod='simpleGLMM', misp='missunifcov', do.true = do.true)
+
+# GLMM example
+osa.methods <- c('mcmc', 're_mcmc', 'pears')
+dharma.methods <- c('uncond_nrot', 'cond_nrot',  're_uncond_nrot' )
+run_model(reps, ng = 5, mod='simpleGLMM', misp='deltagamma', 
+          family = "Tweedie", link = "log", do.true = do.true)
+
+## Simple spatial SPDE model ==================================================
+
+## possible mispecifications: overdispersion, misscov, mispomega, dropRE, aniso - outliers not set up correctly when distribution not normal
+
+# LMM example
+osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 're_mcmc', 'pears')
 dharma.methods <- c('uncond', 'cond', 're_uncond', 
-                    'uncond_nrot', 're_uncond_nrot' )
-run_model(reps, n=200, mod='spatial', misp='overdispersion', do.true = do.true)
-run_model(reps, n=200, mod='spatial', cov.mod = 'unif', misp='misscov', do.true = do.true)
+                    'uncond_nrot', 'cond_nrot',  're_uncond_nrot' )
 run_model(reps, n=200, mod='spatial', misp='mispomega', do.true = do.true)
-run_model(reps, n=200, mod='spatial', misp='dropRE', do.true = do.true)
+
+# GLMM example
+osa.methods <- c('gen', 'cdf', 'mcmc', 're_mcmc', 'pears') #only 'cdf' and 'gen' suitable for discrete distributions
+run_model(reps, n=200, mod='spatial', misp='dropRE', 
+          family = "Poisson", link = "log", do.true = do.true)
 
 # stop clusters
 # sfStop()
+
 
