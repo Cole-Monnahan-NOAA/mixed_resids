@@ -87,10 +87,10 @@ calculate.osa <- function(obj, methods, observation.name,
               runtime.osg=runtime.osg, runtime.cdf=runtime.cdf))
 }
 
-calculate.dharma <- function(obj, expr, N=1000, obs, fpr, int.resp, rot){
+calculate.dharma <- function(obj, expr, N=1000, obs, idx, fpr, int.resp, rot){
   #alternative <- match.arg(alternative)
   t0 <- Sys.time()
-  tmp <- replicate(N, eval(expr))
+  tmp <- replicate(N, eval(expr)[idx])
   dharma <- createDHARMa(tmp, obs, fittedPredictedResponse = fpr,
                          integerResponse = int.resp,
                          rotation = rot)
@@ -203,10 +203,10 @@ calc.sac <- function(type, dat, res.obj, version){
   
   if(type == 'osa'){
     res.names <- c('cdf', 'gen', 'fg', 'mcmc', 'osg',
-                   'pears', 're_mcmc', 're_mcmc_obs')
+                   'pears', 're_mcmc')#, 're_mcmc_obs')
   }
   if(type == 'sim'){
-    res.names <- c('cond', 're_uncond', 're_uncond_obs', 'uncond')
+    res.names <- c('cond', 're_uncond',  'uncond')#, 're_uncond_obs',)
   }
   
   df <- data.frame(type = character(), method = character(), model = character(),
@@ -214,8 +214,8 @@ calc.sac <- function(type, dat, res.obj, version){
   
   dmat.obs <- as.matrix(dist(dat$loc, upper = TRUE))
   wt.obs<- 1/dmat.obs; diag(wt.obs) <- 0
-  dmat.all <- as.matrix(dist(dat$mesh$loc[,1:2], upper = TRUE))
-  wt.all <- 1/dmat.all; diag(wt.all) <- 0
+ # dmat.all <- as.matrix(dist(dat$mesh$loc[,1:2], upper = TRUE))
+ # wt.all <- 1/dmat.all; diag(wt.all) <- 0
 
  # y <- NA
   
@@ -223,12 +223,12 @@ calc.sac <- function(type, dat, res.obj, version){
     nms <- names(res.obj)[m]
     x <- res.obj[[m]]
     if (nms %in% res.names) {
-      if ( (nms == 're_mcmc') |
-           (nms == 're_uncond') ){
-        wt <- wt.all
-      } else {
+      # if ( (nms == 're_mcmc') |
+      #      (nms == 're_uncond') ){
+      #   wt <- wt.all
+      # } else {
         wt <- wt.obs
-      }
+      # }s
       if(is.numeric(x)){
         ## only test for positive correlationa
         y <- ape::Moran.I(x, wt, alternative = 'greater')$p.value
@@ -272,7 +272,7 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
         }
       }
       if(!is.null(fam)){
-        if(fam == 'Poisson' & !is.na(res.obj$pears)){
+        if(all(fam == 'Poisson' & !is.na(res.obj$pears))){
           disp <- 1 - pchisq(sum(res.obj$pears^2), res.obj$pears.df)
           df <- rbind(df, data.frame(type='osa', method='pears', model=mod, test='disp',
                                      version = version, pvalue = disp))
