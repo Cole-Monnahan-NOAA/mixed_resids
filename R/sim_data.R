@@ -29,7 +29,8 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
                    trueparms = list(theta, sd.vec, sp.parm, fam, link),
                    misp, seed){
   if(!(misp %in% c('outliers', 'misscov', 'overdispersion', 
-                   'mu0', 'mispomega', 'dropRE', 'deltagamma'))){
+                   'mu0', 'mispomega', 'dropRE', 
+                   'deltagamma', 'aniso'))){
     stop('incorrect mis-specification name')
   } 
   if(!(mod %in% c('linmod', 'randomwalk', 'simpleGLMM', 'spatial'))) stop('incorrect model name')
@@ -118,8 +119,24 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
     mesh <- try(
       R.utils::withTimeout( 
         INLA::inla.mesh.2d(loc, max.edge = c(sp.parm/3,sp.parm), 
-                           offset = c(sp.parm/10,sp.parm*5), min.angle = 26),
-                    timeout = 30, onTimeout = 'silent' ))
+                           offset = c(sp.parm/10,sp.parm*2), min.angle = 26),
+        timeout = 30, onTimeout = 'silent' ))
+    
+    if(misp == "aniso"){
+      loc.aniso <- loc
+      rad <- 45*pi/180
+      R <- rbind(c(cos(rad), sin(rad)), c(-sin(rad), cos(rad)))
+      S <- rbind(c(sqrt(10), 0), c(0, 1/sqrt(10)))
+      for(s in 1:nrow(loc)){
+        loc.aniso[s,] <- loc[s,]%*% solve(S) %*% solve(R)
+      }
+      mesh.aniso <- try(
+        R.utils::withTimeout( 
+          INLA::inla.mesh.2d(loc.aniso, max.edge = c(sp.parm/3,sp.parm), 
+                             offset = c(sp.parm/10,sp.parm*2), min.angle = 26),
+          timeout = 30, onTimeout = 'silent' ))
+    }
+   
     if(is.character(mesh)){
       system("Taskkill /IM fmesher.exe /F")
      # warning("mesh failed in rep=", ii)
@@ -143,7 +160,8 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
 
 
     if(misp == 'mu0') stop("Misspecification not available for spatial")
-    if(misp == 'misscov' | misp == 'overdispersion' | misp == 'dropRE'){
+    if(misp == 'misscov' | misp == 'overdispersion' | 
+       misp == 'dropRE' | misp == "aniso"){
       y1 <- y0
     }
     if(misp=='mispomega'){
@@ -166,6 +184,9 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
   if(mod == 'spatial'){
     dat.out$loc = loc
     dat.out$mesh = mesh
+    if(misp == "aniso"){
+      dat.out$mesh.aniso = mesh.aniso
+    }
   }
   return(dat.out)
 }
