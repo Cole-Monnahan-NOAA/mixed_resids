@@ -39,7 +39,7 @@ setup_trueparms <- function(mod, misp){
     theta <- 1
     sd.vec <- sqrt(c(2,4))
     fam <- 'Tweedie'
-    pow <- 1.5
+    pow <- 1.2
     link <- 'log'
 
     # parms when fam = 'Poisson'; link = 'log'
