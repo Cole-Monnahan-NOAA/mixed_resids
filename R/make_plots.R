@@ -182,28 +182,153 @@ source("code/make_plots.R")
 ## ggsave('plots/ks_vs_ad.png', g, width=7, height=5)
 
 #Single instance plots =====================================
-#randomwalk
+#randomwalk - DHARMa residuals
 pvals <- lapply(list.files('results', pattern='_pvals.RDS',
                            full.names=TRUE), readRDS) %>% bind_rows
-pvals <- pvals[pvals$model == 'randomwalk' & pvals$misp == 'mu0',]
-pvals <- pvals[pvals$method == 'cond' | pvals$method == 'uncond',]
-filter(pvals, version=='h0' &  test=='GOF.ks') %>%
+pvals <- pvals[pvals$method != "cond",]
+pvals.dharma <- pvals[pvals$model == 'randomwalk' & 
+                        pvals$misp == 'mu0' & pvals$type == "sim",]
+
+pvals.osa <- pvals[pvals$model == 'randomwalk' & 
+                     pvals$misp == 'mu0' & pvals$type == "osa",]
+
+filter(pvals.dharma, test=='GOF.ks' & version == "h0") %>%
   ggplot(aes(pvalue, fill=do.true, color=do.true)) +
-  facet_wrap(~method, scales = "free_y") + 
+  facet_grid(~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+filter(pvals.dharma, test=='GOF.ks' & version == "h1" & do.true==FALSE) %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+
+#randomwalk - OSA residuals
+filter(pvals.osa, test=='GOF.ks' & version == "h0") %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+filter(pvals.osa, test=='GOF.ks' & version == "h1" & do.true==FALSE) %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+
+#simpleGLMM - DHARMa residuals
+pvals <- lapply(list.files('results', pattern='_pvals.RDS',
+                           full.names=TRUE), readRDS) %>% bind_rows
+pvals <- pvals[pvals$method != "cond",]
+pvals <- pvals[pvals$method != "uncond",]
+pvals.dharma <- pvals[pvals$model == 'simpleGLMM' & 
+                        pvals$misp == 'deltagamma' & pvals$type == "sim",]
+pvals.osa <- pvals[pvals$model == 'simpleGLMM' & 
+                     pvals$misp == 'deltagamma' & pvals$type == "osa",]
+filter(pvals.dharma, test=='GOF.ks' & version == "h0") %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+filter(pvals.dharma, test=='GOF.ks' & version == "h1" & do.true==FALSE) %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+
+#simpleGLMM - OSA residuals
+filter(pvals.osa, test=='GOF.ks' & version == "h0") %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+filter(pvals.osa, test=='GOF.ks' & version == "h1" & do.true==FALSE) %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(~method, scales = "free_y") + 
   geom_histogram(position='identity', alpha=.5) +
   scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
   scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
   theme(axis.text=element_text(size=6))
 
 
-#simpleGLMM
+#spatial - DHARMa residuals
 pvals <- lapply(list.files('results', pattern='_pvals.RDS',
                            full.names=TRUE), readRDS) %>% bind_rows
-pvals <- pvals[pvals$model == 'simpleGLMM' & pvals$misp == 'deltagamma',]
-pvals <- pvals[pvals$method == 'cond' | pvals$method == 'uncond',]
-filter(pvals, version=='h0' &  test=='GOF.ks') %>%
+# pvals <- pvals[pvals$method != "cond",]
+pvals.dharma <- pvals[pvals$model == 'spatial'  & pvals$type == "sim",]
+pvals.osa <- pvals[pvals$model == 'spatial' & pvals$type == "osa",]
+
+filter(pvals.dharma, test=='GOF.ks' & version == "h0") %>%
   ggplot(aes(pvalue, fill=do.true, color=do.true)) +
-  facet_wrap(~method, scales = "free_y") + 
+  facet_grid(misp~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+filter(pvals.dharma, test=='GOF.ks' & version == "h1" & do.true==FALSE) %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(misp~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+
+#spatial - OSA residuals
+filter(pvals.osa, test=='GOF.ks' & version == "h0") %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(misp~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+filter(pvals.osa, test=='GOF.ks' & version == "h1" & do.true==FALSE) %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(misp~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+
+#SAC
+filter(pvals.dharma, test=='SAC' & version == "h0") %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(misp~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+filter(pvals.dharma, test=='SAC' & version == "h1" & do.true==FALSE) %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(misp~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+
+#spatial - OSA residuals
+filter(pvals.osa, test=='SAC' & version == "h0") %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(misp~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+filter(pvals.osa, test=='SAC' & version == "h1" & do.true==FALSE) %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(misp~method, scales = "free_y") + 
   geom_histogram(position='identity', alpha=.5) +
   scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
   scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
