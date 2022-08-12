@@ -61,7 +61,9 @@ add_aic <- function(opt,n){
 }
 
 
-run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = FALSE, savefiles=TRUE){
+run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm', 
+                      misp, family = "Gaussian", link = "identity",
+                      do.true = FALSE, savefiles=TRUE){
 
   ## Clean up the old runs
   unlink(paste0('results/',mod,'_resids', TRUE))
@@ -76,7 +78,9 @@ run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm', misp, do.true = 
   sfExportAll()
 
   message("Starting parallel runs...")
-  results <- sfLapply(reps, function(ii) run_iter(ii, n, ng, mod, cov.mod, misp, do.true, savefiles))
+  results <- sfLapply(reps, function(ii) run_iter(ii, n, ng, mod, cov.mod, 
+                                                  misp, family, link, 
+                                                  do.true, savefiles))
   #results <- sapply(reps, function(ii) run_iter(ii, n, ng, mod, cov.mod, misp, do.true, savefiles))
 
   ## ## Read results back in from file
