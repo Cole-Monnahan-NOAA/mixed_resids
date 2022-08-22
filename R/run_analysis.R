@@ -49,6 +49,7 @@ dharma.methods <- c('uncond', 'cond', 're_uncond',
                     'uncond_nrot', 'cond_nrot',  're_uncond_nrot' )
 #LMM example
 run_model(reps, mod='randomwalk', misp='mu0', do.true = do.true)
+run_model(reps, mod='randomwalk', misp='normal', do.true = do.true)
 
 ## simpleGLMM with 5 groups===================================================
 
@@ -77,9 +78,10 @@ osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 're_mcmc', 'pears')
 dharma.methods <- c('uncond', 'cond', 're_uncond', 
                     'uncond_nrot', 'cond_nrot',  're_uncond_nrot' )
 run_model(reps, n=200, mod='spatial', misp='mispomega', do.true = do.true)
+run_model(reps, n=200, mod='spatial', misp='misscov', cov.mod = 'unif', do.true = do.true)
 
 # GLMM example
-osa.methods <- c('gen', 'cdf', 'mcmc', 're_mcmc', 'pears') #only 'cdf' and 'gen' suitable for discrete distributions
+osa.methods <- c('gen', 'cdf', 'mcmc', 're_mcmc', 're_fg', 'pears') #only 'cdf' and 'gen' suitable for discrete distributions
 run_model(reps, n=200, mod='spatial', misp='dropRE', 
           family = "Poisson", link = "log", do.true = do.true)
 
