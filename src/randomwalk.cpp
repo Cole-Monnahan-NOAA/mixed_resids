@@ -5,11 +5,20 @@
 //
 // Uffe Høgsbro Thygesen and Kasper Kristensen, 2016
 
+
 #include <TMB.hpp>
+
+template<class Type>
+Type dlnorm(Type x, Type meanlog, Type sdlog, int give_log=0){
+  Type logres = dnorm( log(x), meanlog, sdlog, true) - log(x);
+  if(give_log) return logres; else return exp(logres);
+}
+
 template <class Type>
 Type objective_function<Type>::operator()()
 {
   DATA_VECTOR(y);                  // Observations
+  DATA_INTEGER(mod); //0: normal; 1: lognormal
   DATA_INTEGER(sim_re);
   DATA_VECTOR_INDICATOR(keep, y);  // For one-step predictions
 
@@ -42,14 +51,23 @@ Type objective_function<Type>::operator()()
   }
 
   // Observations
-  Type cdf;
+  Type cdf = 0;
   for (int i = 0; i < y.size(); ++i){
-    nll -= keep(i) * dnorm(y(i), u(i), sig, true);
-    cdf = squeeze( pnorm(y(i), u(i), sig) );
+    if(mod == 0){
+      nll -= keep(i) * dnorm(y(i), u(i), sig, true);
+      cdf = squeeze( pnorm(y(i), u(i), sig) );
+    }
+    if(mod == 1){
+      nll -= keep(i) * dlnorm(y(i), u(i), sig, true);
+      cdf = squeeze( pnorm(log(y(i)), u(i), sig) );
+    }
     nll -= keep.cdf_lower(i) * log( cdf );
     nll -= keep.cdf_upper(i) * log( 1.0 - cdf );
     SIMULATE {
       y(i) = rnorm(u(i), sig); // conditional
+      if(mod == 1){
+        y(i) = exp(y(i));
+      }
     }
   }
   
