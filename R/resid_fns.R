@@ -221,7 +221,12 @@ calc.sac <- function(type, dat, res.obj, version){
   
   for(m in 1:length(res.obj)){
     nms <- names(res.obj)[m]
-    x <- res.obj[[m]]
+    if(type == "osa"){
+      x <- res.obj[[m]]
+    }
+    if(type == "sim"){
+      x <- res.obj[[m]]$out$scaledResiduals
+    }
     if (nms %in% res.names) {
       # if ( (nms == 're_mcmc') |
       #      (nms == 're_uncond') ){
