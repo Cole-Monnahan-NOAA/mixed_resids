@@ -29,7 +29,7 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
                    trueparms = list(theta, sd.vec, sp.parm, fam, link),
                    misp, seed){
   if(!(misp %in% c('outliers', 'misscov', 'overdispersion', 
-                   'mu0', 'mispomega', 'dropRE', 
+                   'mu0', 'normal', 'mispomega', 'dropRE', 
                    'deltagamma', 'aniso'))){
     stop('incorrect mis-specification name')
   } 
@@ -67,15 +67,20 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
   }
 
   if(mod == 'randomwalk'){
+    if(misp == 'overdispersion' | misp == 'misscov'| misp == 'mispomega'){
+      stop("Misspecification not available for random walk")
+    }
     set.seed(seed)
     ## Simulate random measurements
     u <- c(0,cumsum(rnorm(N-1,mean=mu,sd=sd.vec[2])))
-    y0 <- u + rnorm(N,sd=sd.vec[1])
-   
-    if(misp == 'overdispersion' | misp == 'misscov'| misp == 'mispomega') stop("Misspecification not available for random walk")
-    if(misp == 'mu0'){
-      y1 <- y0
+    if(misp == "normal"){
+      y0 <- u + rlnorm(N,sd=sd.vec[1])
+    } else {
+      y0 <- u + rnorm(N,sd=sd.vec[1])
     }
+    
+    y1 <- y0
+    
     random <- list(u=u)
   }
 
