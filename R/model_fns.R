@@ -17,8 +17,13 @@ setup_trueparms <- function(mod, misp, fam, link){
     }
   }
   if(mod=='randomwalk'){
-    theta <- 2
-    sd.vec <- c(1,1)
+    if(misp == "normal"){
+      theta = 0.05
+      sd.vec = c(0.5, 0.05)
+    } else {
+      theta <- 2
+      sd.vec <- c(1,1)
+    }
     sp.parm <- 0
     true.comp[[1]] <- list(mu = theta, ln_sig = log(sd.vec[1]),
            ln_tau = log(sd.vec[2]))
@@ -34,7 +39,9 @@ setup_trueparms <- function(mod, misp, fam, link){
     theta <- 1
     sd.vec <- sqrt(c(2,4))
     if(fam == "Tweedie"){
+      theta <- 1.5
       pow <- 1.2
+      sd.vec <- sqrt(c(2,2))
     }
     if(fam == "Poisson"){
       theta <- 1.5
@@ -103,10 +110,8 @@ setup_trueparms <- function(mod, misp, fam, link){
 
     if(fam == 'Gaussian'){
       theta <- 1
-      sd.vec <- c(1,sqrt(4))
+      sd.vec <- c(1,1)
     }
-
-    
 
     true.comp[[1]] <- true.comp[[2]] <-
       list(beta = theta, theta = log(sd.vec[1]),
@@ -114,7 +119,7 @@ setup_trueparms <- function(mod, misp, fam, link){
            ln_kappa = log(sqrt(8)/sp.parm))
 
     if(misp=='misscov'){
-      theta <- c(1,2)
+      theta <- c(0.5,1.5)
       true.comp[[1]] <-
         list(beta_1 = theta[1], beta_2 = theta[2], theta = log(sd.vec[1]),
              ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd))
@@ -155,7 +160,13 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
   library(goftest)
   library(tweedie)
   
-  res.name <- paste0('results/', mod, '_', misp)
+  if(do.true){
+    mod.name <- paste0(mod, "_true")
+  } else {
+    mod.name <- mod
+  }
+  res.name <- paste0('results/', mod.name, '_', misp)
+  misp.name <- misp
 
   if(mod == 'linmod'){
     Random <- FALSE
@@ -377,27 +388,32 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
 
        ## only makes sense to run when MLE is estimated and there
       ## are RE - turning on when do.true == TRUE (AMH, 6/3/2022)
-      if('mcmc' %in% osa.methods & Random ){
+      if('mcmc' %in% osa.methods){
         t0 <- Sys.time()
-        ## Build up TMB obj again
-        if(do.true)  FE <- mod.out[[h]]$obj$par # true FE
-        if(!do.true) FE <- mod.out[[h]]$opt$par # estimated FE
-        ## make into list; https://stackoverflow.com/questions/46251725/convert-named-vector-to-list-in-r/46251794
-        FE <- split(unname(FE),names(FE))
-        MLE <- modifyList(init.par[[h]], FE) #
-        ## Get FE and map them off
-        xx <- names(MLE)[-which(names(MLE) %in% init.random[[h]])]
-        map <- lapply(names(FE), function(x) factor(FE[[x]]*NA))
-        names(map) <- names(FE)
-        map <- c(map, init.map[[h]])
-        ## Rebuild with original FE mapped off and RE as FE
-        objmle <- MakeADFun(data=init.dat[[h]], parameters=MLE,
-                            map=map, DLL=mod.out[[h]]$obj$env$DLL)
-        fitmle <- tmbstan::tmbstan(objmle, chains=1, warmup=300, iter=301, seed=ii, refresh=-1)
-        postmle <- as.numeric(as.matrix(fitmle)) ## single sample
-        postmle <- postmle[-length(postmle)] # drop lp__ value
-        ## Calculate residuals given the sample
-        tmp <- objmle$report(postmle)
+        if(!(misp == "dropRE" & h == 2)){
+          ## Build up TMB obj again
+          if(do.true)  FE <- mod.out[[h]]$obj$par # true FE
+          if(!do.true) FE <- mod.out[[h]]$opt$par # estimated FE
+          ## make into list; https://stackoverflow.com/questions/46251725/convert-named-vector-to-list-in-r/46251794
+          FE <- split(unname(FE),names(FE))
+          MLE <- modifyList(init.par[[h]], FE) #
+          ## Get FE and map them off
+          xx <- names(MLE)[-which(names(MLE) %in% init.random[[h]])]
+          map <- lapply(names(FE), function(x) factor(FE[[x]]*NA))
+          names(map) <- names(FE)
+          map <- c(map, init.map[[h]])
+          ## Rebuild with original FE mapped off and RE as FE
+          objmle <- MakeADFun(data=init.dat[[h]], parameters=MLE,
+                              map=map, DLL=mod.out[[h]]$obj$env$DLL)
+          fitmle <- tmbstan::tmbstan(objmle, chains=1, warmup=300, iter=301, seed=ii, refresh=-1)
+          postmle <- as.numeric(as.matrix(fitmle)) ## single sample
+          postmle <- postmle[-length(postmle)] # drop lp__ value
+          ## Calculate residuals given the sample
+          tmp <- objmle$report(postmle)
+        }
+        if(misp == "dropRE" & h == 2){
+          tmp <- mod.out[[h]]$report
+        }
         if(is.null(true.parms$fam)){
           sig <- if(is.null(tmp$sig)) tmp$sig_y else tmp$sig
           Fx <- pnorm(q=init.dat[[h]]$y, mean= tmp$exp_val, sd=sig)
@@ -419,44 +435,60 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
             Fx <- pnorm(q=init.dat[[h]]$y, mean= tmp$exp_val, sd=sig)
             osa.out[[h]]$mcmc <-  qnorm(Fx)
           }
-          if(init.dat[[h]]$family == 400){
-            grp.idx <- init.dat[[h]]$group + 1
-            res <- NULL
-            p <- tmp$power
-            phi <- tmp$sig_y
-            #calculate by group as ptweedie relies on pop min/max
-            for(j in 1:ng){
-              idx <- which(grp.idx == j)
-              y <- init.dat[[h]]$y[idx]
-              mu <- tmp$exp_val[idx]
-              Fx <- ptweedie(q = y, mu = mu, 
-                             phi = phi, power = p)
-              zero.idx <- which(y == 0)
-              #as implemented in statmod::qres.tweedie
-              Fx[zero.idx] <- runif(length(zero.idx), 0, Fx[zero.idx])
-              res <- c(res, qnorm(Fx))
+          if(mod == 'simpleGLMM'){
+            if(init.dat[[h]]$family == 400){
+              
+              grp.idx <- init.dat[[h]]$group + 1
+              res <- NULL
+              p <- tmp$power
+              phi <- tmp$sig_y
+              if(misp != "dropRE"){
+                #calculate by group as ptweedie relies on pop min/max
+                for(j in 1:ng){
+                  idx <- which(grp.idx == j)
+                  y <- init.dat[[h]]$y[idx]
+                  mu <- tmp$exp_val[idx]
+                  Fx <- ptweedie(q = y, mu = mu, 
+                                 phi = phi, power = p)
+                  zero.idx <- which(y == 0)
+                  #as implemented in statmod::qres.tweedie
+                  Fx[zero.idx] <- runif(length(zero.idx), 0, Fx[zero.idx])
+                  res <- c(res, qnorm(Fx))
+                }
+              }
+              if(misp == "dropRE"){
+                y <- init.dat[[h]]$y
+                mu <- tmp$exp_val
+                Fx <- ptweedie(q = y, mu = mu, 
+                               phi = phi, power = p)
+                zero.idx <- which(y == 0)
+                #as implemented in statmod::qres.tweedie
+                Fx[zero.idx] <- runif(length(zero.idx), 0, Fx[zero.idx])
+                res <- qnorm(Fx)
+              }
+              osa.out[[h]]$mcmc <- res
             }
-            osa.out[[h]]$mcmc <- res
+            if(init.dat[[h]]$family == 500){
+              zero.idx <- which(init.dat[[h]]$y == 0)
+              pos.idx <- which(init.dat[[h]]$y > 0)
+              sig <- tmp$sig_y
+              Fx <- rep(0,length(init.dat[[h]]$y))
+              Fx[pos.idx] <- pgamma(init.dat[[h]]$y[pos.idx], shape = 1/sig^2, 
+                                    scale = tmp$exp_val[pos.idx]*sig^2)
+              Fx[zero.idx] <- runif(length(zero.idx), 0, 1)
+              osa.out[[h]]$mcmc <- qnorm(Fx)
+            }
           }
-          if(init.dat[[h]]$family == 500){
-            zero.idx <- which(init.dat[[h]]$y == 0)
-            pos.idx <- which(init.dat[[h]]$y > 0)
-            sig <- tmp$sig_y
-            Fx <- rep(0,length(init.dat[[h]]$y))
-            Fx[pos.idx] <- pgamma(init.dat[[h]]$y[pos.idx], shape = 1/sig^2, 
-                                     scale = tmp$exp_val[pos.idx]*sig^2)
-            Fx[zero.idx] <- runif(length(zero.idx), 0, 1)
-            osa.out[[h]]$mcmc <- qnorm(Fx)
-          }
+
         }
         osa.out[[h]]$runtime.mcmc <- as.numeric(Sys.time()-t0, 'secs')
         
-        if('re_mcmc' %in% osa.methods){
+        if('re_mcmc' %in% osa.methods & Random){
           if(mod == "randomwalk"){
             sig <- tmp$tau
             mode <- c(tmp$ypred, unlist(FE))
             Hess <- mod.out[[h]]$obj$env$spHess(mode, random = TRUE)
-            idx <- which(names(mod.out[[1]]$obj$env$par) == "u")
+            idx <- which(names(mod.out[[h]]$obj$env$par) == "u")
             Sigma <- solve(as.matrix(GMRFmarginal(Hess, idx)))
             res <- postmle - mode[idx]
             L <- t(chol(Sigma))
@@ -509,12 +541,43 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
             osa.out[[h]]$re_mcmc_v <- NA
           }
         }
-        
-      } else {
+      }else {
         osa.out[[h]]$mcmc <- osa.out[[h]]$runtime.mcmc <- NA
         osa.out[[h]]$re_mcmc <- NA
-        #osa.out[[h]]$re_obs_mcmc <- NA
+        #
       }
+      
+      if('re_fg' %in% osa.methods & Random){
+        if(mod == "randomwalk"){
+          tmp <- mod.out[[h]]$report
+          sig <- tmp$tau
+          u <- mod.out[[h]]$obj$env$parList()$u
+          mode <- tmp$ypred
+          Hess <- mod.out[[h]]$obj$env$spHess(mode, random = TRUE)
+          idx <- which(names(mod.out[[h]]$obj$env$parList()) == "u")
+          Sigma <- solve(as.matrix(GMRFmarginal(Hess, idx)))
+          res <- u - mode
+          L <- t(chol(Sigma))
+          osa.out[[h]]$re_fg <- as.vector(solve(L, res))
+        }
+        if(mod == "spatial"){#filter on omegas associated with obs
+          tmp <- mod.out[[h]]$report
+          p.list <- mod.out[[h]]$obj$env$parList()
+          omega.idx <- grep('omega', names(mod.out[[h]]$obj$env$last.par.best))
+          omega.idx <- omega.idx[init.dat[[h]]$mesh_i+1]
+          omega <- p.list$omega[omega.idx]
+          mu <- rep(0,length(omega.idx))
+          Q <- tmp$Q * exp(2 * p.list$ln_tau)
+          Sigma <- solve(as.matrix(GMRFmarginal(Q, omega.idx)))
+          L <- t(chol(Sigma))
+          r1 <- as.vector(solve(L, omega))
+          osa.out[[h]]$re_fg <- r1
+          #if(h==1) osa.methods <- c(osa.methods, 're_obs_mcmc')
+        }
+      } else {
+        osa.out[[h]]$re_fg <- NA
+      }
+      
     
       AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC) #!doesn't work if doTrue == TRUE
       AICc <- ifelse(do.true, NA, mod.out[[h]]$aic$AICc) #!doesn't work if doTrue == TRUE
@@ -582,14 +645,15 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
   resids <- rbind(r[[1]], r[[2]])
   stats <- rbind(out[[1]], out[[2]])
   pvals$replicate <- ii
-  pvals$misp <- misp
+  pvals$misp <- misp.name
+  stats$misp <- misp.name
+  resids$misp <- misp.name
   ## Tack this on for plotting later
   resids$do.true <- do.true
   pvals$do.true <- do.true
   stats$do.true <- do.true
   mles <- do.call(rbind, mles)
   if(savefiles){
-    if(do.true) mod <- paste0(mod, "_true")
     dir.create(paste0(res.name, '_pvals'), showWarnings=FALSE)
     dir.create(paste0(res.name, '_resids'), showWarnings=FALSE)
     saveRDS(pvals, file=paste0(res.name, '_pvals/pvals_', ii, '.RDS'))
@@ -663,8 +727,12 @@ mkTMBdat <- function(Dat, Pars, Mod, Misp){
     dat1 <- list(y = Dat$y1, X = Dat$x)
   }
   if(Mod == 'randomwalk'){
-    dat0 <- list(y = Dat$y0, sim_re = 0)
-    dat1 <- list(y = Dat$y1, sim_re = 0)
+    dat0 <- list(y = Dat$y0, mod = 0, sim_re = 0)
+    dat1 <- list(y = Dat$y1, mod = 0, sim_re = 0)
+    if(Misp == "normal"){
+      dat0$mod = 1
+      dat1$y = log(dat1$y)
+    }
   }
   if(Mod == 'simpleGLMM'){
     ng <- length(Dat$random$u)
@@ -805,6 +873,7 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
     if(Misp == 'dropRE'){
       par1$ln_tau = 0
       par1$ln_kappa = 0
+      par1$omega = rep(0, length(par0$omega))
     }
     if(Misp == "aniso"){
       par1$omega = rep(0, Dat$mesh.aniso$n)
