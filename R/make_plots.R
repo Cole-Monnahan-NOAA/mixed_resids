@@ -20,7 +20,7 @@ check_runs[9:12,]
 check_runs[13:16,]
 
 ## Check for MLE consistency.
-nc_id <- stats[stats$converge==1|stats$maxgrad>0.1,]$id
+nc_id <- stats[!is.na(stats$converge) & (stats$converge==1|stats$maxgrad>0.1),]$id
 #only use spatial misp = dropRE
 mles <- mles[!(mles$misp == "mispomega"),]
 mles <- mles[!(mles$model == "spatial" & mles$misp == "overdispersion"),]
@@ -185,23 +185,22 @@ source("code/make_plots.R")
 #randomwalk - DHARMa residuals
 pvals <- lapply(list.files('results', pattern='_pvals.RDS',
                            full.names=TRUE), readRDS) %>% bind_rows
-pvals <- pvals[pvals$method != "cond",]
 pvals.dharma <- pvals[pvals$model == 'randomwalk' & 
-                        pvals$misp == 'mu0' & pvals$type == "sim",]
+                        pvals$type == "sim",]
 
 pvals.osa <- pvals[pvals$model == 'randomwalk' & 
-                     pvals$misp == 'mu0' & pvals$type == "osa",]
+                     pvals$type == "osa",]
 
 filter(pvals.dharma, test=='GOF.ks' & version == "h0") %>%
   ggplot(aes(pvalue, fill=do.true, color=do.true)) +
-  facet_grid(~method, scales = "free_y") + 
+  facet_grid(misp~method, scales = "free_y") + 
   geom_histogram(position='identity', alpha=.5) +
   scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
   scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
   theme(axis.text=element_text(size=6))
 filter(pvals.dharma, test=='GOF.ks' & version == "h1" & do.true==FALSE) %>%
   ggplot(aes(pvalue, fill=do.true, color=do.true)) +
-  facet_grid(~method, scales = "free_y") + 
+  facet_grid(misp~method, scales = "free_y") + 
   geom_histogram(position='identity', alpha=.5) +
   scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
   scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
