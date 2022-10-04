@@ -182,6 +182,46 @@ source("code/make_plots.R")
 ## ggsave('plots/ks_vs_ad.png', g, width=7, height=5)
 
 #Single instance plots =====================================
+#linear regression
+pvals <- lapply(list.files('results', pattern='_pvals.RDS',
+                           full.names=TRUE), readRDS) %>% bind_rows
+pvals <- pvals[pvals$do.true == TRUE,]
+pvals.dharma <- pvals[pvals$model == 'linmod' & 
+                        pvals$type == "sim",]
+
+pvals.osa <- pvals[pvals$model == 'linmod' & 
+                     pvals$type == "osa",]
+filter(pvals.dharma, test=='GOF.ks' & version == "h0") %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+filter(pvals.dharma, test=='GOF.ks' & version == "h1" & do.true==FALSE) %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+
+#linear model - OSA residuals
+filter(pvals.osa, test=='GOF.ks' & version == "h0") %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+filter(pvals.osa, test=='GOF.ks' & version == "h1" & do.true==FALSE) %>%
+  ggplot(aes(pvalue, fill=do.true, color=do.true)) +
+  facet_grid(~method, scales = "free_y") + 
+  geom_histogram(position='identity', alpha=.5) +
+  scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
+  scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
+  theme(axis.text=element_text(size=6))
+
 #randomwalk - DHARMa residuals
 pvals <- lapply(list.files('results', pattern='_pvals.RDS',
                            full.names=TRUE), readRDS) %>% bind_rows
