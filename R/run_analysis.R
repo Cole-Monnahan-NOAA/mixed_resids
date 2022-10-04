@@ -5,7 +5,7 @@
 
 ### Startup
 source("R/startup.R")
-packageVersion('TMB')                   # 1.7.18
+packageVersion('TMB')                   # 1.9.1
 packageVersion('VAST')                  # 3.6.0
 packageVersion('FishStatsUtils')        # 2.9.0
 packageVersion('DHARMa')                # 0.3.3.0
@@ -49,7 +49,6 @@ dharma.methods <- c('uncond', 'cond', 're_uncond',
                     'uncond_nrot', 'cond_nrot',  're_uncond_nrot' )
 #LMM example
 run_model(reps, mod='randomwalk', misp='mu0', do.true = do.true)
-run_model(reps, mod='randomwalk', misp='normal', do.true = do.true)
 
 ## simpleGLMM with 5 groups===================================================
 
@@ -66,7 +65,7 @@ run_model(reps, ng = 5, mod='simpleGLMM', misp='missunifcov', do.true = do.true)
 # GLMM example
 osa.methods <- c('mcmc', 're_mcmc', 'pears')
 dharma.methods <- c('uncond_nrot', 'cond_nrot',  're_uncond_nrot' )
-run_model(reps, ng = 5, mod='simpleGLMM', misp='deltagamma', 
+run_model(reps, ng = 5, mod='simpleGLMM', misp='dropRE', 
           family = "Tweedie", link = "log", do.true = do.true)
 
 ## Simple spatial SPDE model ==================================================
@@ -74,13 +73,39 @@ run_model(reps, ng = 5, mod='simpleGLMM', misp='deltagamma',
 ## possible mispecifications: overdispersion, misscov, mispomega, dropRE, aniso - outliers not set up correctly when distribution not normal
 
 # LMM example
-osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 're_mcmc', 'pears')
+osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 're_mcmc', 're_fg', 'pears')
 dharma.methods <- c('uncond', 'cond', 're_uncond', 
                     'uncond_nrot', 'cond_nrot',  're_uncond_nrot' )
 run_model(reps, n=200, mod='spatial', misp='mispomega', do.true = do.true)
+#h1 mispomega models occasionally fail b/c the exp(omega) leads to convergence issues. 
+#Repeat failed model runs with new seed for h0 and h1:
+pvals <- lapply(list.files('results', pattern='_pvals.RDS',
+                           full.names=TRUE), readRDS) %>% bind_rows
+pvals <- dplyr::filter(pvals, model == "spatial" & misp == "mispomega" & 
+                         do.true == FALSE & version == "h1")
+#bad reps 
+idx <- which(!(1:500 %in% unique(pvals$replicate) ))
+#delete from spatial_mispomega_true...
+metric.nms <- c("stats", "resids", "pvals", "mles") 
+for(i in seq_along(metric.nms)){
+  unlink(paste0("results/spatial_true_mispomega_", 
+                metric.nms[i], 
+                "/", 
+                metric.nms[i],
+                "_", 
+                idx, 
+                ".RDS"))
+}
+#Generate new seeds
+reps <- 1000:(999+length(idx)); rm(pvals, idx, i, metric.nms)
+#Rerun new reps for do.true = TRUE and do.true = FALSE
+run_model(reps, n=200, mod='spatial', misp='mispomega', do.true = TRUE)
+run_model(reps, n=200, mod='spatial', misp='mispomega', do.true = FALSE)
+
+
 run_model(reps, n=200, mod='spatial', misp='misscov', cov.mod = 'unif', do.true = do.true)
 
-# GLMM example
+ # GLMM example
 osa.methods <- c('gen', 'cdf', 'mcmc', 're_mcmc', 're_fg', 'pears') #only 'cdf' and 'gen' suitable for discrete distributions
 run_model(reps, n=200, mod='spatial', misp='dropRE', 
           family = "Poisson", link = "log", do.true = do.true)

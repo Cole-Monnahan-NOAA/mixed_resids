@@ -19,7 +19,7 @@ setup_trueparms <- function(mod, misp, fam, link){
   if(mod=='randomwalk'){
     if(misp == "normal"){
       theta = 0.05
-      sd.vec = c(0.5, 0.05)
+      sd.vec = c(0.5, 0.5)
     } else {
       theta <- 2
       sd.vec <- c(1,1)
@@ -30,8 +30,7 @@ setup_trueparms <- function(mod, misp, fam, link){
     if(misp == 'mu0'){
       true.comp[[2]] <- list(ln_sig = log(sd.vec[1]),
                              ln_tau = log(sd.vec[2]))
-    }
-    if(misp == 'outliers'){
+    } else {
       true.comp[[2]] <- true.comp[[1]]
     }
   }
@@ -51,8 +50,9 @@ setup_trueparms <- function(mod, misp, fam, link){
     sp.parm <- 0
     if(misp=='misscov'){
        #parms when fam = 'Gaussian';link='identity
-       #theta <- c(4,-5)
-       theta <- c(4,-.4)
+       theta <- c(4,-5)
+      #parms when link function on logscale
+      # theta <- c(4,-.4)
        true.comp[[1]] <- list(beta_1 = theta[1], beta_2 = theta[2],
                               ln_sig_y = log(sd.vec[1]),
                               ln_sig_u = log(sd.vec[2]))
@@ -91,14 +91,26 @@ setup_trueparms <- function(mod, misp, fam, link){
         true.comp[[2]] <- list(beta = theta,
                                ln_sig_y = log(sd.y/theta), #cv
                                ln_sig_u = log(sd.vec[2]))
+        #lambda definition based on Compound Poisson-Gamma relationship to Tweedie
+        #Prob(Y==0) = exp(-lambda) based on Poisson 
+        lambda <- (exp(theta)^(2 - pow))/((2-pow)*sd.vec[1])
+        pz <- exp(-lambda)
+        #logit transform of the probability of zero
+        
+        true.comp[[1]]$ln_sig_y[2] <- log((pow-1)/(2-pow))
+        true.comp[[2]]$ln_sig_y[2] <- log(pz/(1-pz))
+      }
+      if(misp == 'dropRE'){
+        true.comp[[1]] <- list(beta = theta,
+                               ln_sig_y = c(log(sd.vec[1]),
+                                            log((pow-1)/(2-pow))),
+                               ln_sig_u = log(sd.vec[2]))
+        true.comp[[2]] <- list(beta = theta,
+                               ln_sig_y = c(log(sd.vec[1]),
+                                            log((pow-1)/(2-pow))))
       }
       true.comp[[1]]$ln_sig_y[2] <- log((pow-1)/(2-pow))
-      #lambda definition based on Compound Poisson-Gamma relationship to Tweedie
-      #Prob(Y==0) = exp(-lambda) based on Poisson 
-      lambda <- (exp(theta)^(2 - pow))/((2-pow)*sd.vec[1])
-      pz <- exp(-lambda)
-      #logit transform of the probability of zero
-      true.comp[[2]]$ln_sig_y[2] <- log(pz/(1-pz))
+      
     }
   }
   if(mod=='spatial'){
@@ -301,8 +313,16 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
         dharma.out[[h]]$cond_nrot$runtime <- NA
       }
       
-      if('uncond_nrot' %in% dharma.methods){
+      if('uncond_nrot' %in% dharma.methods | 
+         'uncond' %in% dharma.methods |
+         're_uncond' %in% dharma.methods |
+         're_uncond_nrot' %in% dharma.methods){
         mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
+        #retape, do not reset parameters to initial values
+        mod.out[[h]]$obj$retape(set.defaults = FALSE) 
+      }
+      
+      if('uncond_nrot' %in% dharma.methods){
         dharma.out[[h]]$uncond_nrot <- 
           calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], 
                            idx = 1:n, fpr=mod.out[[h]]$report$fpr, 
@@ -314,7 +334,6 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
       }
 
       if('uncond' %in% dharma.methods){
-        mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
         dharma.out[[h]]$uncond <- 
           calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], 
                            idx = 1:n, fpr=mod.out[[h]]$report$fpr, 
@@ -326,7 +345,6 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
       }
       
       if('re_uncond' %in% dharma.methods & mod != 'linmod' & Random ){
-        mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
         if(mod == 'spatial'){
           expr <- expression(obj$simulate()$omega)  
           idx <- init.dat[[h]]$mesh_i+1
@@ -357,7 +375,6 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
       }
       
       if('re_uncond_nrot' %in% dharma.methods & mod != 'linmod' & Random ){
-        mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
         if(mod == 'spatial'){
           expr <- expression(obj$simulate()$omega)  
           idx <- init.dat[[h]]$mesh_i+1
@@ -457,14 +474,17 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
                 }
               }
               if(misp == "dropRE"){
-                y <- init.dat[[h]]$y
-                mu <- tmp$exp_val
-                Fx <- ptweedie(q = y, mu = mu, 
-                               phi = phi, power = p)
-                zero.idx <- which(y == 0)
-                #as implemented in statmod::qres.tweedie
-                Fx[zero.idx] <- runif(length(zero.idx), 0, Fx[zero.idx])
-                res <- qnorm(Fx)
+                for(j in 1:ng){
+                  idx <- which(grp.idx == j)
+                  y <- init.dat[[h]]$y[idx]
+                  mu <- tmp$exp_val[idx]
+                  Fx <- ptweedie(q = y, mu = mu, 
+                                 phi = phi, power = p)
+                  zero.idx <- which(y == 0)
+                  #as implemented in statmod::qres.tweedie
+                  Fx[zero.idx] <- runif(length(zero.idx), 0, Fx[zero.idx])
+                  res <- c(res, qnorm(Fx))
+                }
               }
               osa.out[[h]]$mcmc <- res
             }
@@ -731,7 +751,6 @@ mkTMBdat <- function(Dat, Pars, Mod, Misp){
     dat1 <- list(y = Dat$y1, mod = 0, sim_re = 0)
     if(Misp == "normal"){
       dat0$mod = 1
-      dat1$y = log(dat1$y)
     }
   }
   if(Mod == 'simpleGLMM'){
@@ -836,6 +855,9 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
       par1$beta <- par1$beta[1]
       if(!doTrue) par0$beta <- c(0,0)
     }
+    if(Misp == 'dropRE'){
+      par1$ln_sig_u <- numeric(0)
+    }
   }
 
   if(Mod == 'spatial'){
@@ -907,9 +929,9 @@ mkTMBrandom <- function(Mod, Misp, doTrue){
     } else {
       Random.h0 <- 'omega'
     }
-    if(Misp == 'dropRE'){
-      Random.h1 <- c()
-    }
+  }
+  if(Misp == 'dropRE'){
+    Random.h1 <- c()
   }
   out <- list(h0 = Random.h0, h1 = Random.h1)
   return(out)
@@ -937,10 +959,13 @@ mkTMBmap <- function(Pars, Mod, Misp, Fam, doTrue){
       map.h0$theta <- factor(NA)
       map.h1$theta <- factor(NA)
     }
-    if(Misp == 'dropRE'){
+    if(Misp == 'dropRE' & Mod == 'spatial'){
       map.h1$ln_kappa = factor(NA)
       map.h1$ln_tau = factor(NA)
       map.h1$omega <- rep(factor(NA), length(Pars$h1$omega))
+    }
+    if(Misp == 'dropRE' & Mod == 'simpleGLMM'){
+      map.h1$u <- rep(factor(NA), length(Pars$h1$u))
     }
   }
   out <- list(h0 = map.h0, h1 = map.h1)

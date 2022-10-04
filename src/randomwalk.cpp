@@ -32,14 +32,16 @@ Type objective_function<Type>::operator()()
   Type tau=exp(ln_tau);		// process sd
   // Initial condition
   Type nll = -dnorm(u(0), Type(0), Type(1000), true);
-
+  if(sim_re == 1){
+    SIMULATE{
+      u(0) = rnorm(Type(0), tau); 
+    }
+  }
   // Increments
   vector<Type> ypred(u.size());
   ypred.setZero();
   ypred(0) = u(0);
-  SIMULATE{
-    u(0) = rnorm(u(0), tau); 
-  }
+
   for (int i = 1; i < u.size(); ++i){
     ypred(i) = u(i - 1) + mu;
     nll -= dnorm(u(i), ypred(i), tau, true);

@@ -51,14 +51,13 @@ Type objective_function<Type>::operator()()
   DATA_INTEGER( link );
   PARAMETER_VECTOR(beta); //intercept
   PARAMETER_VECTOR(ln_sig_y); 
-  PARAMETER(ln_sig_u); //natural log of between subject sd 
+  PARAMETER_VECTOR(ln_sig_u); //natural log of between subject sd 
   PARAMETER_VECTOR(ln_sig_v); //natural log of overdispersion sd 
   PARAMETER_VECTOR(u); //group-level random effects
   PARAMETER_VECTOR(v); //observation-level random effects
 
   DATA_VECTOR_INDICATOR(keep,y);
 
-  Type sig_u = exp(ln_sig_u);
   Type sig_y;
   Type power = 0;
   Type pz = 0;
@@ -72,18 +71,24 @@ Type objective_function<Type>::operator()()
     }
   } 
   Type nll = 0;
+  //only fit random effect if ln_sig_u isn't null
+  bool u_flag = (ln_sig_u.size()>0);
   //only fit overdispersion if ln_sig_v isn't null
   bool v_flag = (ln_sig_v.size()>0);
   Type sig_v= 0;
+  Type sig_u = 0;
 
   Type cdf;
 
   // Probability of group-level random effects
-  for(int j=0; j<u.size(); j++){
-    nll -= dnorm(u(j), Type(0), sig_u, true);
-    if(sim_re == 1){
-      SIMULATE{
-	      u(j) = rnorm(Type(0), sig_u);
+  if(u_flag){
+    sig_u = exp(ln_sig_u(0));
+    for(int j=0; j<u.size(); j++){
+      nll -= dnorm(u(j), Type(0), sig_u, true);
+      if(sim_re == 1){
+        SIMULATE{
+	        u(j) = rnorm(Type(0), sig_u);
+        }
       }
     }
   }
