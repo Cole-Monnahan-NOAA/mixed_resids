@@ -128,7 +128,7 @@ dharma.methods <- c('uncond', 'cond',
 ## from the residual standpoint I think it's ngroups*nobs that
 ## matters
 runtimes <- mles <- pvals <- list(); k <- 1
-(ngroupsvec <- 2^c(4:11))
+(ngroupsvec <- 2^c(4:10))
 for(ngroups in ngroupsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
@@ -146,7 +146,7 @@ for(ngroups in ngroupsvec){
   sfStop()
 }
 
-(nobsvec <- 2^c(4:11))
+(nobsvec <- 2^c(4:10))
 for(nobs in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
@@ -167,7 +167,7 @@ for(nobs in nobsvec){
 
 ### Spatial
 runtimes <- mles <- pvals <- list(); k <- 1
-(nobsvec <- 2^c(6:10))
+(nobsvec <- 2^c(4:10))
 for(nobs in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
@@ -191,11 +191,11 @@ for(nobs in nobsvec){
 ## Combine together to make runtime plots
 results.simpleGLMM <- readRDS('results/simpleGLMM_sample_sizes.RDS')
 results.linmod <- readRDS('results/linmod_overdispersion_sample_sizes.RDS')
-results.randomwalk <- readRDS('results/randomwalk_sample_sizes.RDS')
+results.randomwalk <- readRDS('results/randomwalk_mu0_sample_sizes.RDS')
 results.spatial <- readRDS('results/spatial_sample_sizes.RDS')
 runtimes.all <- rbind(results.simpleGLMM$runtimes,
                      ## results.linmod$runtimes,
-                      results.randomwalk$runtimes,
+                      results.randomwalk_mu0$runtimes,
                       results.spatial$runtimes)
 ## runtimes.all <- rbind(results.linmod, results.randomwalk,
 ##                       results.spatial, results.simpleGLMM)
@@ -212,16 +212,45 @@ g
 
 ggsave('plots/runtimes.png', g, width=5, height=7)
 
-#Type I error
+# Type I error
 results.linmod$pvals %>% 
   filter(version == "h0") %>% 
   group_by(nobs, method) %>% 
-  summarise(t1_err = sum(pvalue<0.05)/5) %>%
-  ggplot(aes(x = nobs, y = t1_err, color = method)) + geom_point()
+  summarise(t1_err = sum(pvalue<0.05)/50) %>%
+  ggplot(aes(x = nobs, y = t1_err, color = method)) + 
+  geom_point() +
+  facet_wrap(~method) +
+  theme_classic()
+
+# Power
 pow <- results.linmod$pvals %>% 
   filter(version == "h1") %>% 
   group_by(nobs, method) %>% 
-  summarise(power = sum(pvalue<=0.05)/5)
+  summarise(power = sum(pvalue<=0.05)/50)
 pow %>%
-  ggplot(aes(x = nobs, y = power, color = method)) + geom_point()
-results.linmod$pvals %>% ggplot(aes(x=nobs, y = pvalue)) + geom_point() + facet_grid(version~method)
+  ggplot(aes(x = nobs, y = power, color = method)) + 
+  geom_line()  +
+  facet_wrap(~method) +
+  theme_classic()
+
+## randomwalk
+# Type I error
+results.randomwalk$pvals %>% 
+  filter(version == "h0") %>% 
+  group_by(nobs, method) %>% 
+  summarise(t1_err = sum(pvalue<0.05)/50) %>%
+  ggplot(aes(x = nobs, y = t1_err, color = method)) + 
+  geom_line() +
+  facet_wrap(~method) +
+  theme_classic()
+
+# Power
+pow <- results.randomwalk$pvals %>% 
+  filter(version == "h1") %>% 
+  group_by(nobs, method) %>% 
+  summarise(power = sum(pvalue<=0.05)/50)
+pow %>%
+  ggplot(aes(x = nobs, y = power, color = method)) + 
+  geom_line()  +
+  facet_wrap(~method) +
+  theme_classic()

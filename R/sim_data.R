@@ -43,7 +43,7 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
   if(mod == 'simpleGLMM') N <- n*ng
   if(misp == 'misscov' | mod == 'linmod'){
     if(cov.mod == 'norm') X <- cbind(rep(1,n), rnorm(n))
-    if(cov.mod == 'unif') X <- cbind(rep(1,n), runif(n, 5,10))
+    if(cov.mod == 'unif') X <- cbind(rep(1,n), runif(n, -.5,.5))
   } else {
     X <- matrix(1, n, 1)
   }

@@ -50,7 +50,8 @@ setup_trueparms <- function(mod, misp, fam, link){
     sp.parm <- 0
     if(misp=='misscov'){
        #parms when fam = 'Gaussian';link='identity
-       theta <- c(4,-5)
+       theta <- c(4,-8)
+       sd.vec[1] <- 0.5
       #parms when link function on logscale
       # theta <- c(4,-.4)
        true.comp[[1]] <- list(beta_1 = theta[1], beta_2 = theta[2],
