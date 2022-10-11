@@ -261,6 +261,22 @@ filter(pvals.osa, test=='GOF.ks' & version == "h1" & do.true==FALSE) %>%
   scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
   theme(axis.text=element_text(size=6))
 
+#calculate power
+filter(pvals.osa, test=='GOF.ks' & version == "h1" & 
+         do.true==FALSE & misp == "missunifcov" )  %>% 
+  pivot_wider(., id_cols = !type, names_from = "method", 
+              values_from = "pvalue") %>% 
+  dplyr::select(unique(pvals.osa$method)) %>% 
+  apply(., 2, function(x) sum(x < 0.05, na.rm = TRUE))/
+  apply(., 2, function(x) sum(x, na.rm = TRUE))
+
+filter(pvals.osa, test=='GOF.ks' & version == "h1" & 
+         do.true==FALSE & misp == "missnormcov" )  %>% 
+  pivot_wider(., id_cols = !type, names_from = "method", 
+              values_from = "pvalue") %>% 
+  dplyr::select(unique(pvals.osa$method)) %>% 
+  apply(., 2, function(x) sum(x < 0.05, na.rm = TRUE))/
+  apply(., 2, function(x) sum(x, na.rm = TRUE))
 
 #spatial - DHARMa residuals
 pvals <- lapply(list.files('results', pattern='_pvals.RDS',
