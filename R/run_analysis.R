@@ -76,7 +76,7 @@ run_model(reps, ng = 5, mod='simpleGLMM', misp='dropRE',
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 're_mcmc', 're_fg', 'pears')
 dharma.methods <- c('uncond', 'cond', 're_uncond', 
                     'uncond_nrot', 'cond_nrot',  're_uncond_nrot' )
-run_model(reps, n=200, mod='spatial', misp='mispomega', do.true = do.true)
+run_model(reps, n=100, mod='spatial', misp='mispomega', do.true = do.true)
 #h1 mispomega models occasionally fail b/c the exp(omega) leads to convergence issues. 
 #Repeat failed model runs with new seed for h0 and h1:
 pvals <- lapply(list.files('results', pattern='_pvals.RDS',
