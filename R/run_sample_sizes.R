@@ -147,7 +147,7 @@ for(nxng in ngroupsvec){
   sfStop()
 }
 
-(nobsvec <- 2^c(4:10))
+(nobsvec <- 2^c(4:11))
 ngroups <- 4
 for(nxng in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
@@ -191,7 +191,9 @@ for(nobs in nobsvec){
 
 
 ## Combine together to make runtime plots
-results.simpleGLMM <- readRDS('results/simpleGLMM_missunifcov_obs_sample_sizes.RDS')
+results.simpleGLMM.obs <- readRDS('results/simpleGLMM_missunifcov_obs_sample_sizes.RDS')
+results.simpleGLMM.grps <- readRDS('results/simpleGLMM_missunifcov_grps_sample_sizes.RDS')
+
 results.linmod <- readRDS('results/linmod_overdispersion_sample_sizes.RDS')
 results.randomwalk <- readRDS('results/randomwalk_mu0_sample_sizes.RDS')
 results.spatial <- readRDS('results/spatial_sample_sizes.RDS')
@@ -256,6 +258,45 @@ pow <- results.randomwalk$pvals %>%
   filter(version == "h1") %>% 
   group_by(nobs, method) %>% 
   summarise(power = sum(pvalue<=0.05)/50)
+pow %>%
+  ggplot(aes(x = nobs, y = power, color = method)) + 
+  geom_line()  +
+  facet_wrap(~method) +
+  theme_classic()
+
+## simpleGLMM
+# Type I error
+results.simpleGLMM.obs$pvals %>% 
+  filter(version == "h0") %>% 
+  group_by(nobs, method) %>% 
+  summarise(t1_err = sum(pvalue<0.05)/sum(pvalue>=0)) %>%
+  ggplot(aes(x = nobs, y = t1_err, color = method)) + 
+  geom_line() +
+  facet_wrap(~method) +
+  theme_classic()
+results.simpleGLMM.grps$pvals %>% 
+  filter(version == "h0") %>% 
+  group_by(nobs, method) %>% 
+  summarise(t1_err = sum(pvalue<0.05)/sum(pvalue>=0)) %>%
+  ggplot(aes(x = nobs, y = t1_err, color = method)) + 
+  geom_line() +
+  facet_wrap(~method) +
+  theme_classic()
+
+# Power
+pow <- results.simpleGLMM_obs$pvals %>% 
+  filter(version == "h1") %>% 
+  group_by(nobs, method, misp) %>% 
+  summarise(power = sum(pvalue<=0.05)/sum(pvalue >=0))
+pow %>%
+  ggplot(aes(x = nobs, y = power, color = method)) + 
+  geom_line()  +
+  facet_wrap(~method) +
+  theme_classic()
+pow <- results.simpleGLMM.grps$pvals %>% 
+  filter(version == "h1") %>% 
+  group_by(nobs, method, misp) %>% 
+  summarise(power = sum(pvalue<=0.05)/sum(pvalue >=0))
 pow %>%
   ggplot(aes(x = nobs, y = power, color = method)) + 
   geom_line()  +
