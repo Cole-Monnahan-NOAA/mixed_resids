@@ -128,17 +128,18 @@ dharma.methods <- c('uncond', 'cond',
 ## from the residual standpoint I think it's ngroups*nobs that
 ## matters
 runtimes <- mles <- pvals <- list(); k <- 1
-(ngroupsvec <- 2^c(4:10))
-for(ngroups in ngroupsvec){
+(ngroupsvec <- 2^c(4:11))
+nobs <- 8
+for(nxng in ngroupsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
   tmp <- sfLapply(1:Nreps, function(ii)
-    run_iter(ii, n=10, ng=ngroups, mod='simpleGLMM', cov.mod='norm',
+    run_iter(ii, n=nobs, ng=nxng/nobs, mod='simpleGLMM', cov.mod='norm',
              misp='missunifcov', family = "Gaussian", link = "identity",
              do.true=do.true, savefiles=FALSE))
-  pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nobs))
-  mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nobs))
-  runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'stats', nobs))
+  pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nxng))
+  mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nxng))
+  runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'stats', nxng))
   k <- k+1
   results.simpleGLMM <- process_results(mles, runtimes, pvals, 
                                         model='simpleGLMM', misp='missunifcov',
@@ -147,16 +148,17 @@ for(ngroups in ngroupsvec){
 }
 
 (nobsvec <- 2^c(4:10))
-for(nobs in nobsvec){
+ngroups <- 4
+for(nxng in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
   tmp <- sfLapply(1:Nreps, function(ii)
-    run_iter(ii, n=nobs, ng=5, mod='simpleGLMM', cov.mod='norm',
+    run_iter(ii, n=nxng/ngroups, ng=ngroups, mod='simpleGLMM', cov.mod='norm',
              misp='missunifcov', family = "Gaussian", link = "identity",
              do.true=do.true, savefiles=FALSE))
-  pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nobs))
-  mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nobs))
-  runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'stats', nobs))
+  pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nxng))
+  mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nxng))
+  runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'stats', nxng))
   k <- k+1
   results.simpleGLMM <- process_results(mles, runtimes, pvals, 
                                         model='simpleGLMM', misp='missunifcov',
@@ -189,24 +191,29 @@ for(nobs in nobsvec){
 
 
 ## Combine together to make runtime plots
-results.simpleGLMM <- readRDS('results/simpleGLMM_sample_sizes.RDS')
+results.simpleGLMM <- readRDS('results/simpleGLMM_missunifcov_obs_sample_sizes.RDS')
 results.linmod <- readRDS('results/linmod_overdispersion_sample_sizes.RDS')
 results.randomwalk <- readRDS('results/randomwalk_mu0_sample_sizes.RDS')
 results.spatial <- readRDS('results/spatial_sample_sizes.RDS')
 runtimes.all <- rbind(results.simpleGLMM$runtimes,
                      ## results.linmod$runtimes,
-                      results.randomwalk_mu0$runtimes,
+                      results.randomwalk$runtimes,
+                      results.simpleGLMM$runtimes,
                       results.spatial$runtimes)
 ## runtimes.all <- rbind(results.linmod, results.randomwalk,
 ##                       results.spatial, results.simpleGLMM)
 runtimes.all <- runtimes.all %>% filter(!is.na(med))
 
-g <- ggplot(runtimes.all,
-            aes(nobs, med, ymin=lwr, ymax=upr,  color=type)) +
+g <- runtimes.all %>% 
+  dplyr::filter(type == "cdf" | type == "cond" | type == "gen" |
+                  type == "osg") %>%
+  ggplot(.,aes(nobs, med, ymin=lwr, ymax=upr,  color=type)) +
   geom_line()+
   geom_pointrange(fatten=2) + scale_y_log10()+ scale_x_log10()+
   facet_wrap('model', scales='free', ncol=1)+
-  labs(y='runtime (s)')
+  labs(y='runtime (s)') +
+  theme_classic() +
+  scale_colour_viridis_d()
 g
 
 
