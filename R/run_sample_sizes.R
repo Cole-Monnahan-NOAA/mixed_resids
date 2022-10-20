@@ -147,7 +147,7 @@ for(nxng in ngroupsvec){
   sfStop()
 }
 
-(nobsvec <- 2^c(4:11))
+(nobsvec <- 2^c(4:9))
 ngroups <- 4
 for(nxng in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
@@ -168,13 +168,16 @@ for(nxng in nobsvec){
 ##plot_sample_sizes(results.simpleGLMM)
 
 ### Spatial
+osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc')
+dharma.methods <- c('uncond', 'cond', 
+                    'uncond_nrot', 'cond_nrot' )
 runtimes <- mles <- pvals <- list(); k <- 1
-(nobsvec <- 2^c(4:10))
+(nobsvec <- 2^c(4:11))
 for(nobs in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
   tmp <- sfLapply(1:Nreps, function(ii)
-    run_iter(ii, n=nobs, ng, mod='spatial', cov.mod='norm',
+    run_iter(ii, n=nobs, ng = 0, mod='spatial', cov.mod='norm',
              misp='mispomega', family = "Gaussian", link = "identity",
              do.true=do.true, savefiles=FALSE))
   pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nobs))
@@ -183,6 +186,7 @@ for(nobs in nobsvec){
   k <- k+1
   results.spatial <- process_results(mles, runtimes, pvals, 
                                      model='spatial',  misp='mispomega')
+  sfStop()
 }
 #plot_sample_sizes(results.spatial)
 
