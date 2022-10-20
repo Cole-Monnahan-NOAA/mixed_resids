@@ -123,7 +123,7 @@ setup_trueparms <- function(mod, misp, fam, link){
 
     if(fam == 'Gaussian'){
       theta <- 1
-      sd.vec <- c(0.5, 2)
+      sd.vec <- c(0.5, 1)
     }
 
     true.comp[[1]] <- true.comp[[2]] <-
