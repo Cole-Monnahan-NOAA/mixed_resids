@@ -147,7 +147,7 @@ for(nxng in ngroupsvec){
   sfStop()
 }
 
-(nobsvec <- 2^c(4:9))
+(nobsvec <- 2^c(4:11))
 ngroups <- 4
 for(nxng in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
@@ -172,7 +172,7 @@ osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc')
 dharma.methods <- c('uncond', 'cond', 
                     'uncond_nrot', 'cond_nrot' )
 runtimes <- mles <- pvals <- list(); k <- 1
-(nobsvec <- 2^c(4:11))
+(nobsvec <- 2^c(5:9))
 for(nobs in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
