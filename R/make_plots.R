@@ -265,6 +265,7 @@ filter(pvals.osa, test=='GOF.ks' & version == "h1" & do.true==FALSE) %>%
 #simpleGLMM - DHARMa residuals
 pvals <- lapply(list.files('results', pattern='_pvals.RDS',
                            full.names=TRUE), readRDS) %>% bind_rows
+pvals <- pvals[pvals$model == 'simpleGLMM',]
 pvals.dharma <- pvals[pvals$model == 'simpleGLMM' & 
                         pvals$type == "sim",]
 pvals.osa <- pvals[pvals$model == 'simpleGLMM' & 
@@ -302,21 +303,38 @@ filter(pvals.osa, test=='GOF.ks' & version == "h1" & do.true==FALSE) %>%
   theme(axis.text=element_text(size=6))
 
 #calculate power
-filter(pvals.osa, test=='GOF.ks' & version == "h1" & 
+power.df <- filter(pvals, test=='GOF.ks' & version == "h1" & 
          do.true==FALSE & misp == "missunifcov" )  %>% 
   pivot_wider(., id_cols = !type, names_from = "method", 
               values_from = "pvalue") %>% 
-  dplyr::select(unique(pvals.osa$method)) %>% 
-  apply(., 2, function(x) sum(x < 0.05, na.rm = TRUE))/
-  apply(., 2, function(x) sum(x, na.rm = TRUE))
+  dplyr::select(unique(pvals$method))
+apply(power.df, 2, function(x) sum(x < 0.05, na.rm = TRUE))/
+apply(power.df, 2, function(x) sum(x > 0, na.rm = TRUE))
 
-filter(pvals.osa, test=='GOF.ks' & version == "h1" & 
+power.df <- filter(pvals, test=='GOF.ks' & version == "h1" & 
          do.true==FALSE & misp == "missnormcov" )  %>% 
   pivot_wider(., id_cols = !type, names_from = "method", 
               values_from = "pvalue") %>% 
-  dplyr::select(unique(pvals.osa$method)) %>% 
-  apply(., 2, function(x) sum(x < 0.05, na.rm = TRUE))/
-  apply(., 2, function(x) sum(x, na.rm = TRUE))
+  dplyr::select(unique(pvals$method))
+apply(power.df, 2, function(x) sum(x < 0.05, na.rm = TRUE))/
+apply(power.df, 2, function(x) sum(x > 0, na.rm = TRUE))
+
+#calculate Type I error
+tIerr.df <- filter(pvals, test=='GOF.ks' & version == "h0" & 
+                     do.true==FALSE & misp == "missunifcov" )  %>% 
+  pivot_wider(., id_cols = !type, names_from = "method", 
+              values_from = "pvalue") %>% 
+  dplyr::select(unique(pvals$method))
+apply(tIerr.df, 2, function(x) sum(x < 0.05, na.rm = TRUE))/
+apply(tIerr.df, 2, function(x) sum(x > 0, na.rm = TRUE))
+
+tIerr.df <- filter(pvals, test=='GOF.ks' & version == "h0" & 
+                     do.true==FALSE & misp == "missnormcov" )  %>% 
+  pivot_wider(., id_cols = !type, names_from = "method", 
+              values_from = "pvalue") %>% 
+  dplyr::select(unique(pvals$method))
+apply(tIerr.df, 2, function(x) sum(x < 0.05, na.rm = TRUE))/
+apply(tIerr.df, 2, function(x) sum(x > 0, na.rm = TRUE))
 
 #spatial - DHARMa residuals
 pvals <- lapply(list.files('results', pattern='_pvals.RDS',
@@ -387,3 +405,93 @@ filter(pvals.osa, test=='SAC' & version == "h1" & do.true==FALSE) %>%
   scale_fill_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value') + 
   scale_color_viridis_d(labels = c('estimated','theoretical'), name = 'GOF p-value')  +
   theme(axis.text=element_text(size=6))
+
+
+#simpleGLMM and spatial power and Type I error
+name.map <- c(
+  simpleGLMM_dropRE = "GLMM Tweedie",
+  simpleGLMM_missnormcov = "Mixed Model Norm X",
+  simpleGLMM_missunifcov = "Mixed Model Unif X",
+  spatial_dropRE = "GLMM Spatial Poisson",
+  spatial_mispomega = "Mixed Model Spatial"
+)
+method.level <- c(
+  uncond_nrot = "Unconditional",
+  uncond = "Unconditional",
+  pears = "Conditional",
+  osg = "Conditional",
+  mcmc = "Unconditional",
+  gen = "Conditional",
+  fg = "Unconditional",
+  cond_nrot = "Conditional",
+  cond = "Conditional",
+  cdf = "Conditional"
+)
+method.name <- c(
+  uncond_nrot = "Not Rotated ecdf",
+  uncond = "Rotated ecdf",
+  pears = "Pearson",
+  osg = "One-step Gaussian",
+  mcmc = "MCMC",
+  gen = "One-step Generic",
+  fg = "Full Gaussian",
+  cond_nrot = "Not Rotated ecdf",
+  cond = "Rotated ecdf",
+  cdf = "One-step cdf"
+)
+#Type I error
+pvals.power <- lapply(list.files('results', pattern='_pvals.RDS',
+                                 full.names=TRUE), readRDS) %>% 
+  bind_rows %>%
+  dplyr::filter((model == "spatial" | model == "simpleGLMM") & 
+                  misp != "deltagamma" & test=='GOF.ks' & version == "h0" & 
+                  do.true==FALSE & method != "re_uncond_nrot" &
+                  method != "re_uncond" &
+                  method != "re_mcmc" &
+                  method != "re_fg") 
+pvals.power$mod <- paste0(pvals.power$model, "_", pvals.power$misp)
+pvals.power$mod.name <- unname(name.map[pvals.power$mod])
+pvals.power$method.name <- unname(method.name[pvals.power$method])
+pvals.power$method.level <- unname(method.level[pvals.power$method])
+
+pvals.power %>% group_by(mod.name, method.name, method.level) %>%
+  summarize(typeIerror = sum(pvalue <= 0.05)/sum(pvalue >= 0)) %>%
+  ggplot(., aes(x = typeIerror, y = method.name)) + geom_point() + 
+  facet_grid(method.level~mod.name, scales = "free_y") + 
+  geom_vline(xintercept = 0.05)
+
+pvals.power <- lapply(list.files('results', pattern='_pvals.RDS',
+                           full.names=TRUE), readRDS) %>% 
+  bind_rows %>%
+  dplyr::filter((model == "spatial" | model == "simpleGLMM") & 
+                  misp != "deltagamma" & test=='GOF.ks' & version == "h1" & 
+                  do.true==FALSE)
+#Power
+pvals.power <- lapply(list.files('results', pattern='_pvals.RDS',
+                                 full.names=TRUE), readRDS) %>% 
+  bind_rows %>%
+  dplyr::filter((model == "spatial" | model == "simpleGLMM") & 
+                  misp != "deltagamma" & test=='GOF.ks' & version == "h1" & 
+                  do.true==FALSE & method != "re_uncond_nrot" &
+                  method != "re_uncond" &
+                  method != "re_mcmc" &
+                  method != "re_fg") 
+pvals.power$mod <- paste0(pvals.power$model, "_", pvals.power$misp)
+pvals.power$mod.name <- unname(name.map[pvals.power$mod])
+pvals.power$method.name <- unname(method.name[pvals.power$method])
+pvals.power$method.level <- unname(method.level[pvals.power$method])
+
+pvals.power %>% group_by(mod.name, method.name, method.level) %>%
+  summarize(power = sum(pvalue <= 0.05)/sum(pvalue >= 0)) %>%
+  ggplot(., aes(x = power, y = method.name)) + geom_point() + 
+  facet_grid(method.level~mod.name, scales = "free_y") + 
+  geom_vline(xintercept = 0.95)
+
+pvals.power %>% group_by(mod.name, method.name, method.level) %>%
+  summarize(power = sum(pvalue <= 0.05)/sum(pvalue >= 0)) %>%
+  ggplot(., aes(x = mod.name, y = power, color = method.name, group = method.name)) + geom_line() + 
+  # geom_point(stat='summary', fun=sum) +
+  # stat_summary(fun=sum, geom="line") +
+  facet_wrap(~method.level, scales = "free_y") + 
+  geom_vline(xintercept = 0.95)
+
