@@ -200,11 +200,11 @@ results.simpleGLMM.grps <- readRDS('results/simpleGLMM_missunifcov_grps_sample_s
 
 results.linmod <- readRDS('results/linmod_overdispersion_sample_sizes.RDS')
 results.randomwalk <- readRDS('results/randomwalk_mu0_sample_sizes.RDS')
-results.spatial <- readRDS('results/spatial_sample_sizes.RDS')
-runtimes.all <- rbind(results.simpleGLMM$runtimes,
-                     ## results.linmod$runtimes,
+results.spatial <- readRDS('results/spatial_mispomega_sample_sizes.RDS')
+runtimes.all <- rbind(## results.linmod$runtimes,
                       results.randomwalk$runtimes,
-                      results.simpleGLMM$runtimes,
+                      results.simpleGLMM.obs$runtimes,
+                     results.simpleGLMM.grps$runtimes,
                       results.spatial$runtimes)
 ## runtimes.all <- rbind(results.linmod, results.randomwalk,
 ##                       results.spatial, results.simpleGLMM)
