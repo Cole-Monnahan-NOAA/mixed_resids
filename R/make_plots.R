@@ -440,7 +440,7 @@ method.name <- c(
   cdf = "One-step cdf"
 )
 #Type I error
-pvals.power <- lapply(list.files('results', pattern='_pvals.RDS',
+pvals.err <- lapply(list.files('results', pattern='_pvals.RDS',
                                  full.names=TRUE), readRDS) %>% 
   bind_rows %>%
   dplyr::filter((model == "spatial" | model == "simpleGLMM") & 
@@ -449,22 +449,22 @@ pvals.power <- lapply(list.files('results', pattern='_pvals.RDS',
                   method != "re_uncond" &
                   method != "re_mcmc" &
                   method != "re_fg") 
-pvals.power$mod <- paste0(pvals.power$model, "_", pvals.power$misp)
-pvals.power$mod.name <- unname(name.map[pvals.power$mod])
-pvals.power$method.name <- unname(method.name[pvals.power$method])
-pvals.power$method.level <- unname(method.level[pvals.power$method])
+pvals.err$mod <- paste0(pvals.err$model, "_", pvals.err$misp)
+pvals.err$mod.name <- unname(name.map[pvals.err$mod])
+pvals.err$method.name <- unname(method.name[pvals.err$method])
+pvals.power$method.level <- unname(method.level[pvals.err$method])
 
-pvals.power %>% group_by(mod.name, method.name, method.level) %>%
+pvals.err %>% group_by(mod.name, method.name, method.level) %>%
   summarize(typeIerror = sum(pvalue <= 0.05)/sum(pvalue >= 0)) %>%
   ggplot(., aes(x = typeIerror, y = method.name)) + geom_point() + 
   facet_grid(method.level~mod.name, scales = "free_y") + 
   geom_vline(xintercept = 0.05)
 
-pvals.power <- lapply(list.files('results', pattern='_pvals.RDS',
+pvals.err <- lapply(list.files('results', pattern='_pvals.RDS',
                            full.names=TRUE), readRDS) %>% 
   bind_rows %>%
   dplyr::filter((model == "spatial" | model == "simpleGLMM") & 
-                  misp != "deltagamma" & test=='GOF.ks' & version == "h1" & 
+                  misp != "deltagamma" & test=='GOF.ks' & version == "h0" & 
                   do.true==FALSE)
 #Power
 pvals.power <- lapply(list.files('results', pattern='_pvals.RDS',
