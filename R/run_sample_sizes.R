@@ -100,9 +100,8 @@ osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc')
 dharma.methods <- c('uncond', 'cond', 
                     'uncond_nrot', 'cond_nrot' )
 runtimes <- mles <- pvals <- list(); k <- 1
-(nobsvec <- 2^c(4:12))
+(nobsvec <- 2^c(4:11))
 for(nobs in nobsvec){
-  if(nobs>600) osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc')[-3] #don't run gen for large models
   sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
   tmp <- sfLapply(1:Nreps, function(ii)
