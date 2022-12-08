@@ -14,10 +14,40 @@ stats <- lapply(list.files('results', pattern='_stats.RDS',
                            full.names=TRUE), readRDS) %>% bind_rows
 
 ## check on if runs worked out
-check_runs <- group_by(pvals, model, misp, version, do.true) %>% summarize(count=length(unique(replicate)))
-check_runs[1:8,]
-check_runs[9:12,]
-check_runs[13:16,]
+pvals %>% dplyr::filter(., model == "linmod" & test == "GOF.ks") %>% 
+  group_by(., method, misp, version, do.true) %>% 
+  summarize(count=length(unique(replicate))) %>%
+  print(n=28)
+
+unique(pvals[pvals$model=="randomwalk",]$misp)
+pvals %>% dplyr::filter(., model == "randomwalk" & test == "GOF.ks") %>% 
+  group_by(., method, misp, version, do.true) %>% 
+  summarize(count=length(unique(replicate))) %>%
+  print(n=48) # method = fg & version = h1: 317 out of 500 sucessfully ran
+
+unique(pvals[pvals$model=="simpleGLMM",]$misp)
+pvals %>% dplyr::filter(., model == "simpleGLMM" & test == "GOF.ks" & misp == "dropRE") %>% 
+  group_by(., method, misp, version, do.true) %>% 
+  summarize(count=length(unique(replicate))) %>%
+  print(n=14)
+pvals %>% dplyr::filter(., model == "simpleGLMM" & test == "GOF.ks" & misp == "missnormcov") %>% 
+  group_by(., method, misp, version, do.true) %>% 
+  summarize(count=length(unique(replicate))) %>%
+  print(n=32)
+pvals %>% dplyr::filter(., model == "simpleGLMM" & test == "GOF.ks" & misp == "missunifcov") %>% 
+  group_by(., method, misp, version, do.true) %>% 
+  summarize(count=length(unique(replicate))) %>%
+  print(n=32)
+
+unique(pvals[pvals$model=="spatial",]$misp)
+pvals %>% dplyr::filter(., model == "spatial" & test == "GOF.ks" & misp == "dropRE") %>% 
+  group_by(., method, misp, version, do.true) %>% 
+  summarize(count=length(unique(replicate))) %>%
+  print(n=40)
+pvals %>% dplyr::filter(., model == "spatial" & test == "GOF.ks" & misp == "mispomega") %>% 
+  group_by(., method, misp, version, do.true) %>% 
+  summarize(count=length(unique(replicate))) %>%
+  print(n=28)
 
 ## Check for MLE consistency.
 nc_id <- stats[!is.na(stats$converge) & (stats$converge==1|stats$maxgrad>0.1),]$id
