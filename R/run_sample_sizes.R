@@ -171,7 +171,7 @@ osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc')
 dharma.methods <- c('uncond', 'cond', 
                     'uncond_nrot', 'cond_nrot' )
 runtimes <- mles <- pvals <- list(); k <- 1
-(nobsvec <- 2^c(5:9))
+(nobsvec <- 2^c(4:10))
 for(nobs in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
@@ -210,8 +210,8 @@ runtimes.all <- rbind(## results.linmod$runtimes,
 runtimes.all <- runtimes.all %>% filter(!is.na(med))
 
 g <- runtimes.all %>% 
-  dplyr::filter(type == "cdf" | type == "cond" | type == "gen" |
-                  type == "osg") %>%
+ # dplyr::filter(type == "cdf" | type == "cond" | type == "gen" |
+  #                type == "osg") %>%
   ggplot(.,aes(nobs, med, ymin=lwr, ymax=upr,  color=type)) +
   geom_line()+
   geom_pointrange(fatten=2) + scale_y_log10()+ scale_x_log10()+

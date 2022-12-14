@@ -115,12 +115,17 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
   if(mod == 'spatial'){
     ## Simulate spatial random effects
     set.seed(seed)
-    Loc <- matrix(runif(1000*2,0,100),ncol=2)
+    if(N < 500){
+      nspobs <- 500
+    } else {
+      nspobs <- N
+    }
+    Loc <- matrix(runif(nspobs*2,0,100),ncol=2)
     dmat <-  as.matrix(dist(Loc))
     Sigma <- sd.vec[2]^2 * cMatern(dmat,1,sqrt(8)/sp.parm)
     Omega <- t(mvtnorm::rmvnorm(1, rep(0,nrow(Sigma)), 
                                 sigma = Sigma, method = 'chol'))
-    samp.idx <- sample(1:1000, N)
+    samp.idx <- sample(1:nspobs, N)
     loc <- Loc[samp.idx,]
     omega <- Omega[samp.idx]
     
