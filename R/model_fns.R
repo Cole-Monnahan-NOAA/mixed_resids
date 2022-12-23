@@ -624,19 +624,18 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
                            sim_cond= dharma.out[[h]]$cond$resids,
                            sim_uncond=dharma.out[[h]]$uncond$resids)#,
                            #sim_re_uncond=dharma.out[[h]]$re_uncond$resids) #difficult to include b/c diff dimension from data
+      if(ii == 1){
+        
+      }
       out[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
-                             replicate = ii,
-                             runtime_cond=dharma.out[[h]]$cond$runtime,
-                             runtime_uncond=dharma.out[[h]]$uncond$runtime,
-                             # runtime_parcond=dharma.out[[h]]$parcond$runtime,
-                             runtime.cdf=osa.out[[h]]$runtime.cdf,
-                             runtime.fg=osa.out[[h]]$runtime.fg,
-                             runtime.osg=osa.out[[h]]$runtime.osg,
-                             runtime.gen=osa.out[[h]]$runtime.gen,
-                             runtime.mcmc=osa.out[[h]]$runtime.mcmc,
-                             maxgrad=maxgrad, converge=converge,
+                             replicate = ii, maxgrad=maxgrad, converge=converge,
                              AIC=AIC, AICc=AICc)
-
+      out[[h]][names(osa.out[[h]])[grep("runtime", names(osa.out[[h]]))]] <- 
+        sapply(grep("runtime", names(osa.out[[h]])), function(x) osa.out[[h]][[x]] )
+      out[[h]][paste0("runtime.", names(dharma.out[[1]])[!grepl("re", names(dharma.out[[1]]))])] <- 
+        sapply(names(dharma.out[[1]])[!grepl("re", names(dharma.out[[1]]))], function(x) dharma.out[[h]][[x]]$runtime)
+        
+    
       pvals <- rbind(pvals, cbind(id,calc.pvals( type = 'osa', method = osa.methods, mod = mod,
                                         res.obj = osa.out[[h]], version = names(mod.out)[h],
                                         fam = true.parms$fam, do.true )))
