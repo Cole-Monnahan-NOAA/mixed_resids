@@ -1,0 +1,24 @@
+\begin{table}[h]
+    \caption{Linear Model Simulation: data generating models, parameter values, and mis-specifications.}
+    \begin{tabular}{llp{8cm}}
+    \toprule
+    Data Generating Model & Parameters & Mis-specified Model \\
+    \hline
+    {$\!\begin{aligned}
+    X_{i} &\sim N(0, 1) \\
+    \mu_{i, j} &= X_{i}\beta \\
+    y_{i,j} &\sim N(\mu_{i,j}, \sigma_{y}) 
+    \end{aligned}$}
+    &
+    {$\!\begin{aligned}
+    \beta &= (4, -5) \\
+    \sigma_{y} &= 1 
+    \end{aligned}$}
+    &
+    Data simulated with lognormal overdispersion: \newline
+    $\mu_{i, j} = X_{i}\beta + exp(\epsilon)$ \newline
+    $\epsilon \sim N(0, 1)$ \newline
+    Data fit to model without drift term\\
+    \bottomrule
+    \end{tabular}
+    \end{table}

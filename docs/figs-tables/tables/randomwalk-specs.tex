@@ -1,0 +1,23 @@
+\begin{table}[h]
+    \caption{Randomwalk Simulation: data generating models, parameter values, and mis-specifications.}
+    \begin{tabular}{llp{8cm}}
+    \toprule
+    Data Generating Model & Parameters & Mis-specified Model \\
+    \hline
+    {$\!\begin{aligned}
+     \mu_{i} &= u_{i-1} + a \\
+    u_{i} &\sim N(\mu_{i},\tau) \\
+    y_{i} &\sim N(u_{i}, \sigma) 
+    \end{aligned}$}
+    &
+    {$\!\begin{aligned}
+    a &= 0.75 \\
+    \tau &= 1 \\ 
+    \sigma &= 1 
+    \end{aligned}$}
+    &
+    Data simulated with drift term, a \newline
+    Data fit to model without drift term\\
+    \bottomrule
+    \end{tabular}
+    \end{table}

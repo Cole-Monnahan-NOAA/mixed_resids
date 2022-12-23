@@ -1,0 +1,56 @@
+\begin{table}[h]
+    \caption{Mixed Model Simulation: data generating models, parameter values, and mis-specifications.}
+    \begin{tabular}{llp{8cm}}
+    \toprule
+    Data Generating Model & Parameters & Mis-specified Model \\
+    \hline
+    {$\!\begin{aligned}
+    X_{i} &\sim N(0, 1) \\
+    u_{j} &\sim N(0, \sigma_{u}) \\
+    \mu_{i, j} &= X_{i}\beta + u_{j} \\
+    y_{i,j} &\sim N(\mu_{i,j}, \sigma_{y}) 
+    \end{aligned}$}
+    &
+    {$\!\begin{aligned}
+    \beta &= (4, -8) \\
+    \sigma_{u} &= 2 \\
+    \sigma_{y} &=  0.5
+    \end{aligned}$}
+    &
+    Data simulated with covariate term \newline
+    Data fit to model without covariate term\\
+    \hline
+    {$\!\begin{aligned}
+    X_{i} &\sim Unif(-0.5, 0.5) \\
+    u_{j} &\sim N(0, \sigma_{u}) \\
+    \mu_{i, j} &= X_{i}\beta + u_{j} \\
+    y_{i,j} &\sim N(\mu_{i,j}, \sigma_{y}) 
+    \end{aligned}$}
+    &
+    {$\!\begin{aligned}
+    \beta &= (4, -8) \\
+    \sigma_{u} &= 2 \\
+    \sigma_{y} &= 0.5
+    \end{aligned}$}
+    &
+    Data simulated with covariate term \newline
+    Data fit to model without covariate term\\
+    \hline
+    {$\!\begin{aligned}
+    u_{j} &\sim N(0, \sigma_{u}) \\
+    \mu_{i, j} &= exp(\beta_{0} + u_{j}) \\
+    y_{i,j} &\sim Tweedie(\mu_{i,j}, \phi, p) 
+    \end{aligned}$}
+    &
+    {$\!\begin{aligned}
+    \beta &= 1.5 \\
+    \sigma_{u} &= 1.4 \\
+    \phi &= 1.4 \\
+    p &= 1.2
+    \end{aligned}$}
+    &
+    Data simulated with random effect term \newline
+    Data fit to model without random effect term\\
+    \bottomrule
+    \end{tabular}
+    \end{table}

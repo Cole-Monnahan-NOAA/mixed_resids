@@ -1,0 +1,42 @@
+\begin{table}[h]
+    \caption{Spatial Simulation: data generating models, parameter values, and mis-specifications.}
+    \begin{tabular}{llp{8cm}}
+    \toprule
+    Data Generating Model & Parameters & Mis-specified Model \\
+    \hline
+    {$\!\begin{aligned}
+    \omega &\sim GMRF(Q[\kappa, \sigma^{2}_{\omega}]) \\
+    \eta_{i} &= \beta_{0} + \omega_{i} \\
+    y &\sim N(\eta, \sigma_{y})
+    \end{aligned}$}
+    &
+    {$\!\begin{aligned}
+    &\text{spatial range = 50} \\
+    \kappa &= \sqrt{8}/50\\
+    \sigma^{2}_{\omega} &= 1\\
+    \beta_{0} &= 1\\
+    \sigma_{y} &= 1
+    \end{aligned}$}
+    &
+    Data simulated with exp($\omega_{i}$) \newline
+    Data fit to model without covariate term\\
+    \hline
+    {$\!\begin{aligned}
+    \omega &\sim GMRF(Q[\kappa, \sigma^{2}_{\omega}]) \\
+    \eta_{i} &= \beta_{0} + \omega_{i} \\
+    y &\sim Pois(exp(\eta)) 
+    \end{aligned}$}
+    &
+    {$\!\begin{aligned}
+    &\text{spatial range = 50} \\
+    \kappa &= \sqrt{8}/50\\
+    \sigma^{2}_{\omega} &= 2\\
+    \beta_{0} &= 0.5
+    \end{aligned}$}
+    &
+    Data simulated with random effect term \newline
+    Data fit to model without random effect term\\
+    
+    \bottomrule
+    \end{tabular}
+    \end{table}
