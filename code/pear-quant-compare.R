@@ -12,15 +12,19 @@ y4 <- apply(eta.mat, 1, function(x) rgamma(200, x^2/sig2, scale = sig2/x ))
 hist(y4)
 
 output <- function(y){
-
   if(is.matrix(y)){
+    boxplot(y, horizontal=TRUE)
     #sig2. <- var(as.vector(y))
     Sig <- cov(y)
     L <- t(chol(Sig))
     mode <- apply(y, 2, function(x) x-mean(x))
-    y <- as.vector(apply(mode, 1, function(x) solve(L,x)))
+    yrot <- t(apply(mode, 1, function(x) solve(L,x)))
+    y <- as.vector(yrot)
     quant.res <- qnorm(pnorm(y))
-    }
+  } else {
+    hist(y)
+    yrot <- y
+  }
   mu <- mean(y)
   sig2. <- var(y)
   pear.res <- (y-mu)/sqrt(sig2.)
@@ -30,22 +34,32 @@ output <- function(y){
   }
   pear.gof <- ks.test(pear.res, "pnorm")$p.value
   quant.gof <- ks.test(quant.res, "pnorm")$p.value
-  print(hist(y))
-  par(mfrow = c(1,2))
-  print(qqnorm(pear.res, 
-               main = "Pearson Normal Q-Q Plot", 
+  (qqnorm(pear.res,
+               main = "Pearson Normal Q-Q Plot",
                xlab = paste("Ks Test", round(pear.gof, 3))));abline(0,1, col = "red", lwd=1.5)
-  print(qqnorm(quant.res, 
-               main = "Quantile Normal Q-Q Plot", 
+  (qqnorm(quant.res,
+               main = "Quantile Normal Q-Q Plot",
                xlab = paste("Ks Test", round(quant.gof, 3))));abline(0,1, col = "red", lwd=1.5)
+  return(invisible(yrot))
 }
+
+
+par(mfrow = c(2,3))
 output(y1)
 output(y2)
+
+par(mfrow = c(2,3))
 #approx normal gamma with group RE term
 output(as.vector(y3))
 #apply rotation - fixes problem
-output(y3)
+y3rot <- output(y3)
+
+par(mfrow = c(2,3))
 #skewed gamma with group RE term
 output(as.vector(y4))
 #apply rotation - residuals still correlated
-output(y4)
+y4rot <- output(y4)
+
+## What is the rotation doing?
+pairs(rbind(y3,y3rot), col=rep(c(1,2), each=nrow(y3)))
+pairs(rbind(y4,y4rot), col=rep(c(1,2), each=nrow(y4)))
