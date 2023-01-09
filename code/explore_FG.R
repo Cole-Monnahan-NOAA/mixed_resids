@@ -28,9 +28,9 @@ mode <- newobj2$env$last.par
 ## "unconditional" about it.
 Sigma <- solve(as.matrix(newobj2$env$spHess(mode, random = TRUE)))
 i <- which(names(newobj2$env$par[newobj2$env$random]) == observation.name)
-res <- obs - mode[i]
 ## Do the rotation of just the data.
 L <- t(chol(Sigma[i,i]))
+res <- obs - mode[i]
 pred <- data.frame(residual = as.vector(solve(L, res)))
 
 ## explore what it's doing a bit
@@ -57,8 +57,8 @@ library(corrplot)
 corrplot(corr[ind,ind], type='upper')
 corrplot(corr[x.ind[1:10], x.ind[1:10]], type='upper', diag=FALSE)
 
-## Try doing it conditionally
+## Try doing it conditionally. Is this right?
 i <- which(names(newobj2$env$par[newobj2$env$random]) == observation.name)
 Sigma2 <- solve(as.matrix(newobj2$env$spHess(mode, random = TRUE))[i,i])
 corr2 <- cov2cor(Sigma2)
-corrplot(corr2[1:10, 1:10], type='upper')
+corrplot(corr2[1:10, 1:10], type='upper', diag=FALSE)
