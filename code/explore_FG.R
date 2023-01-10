@@ -26,12 +26,29 @@ mode <- newobj2$env$last.par
 ## Get joint hessian of data and random effects. The inversion
 ## includes the real random effects and this is what is
 ## "unconditional" about it.
+
+#rotate then subset
 Sigma <- solve(as.matrix(newobj2$env$spHess(mode, random = TRUE)))
+L <- t(chol(Sigma))
 i <- which(names(newobj2$env$par[newobj2$env$random]) == observation.name)
 ## Do the rotation of just the data.
-L <- t(chol(Sigma[i,i]))
+#L <- t(chol(Sigma[i,i]))
+#res <- obs - mode[i]
+res <- mode0 - mode
+r1 <- as.vector(solve(L, res))[i]
+#pred <- data.frame(residual = as.vector(solve(L, res)))
+
+##TMB way (subset then rotate):
+h <- newobj2$env$spHess(mode, random = TRUE)
+i <- which(names(newobj2$env$par[newobj2$env$random]) == observation.name)
+Sigma <- solve(as.matrix(GMRFmarginal(h, i)))
 res <- obs - mode[i]
-pred <- data.frame(residual = as.vector(solve(L, res)))
+L <- t(chol(Sigma))
+r2 <- as.vector(solve(L, res))
+
+plot(r1, r2);abline(0,1)
+sum(r1-r2)
+
 
 ## explore what it's doing a bit
 names(args0$data)
@@ -62,3 +79,19 @@ i <- which(names(newobj2$env$par[newobj2$env$random]) == observation.name)
 Sigma2 <- solve(as.matrix(newobj2$env$spHess(mode, random = TRUE))[i,i])
 corr2 <- cov2cor(Sigma2)
 corrplot(corr2[1:10, 1:10], type='upper', diag=FALSE)
+
+
+GMRFmarginal <- function(Q, i, ...) {
+  ind <- 1:nrow(Q)
+  i1 <- (ind)[i]
+  i0 <- setdiff(ind, i1)
+  if (length(i0) == 0)
+    return(Q)
+  Q0 <- as(Q[i0, i0, drop = FALSE], "symmetricMatrix")
+  L0 <- Cholesky(Q0, ...)
+  ans <- Q[i1, i1, drop = FALSE] - Q[i1, i0, drop = FALSE] %*%
+    solve(Q0, Q[i0, i1, drop = FALSE])
+  ans
+}
+
+Sigma <- solve(as.matrix(GMRFmarginal(h, i)))
