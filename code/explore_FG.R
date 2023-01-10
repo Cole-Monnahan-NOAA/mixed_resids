@@ -1,7 +1,26 @@
 rm(list=ls())
 ## https://github.com/kaskr/adcomp/blob/master/TMB/inst/examples/simple.cpp
-runExample('simple')
-observation.name <- 'x'
+#runExample('simple')
+
+source("R/startup.R")
+
+mod <- "randomwalk"
+misp <- "mu0"
+setupTMB(mod)
+true.parms <- setup_trueparms(mod, misp, fam = "Gaussian", link = "identity")
+sim.dat <- simdat(n=100, ng=0, mod, 
+                  cov.mod="norm", true.parms, 
+                  misp, seed = 1)
+init.dat <- mkTMBdat(sim.dat, true.parms, mod, misp)
+init.par <- mkTMBpar(true.parms, sim.dat, mod, misp, FALSE) #use FALSE b/c estimating model
+init.random <- mkTMBrandom(mod, misp, FALSE)
+init.map <- mkTMBmap(init.par, mod, misp, true.parms$fam, FALSE)
+h <- 1 #fit correct model
+obj <- MakeADFun(data = init.dat[[h]], parameters = init.par[[h]], 
+                 map = init.map[[h]], random = init.random[[h]], DLL = mod)
+opt <- nlminb(obj$par, obj$fn, obj$gr)
+
+observation.name <- 'y'
 obs <- as.vector(obj$env$data[[observation.name]])
 ## Rebuild arg list from the original fit
 args0 <- args <- as.list(obj$env)[intersect(names(formals(MakeADFun)), ls(obj$env))]
@@ -35,15 +54,15 @@ i <- which(names(newobj2$env$par[newobj2$env$random]) == observation.name)
 #L <- t(chol(Sigma[i,i]))
 #res <- obs - mode[i]
 res <- mode0 - mode
-r1 <- as.vector(solve(L, res))[i]
+r1 <- as.vector(solve(L, res))[i] #subset on obs here
 #pred <- data.frame(residual = as.vector(solve(L, res)))
 
 ##TMB way (subset then rotate):
 h <- newobj2$env$spHess(mode, random = TRUE)
 i <- which(names(newobj2$env$par[newobj2$env$random]) == observation.name)
-Sigma <- solve(as.matrix(GMRFmarginal(h, i)))
+Sigma2 <- solve(as.matrix(GMRFmarginal(h, i)))
 res <- obs - mode[i]
-L <- t(chol(Sigma))
+L <- t(chol(Sigma2))
 r2 <- as.vector(solve(L, res))
 
 plot(r1, r2);abline(0,1)
@@ -62,7 +81,7 @@ str(args$random)
 
 modedf <- data.frame(par=names(mode0), mode0, mode)
 u.ind <- which(modedf$par == 'u')
-x.ind <- which(modedf$par == 'x')
+x.ind <- which(modedf$par == 'y')
 ggplot(modedf, aes(mode0, mode)) + facet_wrap('par', scales='free') + geom_point()
 
 corr <- cov2cor(Sigma)
@@ -75,11 +94,16 @@ corrplot(corr[ind,ind], type='upper')
 corrplot(corr[x.ind[1:10], x.ind[1:10]], type='upper', diag=FALSE)
 
 ## Try doing it conditionally. Is this right?
-i <- which(names(newobj2$env$par[newobj2$env$random]) == observation.name)
-Sigma2 <- solve(as.matrix(newobj2$env$spHess(mode, random = TRUE))[i,i])
+# i <- which(names(newobj2$env$par[newobj2$env$random]) == observation.name)
+# Sigma2 <- solve(as.matrix(newobj2$env$spHess(mode, random = TRUE))[i,i])
 corr2 <- cov2cor(Sigma2)
 corrplot(corr2[1:10, 1:10], type='upper', diag=FALSE)
 
+#visualize with INLA
+library(INLA)
+#both matrices show correlation
+image(Sigma) #joint correlation of RE and data
+image(Sigma2) #correlation of just data
 
 GMRFmarginal <- function(Q, i, ...) {
   ind <- 1:nrow(Q)
