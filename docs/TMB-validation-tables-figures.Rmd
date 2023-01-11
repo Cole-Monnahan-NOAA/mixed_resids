@@ -17,81 +17,83 @@ source("figs-tables/results-setup.R")
 ```
 
 ```{r pears-quant-comp, echo = FALSE, results = "hide"}
+## IID =======================================================================
 set.seed(123)
-#Approx. normal Gamma
-y1 <- rgamma(1000, shape = 100, scale = .1)
-#Positively skewed Gamma
-y2 <- rgamma(1000, shape = .5, scale = 3)
-#Mixed effect Gamma
-eta.mat <- as.matrix(exp(rnorm(5, 0, .5)))
-#Approx normal
-sig2 <- .001
-y3 <- apply(eta.mat, 1, function(x) rgamma(200, x^2/sig2, scale = sig2/x ))
-#Positively skewed
-sig2 <- 1
-y4 <- apply(eta.mat, 1, function(x) rgamma(200, x^2/sig2, scale = sig2/x ))
-output <- function(y){
+# Approx. normal gamma
+y1 <- rgamma(1000, shape = 100, scale = .1)# mean=10; var=1
+# Skewed gamma
+y2 <- rgamma(1000, shape = .5, scale = 3)# mean=1.5; var = 4.5
 
-  if(is.matrix(y)){
-    #sig2. <- var(as.vector(y))
-    Sig <- cov(y)
-    L <- t(chol(Sig))
-    mode <- apply(y, 2, function(x) x-mean(x))
-    y <- as.vector(apply(mode, 1, function(x) solve(L,x)))
-    quant.res <- qnorm(pnorm(y))
-    }
+output.iid <- function(y){
+  hist(y)
   mu <- mean(y)
   sig2. <- var(y)
   pear.res <- (y-mu)/sqrt(sig2.)
-  if(!exists("quant.res")){
-    Fx <- pgamma(y, shape = mu^2/sig2., scale = sig2./mu)
-    quant.res <- qnorm(Fx)
-  }
-  out <- data.frame(pear.res, quant.res)
-  colnames(out) <- c("Pearson Residual", "Quantile Residual")
-  return(out)
+  Fx <- pgamma(y, shape = mu^2/sig2., scale = sig2./mu)
+  quant.res <- qnorm(Fx)
+  pear.gof <- ks.test(pear.res, "pnorm")$p.value
+  quant.gof <- ks.test(quant.res, "pnorm")$p.value
+  (qqnorm(pear.res,
+          main = "Pearson Normal Q-Q Plot",
+          xlab = paste("Ks Test", round(pear.gof, 3))));abline(0,1, col = "red", lwd=1.5)
+  (qqnorm(quant.res,
+          main = "Quantile Normal Q-Q Plot",
+          xlab = paste("Ks Test", round(quant.gof, 3))));abline(0,1, col = "red", lwd=1.5)
+  
+  
+  return(invisible(y))
+  
 }
+# iid
+par(mfrow = c(2,3))
+output.iid(y1)
+output.iid(y2)
 
-y1.out <- output(y1)
-y1.out$gamma <- "Approx. Normal"
-y2.out <- output(y2)
-y2.out$gamma <- "Skewed"
-y12.out <- rbind(y1.out, y2.out)
+#Banded Correlation
+set.seed(1)
+C <- exp(-as.matrix(dist(seq(0,1,by=.1))))
+L <- t(chol(C))
+n.sim <- 500
+eta <- t(rmvnorm(n.sim,sigma=C))
 
-y3.nr <- output(as.vector(y3))
-y3.rot <- output(y3)
-y4.nr <- output(as.vector(y4))
-y4.rot <- output(y4)
-y3.nr$gamma <- y3.rot$gamma <- "Approx. Normal"
-y4.nr$gamma <- y4.rot$gamma <- "Skewed"
+# Correlation in mean process
+# Normal case
+y7 <- eta
+r7.nrot <- y7 #mean=0; sd=1, this is essentially the Pearson residual (y7-0)/1
+r7.rot <- solve(L, y7)
+gof.nrot <- ks.test(r7.nrot, "pnorm")$p.value
+gof.rot <- ks.test(r7.rot, "pnorm")$p.value
 
-y3.nr$rot <- y4.nr$rot <- "Not Rotated"
-y3.rot$rot <- y4.rot$rot <- "Rotated"
-y34.out <- rbind(y3.nr, y3.rot, y4.nr, y4.rot)
+par(mfrow = c(2,3))
+boxplot(t(y7), horizontal=TRUE)
+(qqnorm(r7.nrot,
+        main = "Unrotated Normal Q-Q Plot",
+        xlab = paste("Ks Test", round(gof.nrot, 3))));abline(0,1, col = "red", lwd=1.5)
+(qqnorm(r7.rot,
+        main = "Rotated Normal Q-Q Plot",
+        xlab = paste("Ks Test", round(gof.rot, 3))));abline(0,1, col = "red", lwd=1.5)
+
+# Gamma case
+sig2 <- 1
+y8 <- t(apply(exp(eta), 1:2, function(x) rgamma(1, x^2/sig2, scale = sig2/x )))
+hist(y8)
+moments::skewness(as.vector(y8)); moments::kurtosis(as.vector(y8))
+
+#pgamma removes skewness and lowers kurtosis but returns zeros - cannot convert with qnorm, returns -Inf values
+r8.unif <- apply(y8, 2, function(x) pgamma(x, mean(x)^2/var(x), scale = var(x)/mean(x)))
+hist(r8.unif)
+moments::skewness(as.vector(r8.unif)); moments::kurtosis(as.vector(r8.unif))
+
+#rotating first removes correlation but retains kurtosis - cannot use pgamma because negative values
+S <- cov(y8)
+y8 <- t(y8)
+L <- t(chol(S))
+mode <- apply(y8, 1, function(x) x - mean(x))
+r8.rot <- solve(L, y8)
+hist(r8.rot)
+moments::skewness(as.vector(r8.rot))
+moments::kurtosis(as.vector(r8.rot))
 ```
-
-```{r pears-quant-qqnorm-lm, echo = FALSE, fig.cap = "QQNorm plots of Pearson and Quantile residuals calculated for two Gamma distributions, one that is approximately Normal, $y \\sim Gamma(\\alpha = 100, \\beta = 0.1)$, and one that is skewed, $y \\sim Gamma(\\alpha = 0.5, \\beta = 3)$." }
-pivot_longer(y12.out, cols = 1:2, names_to = "type", values_to = "resid") %>% 
-  ggplot(., aes(sample = resid)) +
-    geom_qq() + 
-    geom_qq_line(color="red") +  
-    xlab("Theoretical") +
-    ylab("Sample") +
-    facet_grid(gamma ~ type, scale = "free_y") + 
-  theme_bw() + ggtitle("QQ Plot, LM")
-```
-
-```{r pears-quant-qqnorm-lmm, echo = FALSE, fig.cap = "QQNorm plots of Pearson and Quantile residuals calculated for two Mixed Model Gamma distributions, one that is approximately Normal (var = 0.001), and one that is skewed (var = 1). For each case, residuals were calculated with and without applying a rotation to remove correlation." }
-pivot_longer(y34.out, cols = 1:2, names_to = "type", values_to = "resid") %>% 
-  ggplot(., aes(sample = resid)) +
-    geom_qq() + 
-    geom_qq_line(color="red") +  
-    xlab("Theoretical") +
-    ylab("Sample") +
-    facet_nested(gamma + rot ~ type, scale = "free_y") + 
-  theme_bw() + ggtitle("QQ Plot, LMM")
-```
-
 
 
 ```{r chol-demo-1, echo=FALSE, out.width = "90%", fig.cap="Given zero-centered multivariate data with a covariance matrix, Sigma. Pairs plo=ts visualize the correlation structure of the data. Blue and red indicate points tracked in transformation. The red points correspond with the marginal percentile in the histogram."}

@@ -6,6 +6,8 @@ library(tidyr)
 library(kableExtra)
 library(ggh4x)
 library(ggsci)
+library(mvtnorm)
+library(moments)
 
 ## Define path to results files
 path <- "../results"
