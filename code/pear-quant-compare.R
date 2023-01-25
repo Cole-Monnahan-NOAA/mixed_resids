@@ -92,6 +92,7 @@ eta <- t(rmvnorm(n.sim,sigma=C))
 #Use Copula method
 y5 <- qgamma(pnorm(eta), shape = 100, scale = .1)
 y6 <- qgamma(pnorm(eta), shape = .5, scale = 3)
+#Standard Normal distribution: skewness = 0, kurtosis = 3
 moments::skewness(as.vector(y5)); moments::kurtosis(as.vector(y5))
 moments::skewness(as.vector(y6)); moments::kurtosis(as.vector(y6))
 
@@ -113,14 +114,22 @@ qqnorm(r6.rot); abline(0,1); ks.test(r6.rot, "pnorm")
 
 # Correlation in mean process
 # Normal case
+set.seed(1)
+C <- exp(-as.matrix(dist(seq(0,10,length.out = 500))))
+sig <- 1.2
+S <- diag(rep(sig, ncol(C))) %*% C %*%  diag(rep(sig, ncol(C)))
+eta <- as.numeric(rmvnorm(1, rep(0, ncol(C)), sigma=S)) 
+L <- t(chol(S))
+
 y7 <- eta
-r7.nrot <- y7 #mean=0; sd=1, this is essentially the Pearson residual (y7-0)/1
-r7.rot <- solve(L, y7)
+mode <- y7 - mean(eta)
+r7.nrot <- mode/sd(eta)# this is essentially the Pearson residual (y7-mean)/sd
+r7.rot <- t(solve(L, mode))
 gof.nrot <- ks.test(r7.nrot, "pnorm")$p.value
 gof.rot <- ks.test(r7.rot, "pnorm")$p.value
 
 par(mfrow = c(2,3))
-boxplot(t(y7), horizontal=TRUE)
+hist(y7)
 (qqnorm(r7.nrot,
         main = "Unrotated Normal Q-Q Plot",
         xlab = paste("Ks Test", round(gof.nrot, 3))));abline(0,1, col = "red", lwd=1.5)
@@ -130,23 +139,53 @@ boxplot(t(y7), horizontal=TRUE)
 
 # Gamma case
 sig2 <- 1
-y8 <- t(apply(exp(eta), 1:2, function(x) rgamma(1, x^2/sig2, scale = sig2/x )))
+y8 <- rgamma( length(eta), exp(eta)^2/sig2, scale = sig2/exp(eta) )
 hist(y8)
-moments::skewness(as.vector(y8)); moments::kurtosis(as.vector(y8))
+moments::skewness(y8); moments::kurtosis(y8)
 
-#pgamma removes skewness and lowers kurtosis but returns zeros - cannot convert with qnorm, returns -Inf values
-r8.unif <- apply(y8, 2, function(x) pgamma(x, mean(x)^2/var(x), scale = var(x)/mean(x)))
-hist(r8.unif)
-moments::skewness(as.vector(r8.unif)); moments::kurtosis(as.vector(r8.unif))
+#Standard Normal distribution: skewness = 0, kurtosis = 3
+#pgamma first rotation second results in high kurtosis
+mu.x <- mean(y8)
+var.x <- var(y8)
+r8.unif <- pgamma(y8, mu.x^2/var.x, scale = var.x/mu.x)
+r8.norm <- qnorm(r8.unif)
+r8.gamma.rot <- solve(L, r8.norm)
+hist(r8.gamma.rot)
+moments::skewness(r8.gamma.rot); moments::kurtosis(r8.gamma.rot)
 
-#rotating first removes correlation but retains kurtosis - cannot use pgamma because negative values
-S <- cov(y8)
-round(S,2)
-L <- t(chol(S))
-mode <- apply(y8, 2, function(x) x - mean(x))
-r8.rot <- t(solve(L, t(mode)))
+#rotating first gives same results as r8.gamma.rot
+r8.rot <- solve(L, y8)
 hist(r8.rot)
-mean(r8.rot) #mean of 0
-var(as.vector(r8.rot)) # var of 1
-moments::skewness(as.vector(r8.rot))
-moments::kurtosis(as.vector(r8.rot))
+
+
+#Generate a DHARMa rotation scenario using the simulated RE, not obs to calculate Sigma for rotation
+#y8.sim.rot <- matrix(0, 1000, 500)
+y8.sim.mat <- eta.sim.mat <- matrix(0, 500, 1000)
+for(i in 1:1000){
+  eta <- as.numeric(rmvnorm(1, rep(0, ncol(C)), sigma=S))
+  eta.sim.mat[,i] <- eta
+  #use simulated fitted predicted response in transformed space to calculate covariance
+  y8.sim <- rgamma(length(eta), exp(eta)^2/sig2, scale = sig2/exp(eta) )
+  y8.sim.mat[,i] <- y8.sim
+}
+
+ks.test(createDHARMa(y8.sim.mat, as.vector(y8), rotation = NULL)$scaledResiduals, "punif")
+ks.test(createDHARMa(y8.sim.mat, as.vector(y8), rotation = "estimated")$scaledResiduals, "punif")
+ks.test(createDHARMa(y8.sim.mat, as.vector(y8), rotation = S)$scaledResiduals, "punif")
+#rotate with just the correlation matrix? - need to test under simulation
+ks.test(createDHARMa(y8.sim.mat, as.vector(y8), rotation = C)$scaledResiduals, "punif")
+#rotate with just the correlation matrix of the simulation?
+ks.test(createDHARMa(y8.sim.mat, as.vector(y8), 
+                     rotation = as.matrix(Matrix::nearPD(cor(t(y8.sim.mat)))$mat))$scaledResiduals, "punif")
+
+covar <- Matrix::nearPD(cov(t(eta.sim.mat)))$mat
+L <- t(chol(covar))
+y8.sim.rot <- apply(y8.sim.mat, 2, function(x) solve(L, x))
+y8.rot <- solve(L, y8)
+r8.sim <- ecdf(y8.sim.rot)(y8.rot)
+hist(r8.sim)
+gap::qqunif(r8.sim, logscale = FALSE)
+hist(qnorm(r8.sim))
+ks.test(r8.sim, "punif")
+moments::skewness(qnorm(r8.sim)); moments::kurtosis(qnorm(r8.sim))
+
