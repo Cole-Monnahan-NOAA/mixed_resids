@@ -326,6 +326,7 @@ extractOSA <- function(obj, observation.name=NULL,
     pred <- applyMethod(oneStepDiscrete)
   }
   if (method == "fullGaussian") {
+    browser()
     args2 <- args
     args2$random <- c(args2$random, observation.name)
     fix <- data.term.indicator
@@ -368,4 +369,38 @@ extractOSA <- function(obj, observation.name=NULL,
   }
   if(!exists('out')) stop("Function not setup to work with method ", method)
   return(out)
+}
+
+
+
+
+extractOSAcovar <- function(obj, observation.name){
+  obs <- as.vector(obj$env$data[[observation.name]])
+  ## Rebuild arg list from the original fit
+  args0 <- args <- as.list(obj$env)[intersect(names(formals(MakeADFun)), ls(obj$env))]
+  ## Update par list with the MLEs
+  args$parameters <- obj$env$parList(par = obj$env$last.par.best)
+  ## Turn off estimation of fixed effects
+  names.random <- unique(names(obj$env$par[obj$env$random]))
+  names.fixed <- setdiff(names(args$parameters), names.random)
+  args$map <- lapply(args$parameters[names.fixed], function(x) factor(x * NA))
+  ## Move observations from data into parameter list, delcare as
+  ## random effects, turn on estimation of it via map
+  args$random <- c(names.random, observation.name)
+  args$parameters[observation.name] <- args$data[observation.name]
+  args$data[observation.name] <- NULL
+  ## Build new object
+  newobj2 <- do.call("MakeADFun", args)
+  ## mode before optimization the RE
+  mode0 <- newobj2$env$last.par
+  newobj2$fn()
+  ## mode after
+  mode <- newobj2$env$last.par
+  ## Get joint hessian of data and random effects. The inversion
+  ## includes the real random effects and this is what is
+  ## "unconditional" about it.
+  ### rotate then subset
+  Sigma <- solve(as.matrix(newobj2$env$spHess(mode, random = TRUE)))
+  i <- which(names(newobj2$env$par[newobj2$env$random]) == observation.name)
+  return(Sigma[i,i])
 }

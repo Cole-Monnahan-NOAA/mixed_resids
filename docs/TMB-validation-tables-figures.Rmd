@@ -17,81 +17,83 @@ source("figs-tables/results-setup.R")
 ```
 
 ```{r pears-quant-comp, echo = FALSE, results = "hide"}
+## IID =======================================================================
 set.seed(123)
-#Approx. normal Gamma
-y1 <- rgamma(1000, shape = 100, scale = .1)
-#Positively skewed Gamma
-y2 <- rgamma(1000, shape = .5, scale = 3)
-#Mixed effect Gamma
-eta.mat <- as.matrix(exp(rnorm(5, 0, .5)))
-#Approx normal
-sig2 <- .001
-y3 <- apply(eta.mat, 1, function(x) rgamma(200, x^2/sig2, scale = sig2/x ))
-#Positively skewed
-sig2 <- 1
-y4 <- apply(eta.mat, 1, function(x) rgamma(200, x^2/sig2, scale = sig2/x ))
-output <- function(y){
+# Approx. normal gamma
+y1 <- rgamma(1000, shape = 100, scale = .1)# mean=10; var=1
+# Skewed gamma
+y2 <- rgamma(1000, shape = .5, scale = 3)# mean=1.5; var = 4.5
 
-  if(is.matrix(y)){
-    #sig2. <- var(as.vector(y))
-    Sig <- cov(y)
-    L <- t(chol(Sig))
-    mode <- apply(y, 2, function(x) x-mean(x))
-    y <- as.vector(apply(mode, 1, function(x) solve(L,x)))
-    quant.res <- qnorm(pnorm(y))
-    }
+output.iid <- function(y){
+  hist(y)
   mu <- mean(y)
   sig2. <- var(y)
   pear.res <- (y-mu)/sqrt(sig2.)
-  if(!exists("quant.res")){
-    Fx <- pgamma(y, shape = mu^2/sig2., scale = sig2./mu)
-    quant.res <- qnorm(Fx)
-  }
-  out <- data.frame(pear.res, quant.res)
-  colnames(out) <- c("Pearson Residual", "Quantile Residual")
-  return(out)
+  Fx <- pgamma(y, shape = mu^2/sig2., scale = sig2./mu)
+  quant.res <- qnorm(Fx)
+  pear.gof <- ks.test(pear.res, "pnorm")$p.value
+  quant.gof <- ks.test(quant.res, "pnorm")$p.value
+  (qqnorm(pear.res,
+          main = "Pearson Normal Q-Q Plot",
+          xlab = paste("Ks Test", round(pear.gof, 3))));abline(0,1, col = "red", lwd=1.5)
+  (qqnorm(quant.res,
+          main = "Quantile Normal Q-Q Plot",
+          xlab = paste("Ks Test", round(quant.gof, 3))));abline(0,1, col = "red", lwd=1.5)
+  
+  
+  return(invisible(y))
+  
 }
+# iid
+par(mfrow = c(2,3))
+output.iid(y1)
+output.iid(y2)
 
-y1.out <- output(y1)
-y1.out$gamma <- "Approx. Normal"
-y2.out <- output(y2)
-y2.out$gamma <- "Skewed"
-y12.out <- rbind(y1.out, y2.out)
+#Banded Correlation
+set.seed(1)
+C <- exp(-as.matrix(dist(seq(0,1,by=.1))))
+L <- t(chol(C))
+n.sim <- 500
+eta <- t(rmvnorm(n.sim,sigma=C))
 
-y3.nr <- output(as.vector(y3))
-y3.rot <- output(y3)
-y4.nr <- output(as.vector(y4))
-y4.rot <- output(y4)
-y3.nr$gamma <- y3.rot$gamma <- "Approx. Normal"
-y4.nr$gamma <- y4.rot$gamma <- "Skewed"
+# Correlation in mean process
+# Normal case
+y7 <- eta
+r7.nrot <- y7 #mean=0; sd=1, this is essentially the Pearson residual (y7-0)/1
+r7.rot <- solve(L, y7)
+gof.nrot <- ks.test(r7.nrot, "pnorm")$p.value
+gof.rot <- ks.test(r7.rot, "pnorm")$p.value
 
-y3.nr$rot <- y4.nr$rot <- "Not Rotated"
-y3.rot$rot <- y4.rot$rot <- "Rotated"
-y34.out <- rbind(y3.nr, y3.rot, y4.nr, y4.rot)
+par(mfrow = c(2,3))
+boxplot(t(y7), horizontal=TRUE)
+(qqnorm(r7.nrot,
+        main = "Unrotated Normal Q-Q Plot",
+        xlab = paste("Ks Test", round(gof.nrot, 3))));abline(0,1, col = "red", lwd=1.5)
+(qqnorm(r7.rot,
+        main = "Rotated Normal Q-Q Plot",
+        xlab = paste("Ks Test", round(gof.rot, 3))));abline(0,1, col = "red", lwd=1.5)
+
+# Gamma case
+sig2 <- 1
+y8 <- t(apply(exp(eta), 1:2, function(x) rgamma(1, x^2/sig2, scale = sig2/x )))
+hist(y8)
+moments::skewness(as.vector(y8)); moments::kurtosis(as.vector(y8))
+
+#pgamma removes skewness and lowers kurtosis but returns zeros - cannot convert with qnorm, returns -Inf values
+r8.unif <- apply(y8, 2, function(x) pgamma(x, mean(x)^2/var(x), scale = var(x)/mean(x)))
+hist(r8.unif)
+moments::skewness(as.vector(r8.unif)); moments::kurtosis(as.vector(r8.unif))
+
+#rotating first removes correlation but retains kurtosis - cannot use pgamma because negative values
+S <- cov(y8)
+y8 <- t(y8)
+L <- t(chol(S))
+mode <- apply(y8, 1, function(x) x - mean(x))
+r8.rot <- solve(L, y8)
+hist(r8.rot)
+moments::skewness(as.vector(r8.rot))
+moments::kurtosis(as.vector(r8.rot))
 ```
-
-```{r pears-quant-qqnorm-lm, echo = FALSE, fig.cap = "QQNorm plots of Pearson and Quantile residuals calculated for two Gamma distributions, one that is approximately Normal, $y \\sim Gamma(\\alpha = 100, \\beta = 0.1)$, and one that is skewed, $y \\sim Gamma(\\alpha = 0.5, \\beta = 3)$." }
-pivot_longer(y12.out, cols = 1:2, names_to = "type", values_to = "resid") %>% 
-  ggplot(., aes(sample = resid)) +
-    geom_qq() + 
-    geom_qq_line(color="red") +  
-    xlab("Theoretical") +
-    ylab("Sample") +
-    facet_grid(gamma ~ type, scale = "free_y") + 
-  theme_bw() + ggtitle("QQ Plot, LM")
-```
-
-```{r pears-quant-qqnorm-lmm, echo = FALSE, fig.cap = "QQNorm plots of Pearson and Quantile residuals calculated for two Mixed Model Gamma distributions, one that is approximately Normal (var = 0.001), and one that is skewed (var = 1). For each case, residuals were calculated with and without applying a rotation to remove correlation." }
-pivot_longer(y34.out, cols = 1:2, names_to = "type", values_to = "resid") %>% 
-  ggplot(., aes(sample = resid)) +
-    geom_qq() + 
-    geom_qq_line(color="red") +  
-    xlab("Theoretical") +
-    ylab("Sample") +
-    facet_nested(gamma + rot ~ type, scale = "free_y") + 
-  theme_bw() + ggtitle("QQ Plot, LMM")
-```
-
 
 
 ```{r chol-demo-1, echo=FALSE, out.width = "90%", fig.cap="Given zero-centered multivariate data with a covariance matrix, Sigma. Pairs plo=ts visualize the correlation structure of the data. Blue and red indicate points tracked in transformation. The red points correspond with the marginal percentile in the histogram."}
@@ -127,139 +129,71 @@ knitr::include_graphics("figs-tables/figures/demo_pairs3.png")
 
 ## Simple Linear Model
 
-```{r, linmod-results osa-true, echo = FALSE, message = FALSE, fig.cap = "Simple Linear Model. Distribution of theoretical p-values under the correct model evaluated for each analytical method when true parameters are known. **Take home: all analytical methods collapse to Pearson exactly when no random effects.**"}
-osa.methods <- c(
+```{r, linmod-results, echo = FALSE, message = FALSE, fig.width = 8, warning = FALSE, fig.cap = "Simple Linear Model. Type I error rates and Power evaluated for each analytical and simulation method. Results are partitioned out by residual type (top to bottom)."}
+res.methods <- c(
    'full Gaussian',
    'one-step Gaussian',
    'one-step Generic',
    'cdf',
+   'Unconditional ecdf, Rotated',
+   'Unconditional ecdf, Not Rotated',
+   'Conditional ecdf, Rotated',  
+   'Conditional ecdf, Not Rotated',
    'Pearson'
 )
-pval.df <- filter.true(pvals, "linmod", 
-                       osa.methods)
 
-plot.fun(pval.df, "osa", TRUE)
-```
+pval.df.true <- filter.true(pvals, "linmod",
+                       res.methods)
+pval.df.est <- filter.est(pvals, "linmod",
+                       res.methods)
 
-```{r, linmod-results osa-est, echo = FALSE, message = FALSE, fig.cap = "Simple Linear Model. Distribution of estimated p-values evaluated for each analytical method when parameters are estimated under the correct (top) and mis-specified (bottom) models. **Take home: all analytical methods collapse to approx. Pearson when no random effects.**"}
-osa.methods <- c(
-   'full Gaussian',
-   'one-step Gaussian',
-   'one-step Generic',
-   'cdf',
-   'Pearson'
-)
-pval.df <- filter.est(pvals, "linmod", 
-                      osa.methods)
+pval.df.true$misp <- factor(pval.df.true$misp,
+         levels = "overdispersion",
+         labels = "Overdispersion")
+pval.df.est$misp <- factor(pval.df.est$misp,
+         levels = "overdispersion",
+         labels = "Overdispersion")
+  
 
-plot.fun(pval.df, "osa", FALSE)
-```
-
-```{r, linmod-results sim-true, echo = FALSE, message = FALSE, fig.cap = "Simple Linear Model. Distribution of theoretical p-values under the correct model evaluated for each simulation-based method when true parameters are known. **Take home: simulation-based methods approximately Pearson when no random effects.**"}
-
-ecdf.methods <- c(
-   "ecdf, Rotated",
-   "ecdf, Not Rotated"
-)
-pval.df <- filter.true(pvals, "linmod", 
-                       ecdf.methods)
-
-plot.fun(pval.df, "sim", TRUE)
-```
-
-```{r, linmod-results sim-est, echo = FALSE, message = FALSE, fig.cap = "Simple Linear Model. Distribution of estimated p-values evaluated for each analytical method when parameters are estimated under the correct (top) and mis-specified (bottom) models. **Take home: simulation-based methods approximately Pearson when no random effects.**"}
-
-ecdf.methods <- c(
-   "ecdf, Rotated",
-   "ecdf, Not Rotated"
-)
-pval.df <- filter.est(pvals, "linmod", 
-                       ecdf.methods)
-
-plot.fun(pval.df, "sim", FALSE)
+plot.err.pow(pval.df.true, pval.df.est)
 ```
 
 \clearpage
 \newpage
 ## Simple Mixed Model
 
-```{r, simpleGLMM-results osa-true, echo = FALSE, message = FALSE, fig.cap = "Simple Mixed Model. Distribution of theoretical p-values under the correct model evaluated for each analytical method when true parameters are known. **Take home: all return approx uniform p-value distributions, regardless of mis-specification or of being linear or generalized linear, including Pearson.**"}
-osa.methods <- c(
+```{r, simpleGLMM-results, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 8, fig.cap = "Simple Mixed Model. Type I error rates and Power evaluated for each analytical and simulation method. Results are partitioned out by model mis-specification (from left to right) and residual type (top to bottom)."}
+res.methods <- c(
    'full Gaussian',
    'one-step Gaussian',
    'one-step Generic',
    'cdf',
    'MCMC',
+   'Unconditional ecdf, Rotated',
+   'Unconditional ecdf, Not Rotated',
+   'Conditional ecdf, Rotated',  
+   'Conditional ecdf, Not Rotated',
    'Pearson'
 )
-pval.df <- filter.true(pvals, "simpleGLMM", 
-                       osa.methods)
 
-pval.df$misp <- factor(pval.df$misp,
-                     levels = c("dropRE", "missnormcov", "missunifcov"),
-                     labels = c("GLMM - Drop RE",
-                                "LMM - Missing X Normal",
-                                "LMM - Missing X Uniform"))
+pval.df.true <- filter.true(pvals, "simpleGLMM",
+                       res.methods)
+pval.df.est <- filter.est(pvals, "simpleGLMM",
+                       res.methods)
 
-plot.fun(pval.df, "osa", TRUE)
-```
+pval.df.true$misp <- factor(pval.df.true$misp,
+         levels = c("dropRE", "missnormcov", "missunifcov"),
+         labels = c("GLMM - Drop RE", 
+                    "LMM - Missing X Normal",
+                    "LMM - Missing X Uniform"))
+pval.df.est$misp <- factor(pval.df.est$misp,
+         levels = c("dropRE", "missnormcov", "missunifcov"),
+         labels = c("GLMM - Drop RE", 
+                    "LMM - Missing X Normal",
+                    "LMM - Missing X Uniform"))
+  
 
-```{r, simpleGLMM-results osa-est, echo = FALSE, message = FALSE, fig.height = 8, fig.cap = "Simple Mixed Model. Distribution of estimated p-values evaluated for each analytical method when parameters are estimated under the correct (top) and mis-specified (bottom) models. **Take home: Pearson is more highly skewd towards one than other methods. The power to detect the mis-specification of a missing normally distributed covariate in the Linear Mixed Model is lower than other mis-specifications.**"}
-osa.methods <- c(
-   'full Gaussian',
-   'one-step Gaussian',
-   'one-step Generic',
-   'cdf',
-   'MCMC',
-   'Pearson'
-)
-pval.df <- filter.est(pvals, "simpleGLMM", 
-                      osa.methods)
-
-pval.df$misp <- factor(pval.df$misp,
-                     levels = c("dropRE", "missnormcov", "missunifcov"),
-                     labels = c("GLMM - Drop RE",
-                                "LMM - Missing X Normal",
-                                "LMM - Missing X Uniform"))
-
-plot.fun(pval.df, "osa", FALSE)
-```
-
-
-```{r, simpleGLMM-results sim-true, echo = FALSE, message = FALSE, fig.cap = "Simple Mixed Model. Distribution of theoretical p-values under the correct model evaluated for each simulation-based method when true parameters are known. **Take home: Unconditional ecdf residuals fail to detect the correct model, regardless of mis-specification - is there an error here? Unrotated conditional ecdf resiudals are all approximately uniform.**"}
-
-ecdf.methods <- c(
-   "ecdf, Rotated", 
-   "ecdf, Not Rotated"
-)
-pval.df <- filter.true(pvals, "simpleGLMM", 
-                       ecdf.methods)
-
-pval.df$misp <- factor(pval.df$misp,
-                     levels = c("dropRE", "missnormcov", "missunifcov"),
-                     labels = c("GLMM - Drop RE",
-                                "LMM - Missing X Normal",
-                                "LMM - Missing X Uniform"))
-
-plot.fun(pval.df, "sim", TRUE)
-```
-
-```{r, simpleGLMM-results sim-est, echo = FALSE, message = FALSE,  fig.height = 8, fig.cap = "Simple Mixed Model. Distribution of estimated p-values evaluated for each analytical method when parameters are estimated under the correct (top) and mis-specified (bottom) models. **Take home: Unconditional ecdf residuals fail to detect the correct model, regardless of mis-specification - is there an error here? The power to detect the mis-specification of a missing normally distributed covariate in the rotated unconditional and unrotated conditional ecdf residuals is lower than other mis-specifications. The power to detect the mis-specification of a missing uniformally distributed covariate is also lower for the rotated unconditional ecdf residuals."}
-
-ecdf.methods <- c(
-   "ecdf, Rotated", 
-   "ecdf, Not Rotated"
-)
-pval.df <- filter.est(pvals, "simpleGLMM", 
-                       ecdf.methods)
-
-pval.df$misp <- factor(pval.df$misp,
-                     levels = c("dropRE", "missnormcov", "missunifcov"),
-                     labels = c("GLMM - Drop RE",
-                                "LMM - Missing X Normal",
-                                "LMM - Missing X Uniform"))
-
-plot.fun(pval.df, "sim", FALSE)
+plot.err.pow(pval.df.true, pval.df.est)
 ```
 
 
@@ -288,60 +222,35 @@ pow.plot(df)
 \newpage
 ## Randomwalk
 
-```{r, rw-results osa-true, echo = FALSE, message = FALSE, fig.cap = "Randomwalk. Distribution of theoretical p-values under the correct model evaluated for each analytical method when true parameters are known. **Take home: all return approx uniform p-value distributions, including Pearson.**"}
-osa.methods <- c(
+```{r, randomwalk-results, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 8, fig.cap = "Simple Mixed Model. Type I error rates and Power evaluated for each analytical and simulation method. Results are partitioned out by residual type (top to bottom)."}
+res.methods <- c(
    'full Gaussian',
    'one-step Gaussian',
    'one-step Generic',
    'cdf',
    'MCMC',
+   'Unconditional ecdf, Rotated',
+   'Unconditional ecdf, Not Rotated',
+   'Conditional ecdf, Rotated',  
+   'Conditional ecdf, Not Rotated',
    'Pearson'
 )
-pval.df <- filter.true(pvals, "randomwalk", 
-                       osa.methods)
 
-plot.fun(pval.df, "osa", TRUE)
+pval.df.true <- filter.true(pvals, "randomwalk",
+                       res.methods)
+pval.df.est <- filter.est(pvals, "randomwalk",
+                       res.methods)
+
+pval.df.true$misp <- factor(pval.df.true$misp,
+         levels = "mu0",
+         labels = "Missing Drift Term")
+pval.df.est$misp <- factor(pval.df.est$misp,
+         levels = "mu0",
+         labels = "Missing Drift Term")
+  
+
+plot.err.pow(pval.df.true, pval.df.est)
 ```
-
-```{r, rw-results osa-est, echo = FALSE, message = FALSE, fig.cap = "Randomwalk. Distribution of estimated p-values evaluated for each analytical method when parameters are estimated under the correct (top) and mis-specified (bottom) models. **Take home: Pearson rejects the correct model more than expected, MCMC fails to detect mis-specification.**"}
-osa.methods <- c(
-   'full Gaussian',
-   'one-step Gaussian',
-   'one-step Generic',
-   'cdf',
-   'MCMC',
-   'Pearson'
-)
-pval.df <- filter.est(pvals, "randomwalk", 
-                      osa.methods)
-
-plot.fun(pval.df, "osa", FALSE)
-```
-
-```{r, rw-results sim-true, echo = FALSE, message = FALSE, fig.cap = "Randomwalk. Distribution of theoretical p-values under the correct model evaluated for each simulation-based method when true parameters are known. **Take home: unconditional ecdf needs to be rotated but rotation does not matter when conditioning on random effects.**"}
-
-ecdf.methods <- c(
-   "ecdf, Rotated", 
-   "ecdf, Not Rotated"
-)
-pval.df <- filter.true(pvals, "randomwalk", 
-                       ecdf.methods)
-
-plot.fun(pval.df, "sim", TRUE)
-```
-
-```{r, rw-results sim-est, echo = FALSE, message = FALSE, fig.cap = "Randomwalk. Distribution of estimated p-values evaluated for each analytical method when parameters are estimated under the correct (top) and mis-specified (bottom) models. **Take home: unconditional ecdf needs to be rotated but rotation does not matter when conditioning on random effects. Conditioning on estimated random effects results in rejecting the model more often than expected, regardless of rotation.**"}
-
-ecdf.methods <- c(
-   "ecdf, Rotated", 
-   "ecdf, Not Rotated"
-)
-pval.df <- filter.est(pvals, "randomwalk", 
-                       ecdf.methods)
-
-plot.fun(pval.df, "sim", FALSE)
-```
-
 
 ```{r, randomwalk-TypeIError, echo = FALSE, message = FALSE, fig.height = 7, fig.cap = "Randomwalk. Type I Error rates for different quantile residual methods as sample size increases. **Take home: MCMC has a high Type I Error rate when sample sizes are small. Rotated ecdf methods have lower Type I Error rates than unrotated ecdf methods, yet all have high error rates at large sample sizes.**"}
 df <- pvals.all %>% dplyr::filter(model == "randomwalk")
@@ -356,78 +265,37 @@ pow.plot(df)
 \clearpage
 \newpage
 ## Spatial
-```{r, spatial-results osa-true, echo = FALSE, message = FALSE, fig.cap = "Spatial Model. Distribution of theoretical p-values under the correct model evaluated for each analytical method when true parameters are known. **Take home: Pearson residuals reject the correct model at a high rate (high Type I error) when the model is a GLMM but reject the model at the expected rate when the model is a LMM**. "}
-osa.methods <- c(
+
+```{r, spatial-results, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 8, fig.cap = "Simple Mixed Model. Type I error rates and Power evaluated for each analytical and simulation method. Results are partitioned out by model mis-specification (from left to right) and residual type (top to bottom)."}
+res.methods <- c(
    'full Gaussian',
    'one-step Gaussian',
    'one-step Generic',
    'cdf',
    'MCMC',
+   'Unconditional ecdf, Rotated',
+   'Unconditional ecdf, Not Rotated',
+   'Conditional ecdf, Rotated',  
+   'Conditional ecdf, Not Rotated',
    'Pearson'
 )
-pval.df <- filter.true(pvals, "spatial", 
-                      osa.methods)
 
-pval.df$misp <- factor(pval.df$misp,
+pval.df.true <- filter.true(pvals, "spatial",
+                       res.methods)
+pval.df.est <- filter.est(pvals, "spatial",
+                       res.methods)
+
+pval.df.true$misp <- factor(pval.df.true$misp,
                      levels = c("dropRE", "mispomega"),
                      labels = c("GLMM - Drop RE",
                                 "LMM - Lognormal RE"))
-
-plot.fun(pval.df, "osa", TRUE)
-```
-
-```{r, spatial-results osa-est, echo = FALSE, message = FALSE, fig.height = 8, fig.cap = "Spatial Model. Distribution of estimated p-values evaluated for each analytical method when parameters are estimated under the correct (top) and mis-specified (bottom) models. **Take home: Pearson residuals reject the correct model at a high rate (high Type I error) for both the GLMM and LMM. Power is slightly lower for dectecting the mis-specification of the LMM model where random effects were lognormally distributed**"}
-osa.methods <- c(
-   'full Gaussian',
-   'one-step Gaussian',
-   'one-step Generic',
-   'cdf',
-   'MCMC',
-   'Pearson'
-)
-pval.df <- filter.est(pvals, "spatial", 
-                      osa.methods)
-
-pval.df$misp <- factor(pval.df$misp,
+pval.df.est$misp <- factor(pval.df.est$misp,
                      levels = c("dropRE", "mispomega"),
                      labels = c("GLMM - Drop RE",
                                 "LMM - Lognormal RE"))
+  
 
-plot.fun(pval.df, "osa", FALSE)
-```
-
-```{r, spatial-results sim-true, echo = FALSE, message = FALSE, fig.cap = "Spatial Model. Distribution of theoretical p-values under the correct model evaluated for each simulation-based method when true parameters are known. **Take home: the unconditional ecdf residuals reject the correct model at a high rate (high Type I error) when the model is a GLMM, regardless of rotation. The rotation corrects the unconditional ecdf residuals when the model is a LMM. The rotated, conditional ecdf residuals reject the correct model more often than expected, while the unrotated residuals reject the correct model at approximately the expected rate. For the LMM, the rotation does not have an effect - both produce uniformally distributed residuals. This result suggests an error in the rotation when observations are not normal.** "}
-
-ecdf.methods <- c(
-   "ecdf, Rotated", 
-   "ecdf, Not Rotated"
-)
-pval.df <- filter.true(pvals, "spatial", 
-                      ecdf.methods)
-
-pval.df$misp <- factor(pval.df$misp,
-                     levels = c("dropRE", "mispomega"),
-                     labels = c("GLMM - Drop RE",
-                                "LMM - Lognormal RE"))
-
-plot.fun(pval.df, "sim", TRUE)
-```
-
-```{r, spatial-results sim-est, echo = FALSE, message = FALSE,  fig.height = 8, fig.cap = "Spatial Model. Distribution of estimated p-values evaluated for each analytical method when parameters are estimated under the correct (top) and mis-specified (bottom) models. **Take home: For the GLMM model, both the conditional and unconditional ecdf methods reject the correct model more often than expected, regardless of rotation. For the LMM, the rotation corrects the unconditional ecdf residuals, but not the conditional ones. Power is slightly lower for dectecting the mis-specification of the LMM model where random effects are lognormally distributed.**"}
-
-ecdf.methods <- c(
-   "ecdf, Rotated", 
-   "ecdf, Not Rotated"
-)
-pval.df <- filter.est(pvals, "spatial", 
-                      ecdf.methods)
-
-pval.df$misp <- factor(pval.df$misp,
-                     levels = c("dropRE", "mispomega"),
-                     labels = c("GLMM - Drop RE",
-                                "LMM - Lognormal RE"))
-
-plot.fun(pval.df, "sim", FALSE)
+plot.err.pow(pval.df.true, pval.df.est)
 ```
 
 \clearpage

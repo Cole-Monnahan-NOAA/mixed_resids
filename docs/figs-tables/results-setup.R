@@ -6,6 +6,8 @@ library(tidyr)
 library(kableExtra)
 library(ggh4x)
 library(ggsci)
+library(mvtnorm)
+library(moments)
 
 ## Define path to results files
 path <- "../results"
@@ -21,10 +23,14 @@ pvals$version <- factor(pvals$version,
                         levels = c('h0', 'h1'),
                         labels = c('correct',
                                    'mis-specified'))
+pvals$type[which(pvals$method == "pears")] <- "pears"
+pvals$type[which(pvals$method == "mcmc")] <- "sim"
 pvals$type <- factor(pvals$type,
-                     levels = c("osa", "sim"),
+                     levels = c("osa", "sim", "pears"),
                      labels = c("Analytical Methods",
-                                "Simulation Methods"))
+                                "Simulation Methods",
+                                "Pearson"))
+                   
 pvals <- dplyr::filter(pvals, 
                        method %in% c(
                          'fg',
@@ -63,27 +69,27 @@ pvals$level <- factor(pvals$method,
                         "Conditional"))
 pvals$method <- factor(pvals$method,
                        level = c(
-                        'fg',
-                        'osg',
+                        'pears',
                         'gen',
+                        'osg',
+                        'fg',
                         'cdf', 
                         'mcmc',
-                        'pears',
                         'uncond', 
                         'uncond_nrot',
                         'cond',
                         'cond_nrot'),
                       label = c(
-                        'full Gaussian',
-                        'one-step Gaussian',
+                        'Pearson',
                         'one-step Generic',
+                        'one-step Gaussian',
+                        'full Gaussian',
                         'cdf',
                         'MCMC',
-                        'Pearson',
-                        "ecdf, Rotated", 
-                        "ecdf, Not Rotated", 
-                        "ecdf, Rotated",
-                        "ecdf, Not Rotated"
+                        "Unconditional ecdf, Rotated", 
+                        "Unconditional ecdf, Not Rotated", 
+                        "Conditional ecdf, Rotated",
+                        "Conditional ecdf, Not Rotated"
                       ))
 
 ## Functions
@@ -147,6 +153,49 @@ plot.fun <- function(df, type, doTrue){
     scale_fill_manual(values = c("#440154FF", "#35B779FF")) + 
     scale_color_manual(values = c("#440154FF", "#35B779FF")) +  theme_bw() +
     scale_x_continuous(breaks=c(0,0.5, 1))
+  print(p)
+}
+
+plot.err.pow <- function(df.true, df.est){
+  pvals.true <- df.true %>% filter(version == "correct") %>%
+    group_by(misp, method, type) %>%
+    summarize(typeIerror = sum(pvalue <= 0.05)/sum(pvalue >= 0))
+  pvals.true$restype <- "Theoretical"
+  pvals.true$power <- NA
+  
+  pvals.err.est <- df.est %>% filter(version == "correct") %>%
+    group_by(misp, method, type) %>%
+    summarize(typeIerror = sum(pvalue <= 0.05)/sum(pvalue >= 0))
+  pvals.err.est$restype <- "Estimated"
+  
+  pvals.power <-df.est %>% filter(version == "mis-specified") %>%
+    group_by(misp, method, type) %>%
+    summarize(power = sum(pvalue <= 0.05)/sum(pvalue >= 0))
+  pvals.power$restype <- "Estimated"
+  pvals.est <- left_join(pvals.err.est, pvals.power)
+  
+  pvals.comb <- rbind(pvals.true, pvals.est) %>% 
+    pivot_longer(., c(4,6), names_to = "metric", values_to = "pvalue") 
+  
+  pvals.comb$metric = factor(pvals.comb$metric, 
+                             levels = c("typeIerror", "power"),
+                             labels = c("Type I Error", "Power"))
+  
+  data_vline <- tidyr::expand_grid(misp = unique(pvals.comb$misp),
+                                   metric = unique(pvals.comb$metric))
+  data_vline$vline <- ifelse(data_vline$metric == "Type I Error", 0.05, 0.95)
+    
+  p <- pvals.comb  %>% 
+    ggplot(., aes(x = pvalue, y = method)) + 
+    geom_vline(data = data_vline,
+               aes(xintercept = vline), color = "red",
+               size = 0.75, show.legend = FALSE) +
+    geom_point(mapping = aes(color = type)) + 
+    facet_nested(restype ~ misp + metric, labeller = label_wrap_gen(16) )  +
+    scale_x_continuous(breaks=c(0,0.5,1)) + 
+    ylab("") + xlab("") +
+    scale_color_viridis_d() +
+    theme_bw() + theme(legend.position="bottom")
   print(p)
 }
 
