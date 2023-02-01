@@ -97,7 +97,7 @@ filter.true <- function(df, mod, method.vec){
   dplyr::filter(df, model == mod & 
                   test == "GOF.ks" & 
                   method %in% method.vec &
-                  do.true == TRUE & version == "correct")
+                  do.true == TRUE)
 }
 
 filter.est <- function(df, mod, method.vec){
@@ -111,42 +111,12 @@ plot.fun <- function(df, type, doTrue){
   no.misp <- length(unique(df$misp))
   p <- ggplot(df, aes(pvalue, fill = version, color=version))
   if(no.misp == 1){
-    
-    if(type == "osa" & doTrue){
-      p <- p + facet_wrap(~method, labeller = label_wrap_gen(12), 
-                          scales = "free_y") 
-    }
-    if(type == "osa" & !doTrue){
-      p <- p + facet_grid2(version ~ method, labeller = label_wrap_gen(12), 
-                           scales = "free_y", independent = "y") 
-    }
-    if(type == "sim" & doTrue){
-      p <- p + facet_nested(~level+method, labeller = label_wrap_gen(12), 
-                           scales = "free_y", independent = "y") 
-    }
-    if(type == "sim" & !doTrue){
-      p <- p + facet_nested(version ~ level+method, labeller = label_wrap_gen(12), 
-                           scales = "free_y", independent = "y") 
-    }
+    p <- p + facet_grid2(version ~ method, labeller = label_wrap_gen(12), 
+                         scales = "free_y", independent = "y") 
   } 
   if(no.misp > 1){
-    
-    if(type == "osa" & doTrue){
-      p <- p + facet_grid2(misp ~ method, labeller = label_wrap_gen(14), 
-                          scales = "free_y", independent = "y") 
-    }
-    if(type == "osa" & !doTrue){
-      p <- p + facet_nested(version+misp ~ method, labeller = label_wrap_gen(14), 
-                           scales = "free_y", independent = "y") 
-    }
-    if(type == "sim" & doTrue){
-      p <- p + facet_nested(misp ~ level+method, labeller = label_wrap_gen(14), 
-                           scales = "free_y", independent = "y") 
-    }
-    if(type == "sim" & !doTrue){
-      p <- p + facet_nested(version+misp ~ level+method, labeller = label_wrap_gen(14), 
-                           scales = "free_y", independent = "y") 
-    }
+    p <- p + facet_nested(version+misp ~ method, labeller = label_wrap_gen(14),
+                         scales = "free_y", independent = "y")
   }
   p <- p +  geom_histogram(position ='identity', bins = 50,
                            show.legend = FALSE) +
@@ -203,12 +173,12 @@ plot.err.pow <- function(df.true, df.est){
 results.simpleGLMM.obs <- readRDS(paste0(path, '/simpleGLMM_missunifcov_obs_sample_sizes.RDS'))
 results.simpleGLMM.grps <- readRDS(paste0(path, '/simpleGLMM_missunifcov_grps_sample_sizes.RDS'))
 results.simpleGLMM.grps$pvals$model <-
-  results.simpleGLMM.grps$runtimes$model <- 
+  results.simpleGLMM.grps$runtimes$model <-
   "simpleGLMM.vary.nobs"
 
 results.simpleGLMM.obs <- readRDS(paste0(path, '/simpleGLMM_missunifcov_grps_sample_sizes.RDS'))
 results.simpleGLMM.obs$pvals$model <-
-  results.simpleGLMM.obs$runtimes$model <- 
+  results.simpleGLMM.obs$runtimes$model <-
   "simpleGLMM.vary.ngrps"
 
 results.randomwalk <- readRDS(paste0(path, '/randomwalk_mu0_sample_sizes.RDS'))
@@ -231,8 +201,8 @@ runtimes.all$level <- factor(runtimes.all$type,
                                'cdf',
                                'mcmc',
                                'pears',
-                               'uncond', 
-                               'uncond_nrot', 
+                               'uncond',
+                               'uncond_nrot',
                                'cond',
                                'cond_nrot'),
                              label = c(
@@ -254,8 +224,8 @@ pvals.all$level <- factor(pvals.all$method,
                             'cdf',
                             'mcmc',
                             'pears',
-                            'uncond', 
-                            'uncond_nrot', 
+                            'uncond',
+                            'uncond_nrot',
                             'cond',
                             'cond_nrot'),
                           label = c(
@@ -275,10 +245,10 @@ runtimes.all$method <- factor(runtimes.all$type,
                                 'fg',
                                 'osg',
                                 'gen',
-                                'cdf', 
+                                'cdf',
                                 'mcmc',
                                 'pears',
-                                'uncond', 
+                                'uncond',
                                 'uncond_nrot',
                                 'cond',
                                 'cond_nrot'),
@@ -289,8 +259,8 @@ runtimes.all$method <- factor(runtimes.all$type,
                                 'cdf',
                                 'MCMC',
                                 'Pearson',
-                                "Unconditional ecdf, Rotated", 
-                                "Unconditional ecdf, Not Rotated", 
+                                "Unconditional ecdf, Rotated",
+                                "Unconditional ecdf, Not Rotated",
                                 "Conditional ecdf, Rotated",
                                 "Conditional ecdf, Not Rotated"
                               ))
@@ -299,10 +269,10 @@ pvals.all$method <- factor(pvals.all$method,
                               'fg',
                               'osg',
                               'gen',
-                              'cdf', 
+                              'cdf',
                               'mcmc',
                               'pears',
-                              'uncond', 
+                              'uncond',
                               'uncond_nrot',
                               'cond',
                               'cond_nrot'),
@@ -313,49 +283,50 @@ pvals.all$method <- factor(pvals.all$method,
                               'cdf',
                               'MCMC',
                               'Pearson',
-                              "ecdf, Rotated", 
-                              "ecdf, Not Rotated", 
+                              "ecdf, Rotated",
+                              "ecdf, Not Rotated",
                               "ecdf, Rotated",
                               "ecdf, Not Rotated"
                             ))
-    
+
 
 t1.err.plot <- function(df){
   x.name <- "Number of Observations"
-  if("simpleGLMM.vary.nobs" %in% df$model | 
+  if("simpleGLMM.vary.nobs" %in% df$model |
      "simpleGLMM.vary.ngroups" %in% df$model ){
     x.name <- "Number of Observations x Number of Groups"
-  } 
+  }
   p <- df %>%
-    filter(version == "h0") %>% 
-    group_by(nobs, method, level) %>% 
+    filter(version == "h0") %>%
+    group_by(nobs, method, level) %>%
     summarise(t1_err = sum(pvalue<0.05)/sum(pvalue>=0)) %>%
     ggplot(aes(x = nobs, y = t1_err)) +
-    ylab("Type I Error Rate") + 
-    xlab(x.name) + 
+    ylab("Type I Error Rate") +
+    xlab(x.name) +
     geom_point() + geom_line() +
     facet_grid(method~level, labeller = label_wrap_gen(14)) +
     theme_bw()
-    
+
   print(p)
 }
 
 pow.plot <- function(df){
   x.name <- "Number of Observations"
-  if("simpleGLMM.vary.nobs" %in% df$model | 
+  if("simpleGLMM.vary.nobs" %in% df$model |
      "simpleGLMM.vary.ngroups" %in% df$model ){
     x.name <- "Number of Observations x Number of Groups"
-  } 
-  p <- df %>% 
-    filter(version == "h1") %>% 
-    group_by(nobs, method, level) %>% 
+  }
+  p <- df %>%
+    filter(version == "h1") %>%
+    group_by(nobs, method, level) %>%
     summarise(power = sum(pvalue<=0.05)/sum(pvalue>=0)) %>%
     ggplot(aes(x = nobs, y = power)) +
-      ylab("Power") + 
-      xlab(x.name)  + 
+      ylab("Power") +
+      xlab(x.name)  +
       geom_point() + geom_line() +
       facet_grid(method~level, labeller = label_wrap_gen(14)) +
       theme_bw()
-  
+
   print(p)
 }
+

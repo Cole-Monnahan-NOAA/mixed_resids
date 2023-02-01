@@ -222,35 +222,58 @@ pow.plot(df)
 \newpage
 ## Randomwalk
 
-```{r, randomwalk-results, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 8, fig.cap = "Simple Mixed Model. Type I error rates and Power evaluated for each analytical and simulation method. Results are partitioned out by residual type (top to bottom)."}
-res.methods <- c(
+```{r, rw-results osa-true, echo = FALSE, message = FALSE, fig.cap = "Randomwalk. Distribution of theoretical p-values under the correct model evaluated for each analytical method when true parameters are known. **Take home: all return approx uniform p-value distributions, including Pearson.**"}
+osa.methods <- c(
    'full Gaussian',
    'one-step Gaussian',
    'one-step Generic',
    'cdf',
    'MCMC',
-   'Unconditional ecdf, Rotated',
-   'Unconditional ecdf, Not Rotated',
-   'Conditional ecdf, Rotated',  
-   'Conditional ecdf, Not Rotated',
    'Pearson'
 )
-
-pval.df.true <- filter.true(pvals, "randomwalk",
-                       res.methods)
-pval.df.est <- filter.est(pvals, "randomwalk",
-                       res.methods)
-
-pval.df.true$misp <- factor(pval.df.true$misp,
-         levels = "mu0",
-         labels = "Missing Drift Term")
-pval.df.est$misp <- factor(pval.df.est$misp,
-         levels = "mu0",
-         labels = "Missing Drift Term")
-  
-
-plot.err.pow(pval.df.true, pval.df.est)
+pval.df <- filter.true(pvals, "randomwalk", 
+                       osa.methods)
+plot.fun(pval.df, "osa", TRUE)
 ```
+
+```{r, rw-results osa-est, echo = FALSE, message = FALSE, fig.cap = "Randomwalk. Distribution of estimated p-values evaluated for each analytical method when parameters are estimated under the correct (top) and mis-specified (bottom) models. **Take home: Pearson rejects the correct model more than expected, MCMC fails to detect mis-specification.**"}
+osa.methods <- c(
+   'full Gaussian',
+   'one-step Gaussian',
+   'one-step Generic',
+   'cdf',
+   'MCMC',
+   'Pearson'
+)
+pval.df <- filter.est(pvals, "randomwalk", 
+                      osa.methods)
+plot.fun(pval.df, "osa", FALSE)
+```
+
+```{r, rw-results sim-true, echo = FALSE, message = FALSE, fig.cap = "Randomwalk. Distribution of theoretical p-values under the correct model evaluated for each simulation-based method when true parameters are known. **Take home: unconditional ecdf needs to be rotated but rotation does not matter when conditioning on random effects.**"}
+ecdf.methods <- c(
+   "Unconditional ecdf, Not Rotated", 
+   "Conditional ecdf, Not Rotated",
+   "Unconditional ecdf, Rotated", 
+   "Conditional ecdf, Rotated"
+)
+pval.df <- filter.true(pvals, "randomwalk", 
+                       ecdf.methods)
+plot.fun(pval.df, "sim", TRUE)
+```
+
+```{r, rw-results sim-est, echo = FALSE, message = FALSE, fig.cap = "Randomwalk. Distribution of estimated p-values evaluated for each analytical method when parameters are estimated under the correct (top) and mis-specified (bottom) models. **Take home: unconditional ecdf needs to be rotated but rotation does not matter when conditioning on random effects. Conditioning on estimated random effects results in rejecting the model more often than expected, regardless of rotation.**"}
+ecdf.methods <- c(
+   "Unconditional ecdf, Not Rotated", 
+   "Conditional ecdf, Not Rotated",
+   "Unconditional ecdf, Rotated", 
+   "Conditional ecdf, Rotated"
+)
+pval.df <- filter.est(pvals, "randomwalk", 
+                       ecdf.methods)
+plot.fun(pval.df, "sim", FALSE)
+```
+
 
 ```{r, randomwalk-TypeIError, echo = FALSE, message = FALSE, fig.height = 7, fig.cap = "Randomwalk. Type I Error rates for different quantile residual methods as sample size increases. **Take home: MCMC has a high Type I Error rate when sample sizes are small. Rotated ecdf methods have lower Type I Error rates than unrotated ecdf methods, yet all have high error rates at large sample sizes.**"}
 df <- pvals.all %>% dplyr::filter(model == "randomwalk")
@@ -303,7 +326,7 @@ plot.err.pow(pval.df.true, pval.df.est)
 
 ## Model Runtimes
 ```{r runtimes-log-scale, echo = FALSE, message = FALSE}
-runtimes.all$model <- 
+runtimes.all$model <-
   factor(runtimes.all$model,
          levels = c("simpleGLMM.vary.ngrps",
                     "simpleGLMM.vary.nobs",
@@ -313,25 +336,25 @@ runtimes.all$model <-
                     "Simple LMM, vary no. obs",
                     "Randomwalk",
                     "Spatial"))
-p <- runtimes.all %>% 
+p <- runtimes.all %>%
   ggplot(.,aes(nobs, med, ymin=lwr, ymax=upr,  color=method)) +
-  geom_line()+ 
+  geom_line()+
   facet_wrap(~model) +
   geom_pointrange(fatten=2) + scale_y_log10()+ scale_x_log10()+
   labs(y='runtime, log10(s)') +
-  theme_bw() + 
+  theme_bw() +
   scale_color_jco()
 p
 ```
 
 ```{r runtimes, echo = FALSE, message = FALSE}
-p <- runtimes.all %>% 
+p <- runtimes.all %>%
   ggplot(.,aes(nobs, med, ymin=lwr, ymax=upr,  color=method)) +
-  geom_line()+ 
+  geom_line()+
   facet_wrap(~model) +
-  geom_pointrange(fatten=2) + 
+  geom_pointrange(fatten=2) +
   labs(y='runtime, s') +
-  theme_bw() + 
+  theme_bw() +
   scale_color_jco()
 p
 ```
