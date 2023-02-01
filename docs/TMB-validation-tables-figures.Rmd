@@ -22,7 +22,7 @@ set.seed(123)
 # Approx. normal gamma
 y1 <- rgamma(1000, shape = 100, scale = .1)# mean=10; var=1
 # Skewed gamma
-y2 <- rgamma(1000, shape = .5, scale = 3)# mean=1.5; var = 4.5
+y2 <- rgamma(1000, shape = .1, scale = sqrt(10))# mean =approx. .316; var = 1
 
 output.iid <- function(y){
   hist(y)
@@ -44,55 +44,64 @@ output.iid <- function(y){
   return(invisible(y))
   
 }
+
 # iid
 par(mfrow = c(2,3))
 output.iid(y1)
 output.iid(y2)
 
 #Banded Correlation
-set.seed(1)
-C <- exp(-as.matrix(dist(seq(0,1,by=.1))))
-L <- t(chol(C))
-n.sim <- 500
-eta <- t(rmvnorm(n.sim,sigma=C))
-
-# Correlation in mean process
 # Normal case
-y7 <- eta
-r7.nrot <- y7 #mean=0; sd=1, this is essentially the Pearson residual (y7-0)/1
-r7.rot <- solve(L, y7)
-gof.nrot <- ks.test(r7.nrot, "pnorm")$p.value
+set.seed(1)
+C <- exp(-as.matrix(dist(seq(0,10,length.out = 500))))
+sig <- 3
+S <- diag(rep(sig, ncol(C))) %*% C %*%  diag(rep(sig, ncol(C)))
+eta <- as.numeric(rmvnorm(1, rep(0, ncol(C)), sigma=S)) 
+L <- t(chol(S))
+
+y7 <- eta + 2
+mode <- y7 - mean(y7)
+r7.pears <- mode/sd(y7)
+r7.rot <- t(solve(L, mode))
+gof.pears <- ks.test(r7.pears, "pnorm")$p.value
 gof.rot <- ks.test(r7.rot, "pnorm")$p.value
 
+
+set.seed(123)
+# Gamma case
+alpha = .1
+y8 <- rgamma( length(eta), shape = alpha, scale = exp(eta+2)/alpha )
+mu.x <- mean(y8)
+var.x <- var(y8)
+mode <- y8 - mu.x
+r8.pears <- mode/sqrt(var.x)
+r8 <- qnorm(pgamma(y8, mu.x^2/var.x, scale = var.x/mu.x))
+r8.rot <- solve( t(chol(C)), r8)
+# hist(r8);hist(r8.rot)
+# ks.test(r8, "pnorm");ks.test(r8.rot, "pnorm")
+
+gof.pears <- ks.test(r8.pears, "pnorm")$p.value
+gof.quant <- ks.test(r8, "pnorm")$p.value
+gof.rot <- ks.test(r8.rot, "pnorm")$p.value
+
+
 par(mfrow = c(2,3))
-boxplot(t(y7), horizontal=TRUE)
-(qqnorm(r7.nrot,
-        main = "Unrotated Normal Q-Q Plot",
-        xlab = paste("Ks Test", round(gof.nrot, 3))));abline(0,1, col = "red", lwd=1.5)
+hist(y7)
+(qqnorm(r7.pears,
+        main = "Pearson Normal Q-Q Plot",
+        xlab = paste("Ks Test", round(gof.pears, 3))));abline(0,1, col = "red", lwd=1.5)
 (qqnorm(r7.rot,
         main = "Rotated Normal Q-Q Plot",
         xlab = paste("Ks Test", round(gof.rot, 3))));abline(0,1, col = "red", lwd=1.5)
+hist(y8);
+(qqnorm(r8.pears,
+        main = "Pearson Skewed Q-Q Plot",
+        xlab = paste("Ks Test", round(gof.pears, 3))));abline(0,1, col = "red", lwd=1.5)
+(qqnorm(r8.rot,
+        main = "Rotated, Quantile Skewed Q-Q Plot",
+        xlab = paste("Ks Test", round(gof.rot, 3))));abline(0,1, col = "red", lwd=1.5)
 
-# Gamma case
-sig2 <- 1
-y8 <- t(apply(exp(eta), 1:2, function(x) rgamma(1, x^2/sig2, scale = sig2/x )))
-hist(y8)
-moments::skewness(as.vector(y8)); moments::kurtosis(as.vector(y8))
 
-#pgamma removes skewness and lowers kurtosis but returns zeros - cannot convert with qnorm, returns -Inf values
-r8.unif <- apply(y8, 2, function(x) pgamma(x, mean(x)^2/var(x), scale = var(x)/mean(x)))
-hist(r8.unif)
-moments::skewness(as.vector(r8.unif)); moments::kurtosis(as.vector(r8.unif))
-
-#rotating first removes correlation but retains kurtosis - cannot use pgamma because negative values
-S <- cov(y8)
-y8 <- t(y8)
-L <- t(chol(S))
-mode <- apply(y8, 1, function(x) x - mean(x))
-r8.rot <- solve(L, y8)
-hist(r8.rot)
-moments::skewness(as.vector(r8.rot))
-moments::kurtosis(as.vector(r8.rot))
 ```
 
 
