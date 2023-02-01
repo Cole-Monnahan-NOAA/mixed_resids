@@ -203,10 +203,10 @@ calc.sac <- function(type, dat, res.obj, version){
   
   if(type == 'osa'){
     res.names <- c('cdf', 'gen', 'fg', 'mcmc', 'osg',
-                   'pears', 're_mcmc')#, 're_mcmc_obs')
+                   'pears')
   }
   if(type == 'sim'){
-    res.names <- c('cond', 're_uncond',  'uncond')#, 're_uncond_obs',)
+    res.names <- c('cond', 'uncond', 'cond_nrot', 'uncond_nrot')
   }
   
   df <- data.frame(type = character(), method = character(), model = character(),
@@ -214,8 +214,6 @@ calc.sac <- function(type, dat, res.obj, version){
   
   dmat.obs <- as.matrix(dist(dat$loc, upper = TRUE))
   wt.obs<- 1/dmat.obs; diag(wt.obs) <- 0
- # dmat.all <- as.matrix(dist(dat$mesh$loc[,1:2], upper = TRUE))
- # wt.all <- 1/dmat.all; diag(wt.all) <- 0
 
  # y <- NA
   
@@ -228,12 +226,7 @@ calc.sac <- function(type, dat, res.obj, version){
       x <- res.obj[[m]]$out$scaledResiduals
     }
     if (nms %in% res.names) {
-      # if ( (nms == 're_mcmc') |
-      #      (nms == 're_uncond') ){
-      #   wt <- wt.all
-      # } else {
         wt <- wt.obs
-      # }s
       if(is.numeric(x)){
         ## only test for positive correlationa
         y <- ape::Moran.I(x, wt, alternative = 'greater')$p.value

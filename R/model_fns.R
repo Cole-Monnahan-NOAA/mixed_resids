@@ -315,9 +315,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
       }
       
       if('uncond_nrot' %in% dharma.methods | 
-         'uncond' %in% dharma.methods |
-         're_uncond' %in% dharma.methods |
-         're_uncond_nrot' %in% dharma.methods){
+         'uncond' %in% dharma.methods){
         mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
         #retape, do not reset parameters to initial values
         mod.out[[h]]$obj$retape(set.defaults = FALSE) 
@@ -345,66 +343,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
         dharma.out[[h]]$uncond$runtime <- NA
       }
       
-      if('re_uncond' %in% dharma.methods & mod != 'linmod' & Random ){
-        if(mod == 'spatial'){
-          expr <- expression(obj$simulate()$omega)  
-          idx <- init.dat[[h]]$mesh_i+1
-          obs <- mod.out[[h]]$obj$env$parList()$omega[idx]
-        } else {
-          #center simulation and obs
-          expr <- expression(obj$simulate()$u )
-          obs <- mod.out[[h]]$obj$env$parList()$u
-          idx <- 1:length(obs)
-        }
-        if(mod == 'randomwalk'){
-          fpr <- mod.out[[h]]$report$ypred
-        } else {
-          fpr <- rep(0, length(obs))
-        }
-        dharma.out[[h]]$re_uncond <- 
-          calculate.dharma(mod.out[[h]]$obj, 
-                           expr,
-                           obs=obs, 
-                           idx = idx,
-                           fpr = fpr, 
-                           int.resp = disc, 
-                           rot = rot)
-      } else {
-        dharma.out[[h]]$re_uncond <- list()
-        dharma.out[[h]]$re_uncond$resids <- NA
-        dharma.out[[h]]$re_uncond$runtime <- NA
-      }
-      
-      if('re_uncond_nrot' %in% dharma.methods & mod != 'linmod' & Random ){
-        if(mod == 'spatial'){
-          expr <- expression(obj$simulate()$omega)  
-          idx <- init.dat[[h]]$mesh_i+1
-          obs <- mod.out[[h]]$obj$env$parList()$omega[idx]
-          fpr <- rep(0, length(obs))
-        } else {
-          #center simulation and obs
-          expr <- expression(obj$simulate()$u )
-          obs <- mod.out[[h]]$obj$env$parList()$u
-          idx <- 1:length(obs)
-          if(mod == 'randomwalk'){
-            fpr <- mod.out[[h]]$report$ypred
-          } else {
-            fpr <- rep(0, length(obs))
-          }
-        }
-        dharma.out[[h]]$re_uncond_nrot <- 
-          calculate.dharma(mod.out[[h]]$obj, expr, 
-                           obs=obs, 
-                           idx = idx,
-                           fpr = fpr, 
-                           int.resp = disc, rot = NULL)
-      } else {
-        dharma.out[[h]]$re_uncond_nrot <- list()
-        dharma.out[[h]]$re_uncond_nrot$resids <- NA
-        dharma.out[[h]]$re_uncond_nrot$runtime <- NA
-      }
-
-       ## only makes sense to run when MLE is estimated and there
+      ## only makes sense to run when MLE is estimated and there
       ## are RE - turning on when do.true == TRUE (AMH, 6/3/2022)
       if('mcmc' %in% osa.methods){
         t0 <- Sys.time()
@@ -429,7 +368,8 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
           ## Calculate residuals given the sample
           tmp <- objmle$report(postmle)
         }
-        if(misp == "dropRE" & h == 2){
+        #if no random effect in model mispecification, return the quantile residual
+        if(misp == "dropRE" & h == 2){ 
           tmp <- mod.out[[h]]$report
         }
         if(is.null(true.parms$fam)){
@@ -504,101 +444,10 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
         }
         osa.out[[h]]$runtime.mcmc <- as.numeric(Sys.time()-t0, 'secs')
         
-        if('re_mcmc' %in% osa.methods & Random){
-          if(mod == "randomwalk"){
-            sig <- tmp$tau
-            mode <- c(tmp$ypred, unlist(FE))
-            Hess <- mod.out[[h]]$obj$env$spHess(mode, random = TRUE)
-            idx <- which(names(mod.out[[h]]$obj$env$par) == "u")
-            Sigma <- solve(as.matrix(GMRFmarginal(Hess, idx)))
-            res <- postmle - mode[idx]
-            L <- t(chol(Sigma))
-            osa.out[[h]]$re_mcmc <- as.vector(solve(L, res))
-            # 
-            # Fx <- pnorm(q = postmle, mean = mu, sd = sig) #needs rotation?
-            # osa.out[[h]]$re_mcmc <- qnorm(Fx)
-          } 
-          if(mod == "simpleGLMM"){
-            u.idx <- grep('u', names(objmle$par))
-            sig <- tmp$sig_u
-            mu <- rep(0,length(u.idx))
-            Fx <- pnorm(q = postmle[u.idx], mean = mu, sd = sig) 
-            osa.out[[h]]$re_mcmc <- qnorm(Fx)
-          }
-          # if(mod == "spatial"){
-          #   omega.idx <- grep('omega', names(objmle$par))
-          #   mu <- rep(0, length(postmle[omega.idx]))
-          #   #rotation using spatial covariance matrix
-          #   Sigma <- solve(tmp$Q * exp(2 * FE$ln_tau))
-          #   res <- postmle[omega.idx] #mode of GMRF is 0
-          #   L <- t(chol(Sigma))
-          #   r1 <- as.vector(solve(L, res))
-          #   osa.out[[h]]$re_mcmc <- r1
-          # }
-          if(mod == "spatial"){#filter on omegas associated with obs
-            omega.idx <- grep('omega', names(objmle$par))
-            omega.idx <- omega.idx[init.dat[[h]]$mesh_i+1]
-            mu <- rep(0,length(omega.idx))
-            Q <- tmp$Q * exp(2 * FE$ln_tau)
-            Sigma <- solve(as.matrix(GMRFmarginal(Q, omega.idx)))
-            res <- postmle[omega.idx] #mode of GMRF is 0
-            L <- t(chol(Sigma))
-            r1 <- as.vector(solve(L, res))
-            osa.out[[h]]$re_mcmc <- r1
-            #if(h==1) osa.methods <- c(osa.methods, 're_obs_mcmc')
-          } else {
-            #osa.out[[h]]$re_obs_mcmc <- NA
-            osa.out[[h]]$re_mcmc <- NA
-          }
-          
-          if(misp == 'overdispersion' & mod != 'linmod' & h == 1){
-            mu <- rep(0, n)
-            sig <- tmp$sig_v
-            Fx <- pnorm(q = postmle[grep('v', names(objmle$par))], 
-                        mean = mu, sd = sig)
-            osa.out[[h]]$re_mcmc_v <- qnorm(Fx)
-            osa.methods <- c(osa.methods, 're_mcmc_v')
-          } else {
-            osa.out[[h]]$re_mcmc_v <- NA
-          }
-        }
       }else {
         osa.out[[h]]$mcmc <- osa.out[[h]]$runtime.mcmc <- NA
-        osa.out[[h]]$re_mcmc <- NA
         #
       }
-      
-      if('re_fg' %in% osa.methods & Random){
-        if(mod == "randomwalk"){
-          tmp <- mod.out[[h]]$report
-          sig <- tmp$tau
-          u <- mod.out[[h]]$obj$env$parList()$u
-          mode <- tmp$ypred
-          Hess <- mod.out[[h]]$obj$env$spHess(mode, random = TRUE)
-          idx <- which(names(mod.out[[h]]$obj$env$parList()) == "u")
-          Sigma <- solve(as.matrix(GMRFmarginal(Hess, idx)))
-          res <- u - mode
-          L <- t(chol(Sigma))
-          osa.out[[h]]$re_fg <- as.vector(solve(L, res))
-        }
-        if(mod == "spatial"){#filter on omegas associated with obs
-          tmp <- mod.out[[h]]$report
-          p.list <- mod.out[[h]]$obj$env$parList()
-          omega.idx <- grep('omega', names(mod.out[[h]]$obj$env$last.par.best))
-          omega.idx <- omega.idx[init.dat[[h]]$mesh_i+1]
-          omega <- p.list$omega[omega.idx]
-          mu <- rep(0,length(omega.idx))
-          Q <- tmp$Q * exp(2 * p.list$ln_tau)
-          Sigma <- solve(as.matrix(GMRFmarginal(Q, omega.idx)))
-          L <- t(chol(Sigma))
-          r1 <- as.vector(solve(L, omega))
-          osa.out[[h]]$re_fg <- r1
-          #if(h==1) osa.methods <- c(osa.methods, 're_obs_mcmc')
-        }
-      } else {
-        osa.out[[h]]$re_fg <- NA
-      }
-      
     
       AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC) #!doesn't work if doTrue == TRUE
       AICc <- ifelse(do.true, NA, mod.out[[h]]$aic$AICc) #!doesn't work if doTrue == TRUE
@@ -620,10 +469,8 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
                            osa.osg=osa.out[[h]]$osg,
                            osa.mcmc=osa.out[[h]]$mcmc, 
                            pears=osa.out[[h]]$pears,
-                          # osa.re_mcmc=osa.out[[h]]$re_mcmc, #difficult to include b/c diff dimension from data
                            sim_cond= dharma.out[[h]]$cond$resids,
-                           sim_uncond=dharma.out[[h]]$uncond$resids)#,
-                           #sim_re_uncond=dharma.out[[h]]$re_uncond$resids) #difficult to include b/c diff dimension from data
+                           sim_uncond=dharma.out[[h]]$uncond$resids)) #difficult to include b/c diff dimension from data
       if(ii == 1){
         
       }
