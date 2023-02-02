@@ -667,7 +667,7 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
         par1 <- par0
       }
     } else {
-      par0 <- par1 <- list(u = rep(1, length(Dat$random$u)), mu = 0, ln_sig = 0, ln_tau = 0)
+      par0 <- par1 <- list(u = rep(1, length(Dat$random$u0)), mu = 0, ln_sig = 0, ln_tau = 0)
     }
   }
 
