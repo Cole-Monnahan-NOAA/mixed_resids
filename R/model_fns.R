@@ -470,7 +470,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
                            osa.mcmc=osa.out[[h]]$mcmc, 
                            pears=osa.out[[h]]$pears,
                            sim_cond= dharma.out[[h]]$cond$resids,
-                           sim_uncond=dharma.out[[h]]$uncond$resids)) #difficult to include b/c diff dimension from data
+                           sim_uncond=dharma.out[[h]]$uncond$resids) #difficult to include b/c diff dimension from data
       if(ii == 1){
         
       }
@@ -660,13 +660,14 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
 
   if(Mod == 'randomwalk'){
     if(doTrue){
-      par0 <-  list(u = Dat$random$u, mu = Pars$theta, ln_sig = log(Pars$sd.vec[1]), ln_tau = log(Pars$sd.vec[2]))
+      par0 <-  list(u = Dat$random$u0, mu = Pars$theta, ln_sig = log(Pars$sd.vec[1]), ln_tau = log(Pars$sd.vec[2]))
+      if(Misp == 'mu0'){
+        par1 <-  list(u = Dat$random$u1, mu = 0, ln_sig = log(Pars$sd.vec[1]), ln_tau = log(Pars$sd.vec[2]))
+      } else {
+        par1 <- par0
+      }
     } else {
-      par0 <- list(u = rep(1, length(Dat$random$u)), mu = 0, ln_sig = 0, ln_tau = 0)
-    }
-    par1 <- par0
-    if(Misp == 'mu0'){
-      par1$mu = 0
+      par0 <- par1 <- list(u = rep(1, length(Dat$random$u)), mu = 0, ln_sig = 0, ln_tau = 0)
     }
   }
 

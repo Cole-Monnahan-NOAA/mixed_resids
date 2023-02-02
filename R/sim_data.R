@@ -72,11 +72,14 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
     }
     set.seed(seed)
     ## Simulate random measurements
-    u <- c(0,cumsum(rnorm(N-1,mean=mu,sd=sd.vec[2])))
+    u0 <- c(0,cumsum(rnorm(N-1,mean=mu,sd=sd.vec[2])))
+    set.seed(seed)
+    #used only for theoretical mis-specified
+    u1 <- c(0,cumsum(rnorm(N-1,mean=0,sd=sd.vec[2])))
     if(misp == "normal"){
-      y0 <- rlnorm(N, u, sd.vec[1])
+      y0 <- rlnorm(N, u0, sd.vec[1])
     } else {
-      y0 <- u + rnorm(N,sd=sd.vec[1])
+      y0 <- u0 + rnorm(N,sd=sd.vec[1])
     }
     
     y1 <- y0
@@ -84,7 +87,7 @@ simdat <- function(n, ng=0, mod, cov.mod = 'norm',
       y1 <- log(y0)
     }
     
-    random <- list(u=u)
+    random <- list(u0=u0, u1=u1)
   }
 
   if(mod == 'simpleGLMM'){ 
