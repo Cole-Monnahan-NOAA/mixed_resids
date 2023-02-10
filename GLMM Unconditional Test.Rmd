@@ -1,0 +1,216 @@
+---
+title: "GLMM Unconditional Test"
+author: "Andrea Havron"
+date: "2023-01-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Demo of unconditional theoretical residuals. Simulation (n=100) looks at gamma distributed observations that are both skewed towards zero and approximately normal with a random effect grouping term (iid) and random effects with banded correlation.
+
+```{r, echo = FALSE, message = FALSE, warning=FALSE, results='hide'}
+library(DHARMa)
+library(magrittr)
+library(ggplot2)
+library(tidyr)
+library(mvtnorm)
+```
+
+Run Simulation
+```{r, eval = FALSE}
+#true parms
+n <- 100
+ng <- 5
+sd.u <- 1
+beta <- c(2.3, 0.4)
+C <- exp(-as.matrix(dist(seq(0,10,length.out = n))))
+sd.v <- 1.2
+S <- diag(rep(sd.v, n)) %*% C %*%  diag(rep(sd.v, n))
+
+#Simulate approx normal ([1]) and skewed ([2]) gamma
+y.var <- c(1, 4.5)
+
+
+n.sim <- 100
+pvals.gamma.1 <- pvals.gamma.2 <- pvals.gamma.3 <- 
+  data.frame(uncond.rot = rep(NA, n.sim),
+             uncond.nrot = rep(NA, n.sim),
+             uncond.re.rot = rep(NA, n.sim),
+             cond.nrot = rep(NA, n.sim) )
+
+for(ii in 1:n.sim){
+  set.seed(ii); print(ii)
+  u <- rnorm(ng, 0, sd=sd.u)
+  v <- as.numeric(rmvnorm(1, rep(0, ncol(C)), sigma=S)) 
+  
+## Obs data =================================
+  # Approximately normal
+  y.gamma.1 <- as.matrix(u + beta[1]) %>% exp() %>%
+    apply(., 1, function(x) rgamma(n, x^2/y.var[1], scale = y.var[1]/x)) %>% 
+    as.vector() 
+  # Positively skewed
+  y.gamma.2 <- as.matrix(u + beta[2]) %>% exp() %>%
+    apply(., 1, function(x) rgamma(n, x^2/y.var[2], scale = y.var[2]/x)) %>% 
+    as.vector() 
+  # Banded correlation
+  y.gamma.3 <- as.matrix(v) %>% exp() %>%
+    apply(., 2, function(x) rgamma(n, x^2/y.var[1], scale = y.var[1]/x)) %>% 
+    as.vector() 
+ 
+## Unconditional Simulation ================
+  sim.norm.1 <- replicate(1000, {
+    rep(rnorm(ng, beta[1], sd=sd.u), each = n)
+  })
+  sim.gamma.1 <- sim.norm.1 %>%
+      exp() %>%
+      apply(., 2, function(x) rgamma(n*ng, x^2/y.var[1], scale = y.var[1]/x))
+  
+  sim.norm.2 <- replicate(1000, {
+    rep(rnorm(ng, beta[2], sd=sd.u), each = n)
+  })
+  sim.gamma.2 <- sim.norm.2 %>%
+    exp() %>%
+    apply(., 2, function(x) rgamma(n*ng, x^2/y.var[2], scale = y.var[2]/x))
+  
+  sim.norm.3 <- replicate(1000, {
+    as.numeric(rmvnorm(1, rep(0, ncol(C)), sigma=S)) 
+  })
+  sim.gamma.3 <- sim.norm.3 %>%
+    exp() %>%
+    apply(., 2, function(x) rgamma(n, x^2/y.var[1], scale = y.var[1]/x))
+  
+  # Calculate p-values ===================
+  ## Rotated - estimated using covariance of simulated data
+  pvals.gamma.1$uncond.rot[ii] <- 
+    ks.test(
+      createDHARMa(sim.gamma.1, y.gamma.1,
+                   rotation = "estimated")$scaledResiduals, 
+      'punif')$p.value
+  pvals.gamma.2$uncond.rot[ii] <-
+    ks.test(
+      createDHARMa(sim.gamma.2, y.gamma.2,
+                   rotation = "estimated")$scaledResiduals,
+      'punif')$p.value
+  
+  pvals.gamma.3$uncond.rot[ii] <-
+    ks.test(
+      createDHARMa(sim.gamma.3, y.gamma.3,
+                   rotation = "estimated")$scaledResiduals,
+      'punif')$p.value
+  
+  ## Rotated - estimated using covariance of simulated RE
+  covar.1 <- Matrix::nearPD(cov(t(sim.norm.1)))$mat
+  pvals.gamma.1$uncond.re.rot[ii] <- 
+    ks.test(
+      createDHARMa(sim.gamma.1, y.gamma.1,
+                   rotation = as.matrix(covar.1))$scaledResiduals,
+      'punif')$p.value
+  covar.2 <- Matrix::nearPD(cov(t(sim.norm.2)))$mat
+  pvals.gamma.2$uncond.re.rot[ii] <- 
+    ks.test(
+      createDHARMa(sim.gamma.2, y.gamma.2,
+                   rotation = as.matrix(covar.2))$scaledResiduals,
+      'punif')$p.value
+  covar.3 <- Matrix::nearPD(cov(t(sim.norm.3)))$mat
+  pvals.gamma.3$uncond.re.rot[ii] <- 
+    ks.test(
+      createDHARMa(sim.gamma.3, y.gamma.3,
+                   rotation = as.matrix(covar.3))$scaledResiduals,
+      'punif')$p.value
+  
+  
+  ## Not Rotated
+  pvals.gamma.1$uncond.nrot[ii] <- 
+    ks.test(
+      createDHARMa(sim.gamma.1, y.gamma.1)$scaledResiduals, 
+      'punif')$p.value
+  pvals.gamma.2$uncond.nrot[ii] <-
+    ks.test(
+      createDHARMa(sim.gamma.2, y.gamma.2)$scaledResiduals,
+      'punif')$p.value
+  pvals.gamma.3$uncond.nrot[ii] <-
+    ks.test(
+      createDHARMa(sim.gamma.3, y.gamma.3)$scaledResiduals,
+      'punif')$p.value
+  
+  
+# Conditional Simulation ==============================
+  sim.gamma.1 <- replicate(1000, {
+    as.matrix(u + beta[1])  %>% exp() %>%
+      apply(., 1, function(x) rgamma(n, x^2/y.var[1], scale = y.var[1]/x)) %>%
+      as.vector()
+  })
+  sim.gamma.2 <- replicate(1000, {
+    as.matrix(u + beta[2])%>% exp() %>%
+      apply(., 1, function(x) rgamma(n, x^2/y.var[2], scale = y.var[2]/x)) %>%
+      as.vector()
+  })
+  sim.gamma.3 <- replicate(1000,{
+    as.matrix(v) %>%
+    exp() %>%
+    apply(., 2, function(x) rgamma(n, x^2/y.var[1], scale = y.var[1]/x)) %>%
+      as.vector()
+  })
+
+  # Calculate p-values ===================
+  
+  pvals.gamma.1$cond.nrot[ii] <- 
+    ks.test(
+      createDHARMa(sim.gamma.1, y.gamma.1)$scaledResiduals, 
+      'punif')$p.value
+  pvals.gamma.2$cond.nrot[ii] <-
+    ks.test(
+      createDHARMa(sim.gamma.2, y.gamma.2)$scaledResiduals,
+      'punif')$p.value
+  pvals.gamma.3$cond.nrot[ii] <-
+    ks.test(
+      createDHARMa(sim.gamma.3, y.gamma.3)$scaledResiduals,
+      'punif')$p.value
+}
+
+save(pvals.gamma.1, file = "code/unconditional_test/pvals_gamma_1.RData")
+save(pvals.gamma.2, file = "code/unconditional_test/pvals_gamma_2.RData")
+save(pvals.gamma.3, file = "code/unconditional_test/pvals_gamma_3.RData")
+
+```
+
+Simulation Results
+```{r, echo = FALSE, results='hide'}
+load("code/unconditional_test/pvals_gamma_1.RData")
+load("code/unconditional_test/pvals_gamma_2.RData")
+load("code/unconditional_test/pvals_gamma_3.RData")
+
+pvals.gamma.1 <- pivot_longer(pvals.gamma.1, 1:4, names_to = "method",
+                              values_to = "pvalue")
+pvals.gamma.2 <- pivot_longer(pvals.gamma.2, 1:4, names_to = "method",
+                              values_to = "pvalue")
+pvals.gamma.3 <- pivot_longer(pvals.gamma.3, 1:4, names_to = "method",
+                              values_to = "pvalue")
+
+pvals.gamma.1$case <- "Approx. Normal Gamma w/ Grouping RE"
+pvals.gamma.2$case <- "Skewed Gamma w/ Grouping RE"
+pvals.gamma.3$case <- "Skewed Gamma w/ Banded Correlation"
+
+pval.results <- rbind(
+  pvals.gamma.1, pvals.gamma.2, pvals.gamma.3
+)
+
+method.labs <- c(
+  uncond.rot = "Unconditional, Rotated", 
+  uncond.nrot = "Unconditional, Not Rotated",
+  uncond.re.rot = "Unconditional, RE Rotated", 
+  cond.nrot = "Conditional, Not Rotated")
+
+pval.results %>%
+  ggplot(., aes(x=pvalue)) + geom_histogram(bins = 50) + 
+  facet_grid(case~method, 
+             labeller = labeller(method = method.labs, 
+                                 .default = label_wrap_gen(17))) +
+  scale_x_continuous(
+    breaks=c(0,0.5, 1),
+    labels = scales::number_format(accuracy = 0.1)) +
+  theme_bw()
+```
