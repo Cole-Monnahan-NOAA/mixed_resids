@@ -5,14 +5,14 @@ context('osa function tests')
 #use oneStepPredict example from TMB documentation
 
 test_that('ar1xar1 cdf',{
-  runExample("ar1xar1")
+  TMB::runExample("ar1xar1")
   osa.ar1xar1 <- oneStepPredict(obj, "N", "keep", method="cdf", discrete=TRUE, subset = 1:100)
   osa.myfun <- calculate.osa(obj, "cdf", "N", 'keep', Discrete = TRUE, Subset = 1:100)
   expect_equal(osa.ar1xar1$residual, osa.myfun$cdf)
 })
 
 test_that('simple, all',{
-  runExample('simple')
+  TMB::runExample('simple')
   osa.simple.fg <- oneStepPredict(obj, observation.name = "x", method="fullGaussian")
   osa.simple.osg <- oneStepPredict(obj, observation.name = "x", 
                                    data.term.indicator = 'keep', method="oneStepGaussian")
