@@ -60,6 +60,9 @@ g <- filter(mles, h==0 & !(id %in% nc_id) & do.true == FALSE) %>%
   facet_wrap(~model, nrow=1, scales = 'free_x')
 g
 
+g <- filter(mles, model=='randomwalk') %>% ggplot(aes(x=par,y=mle)) + geom_point() +facet_grid(h~do.true)
+g
+
 #filter before plotting
 pvals <- pvals[!(pvals$model=='linmod'&pvals$method=='uncond'),]
 #only use spatial misp == dropRE for main plot and drop method == 'gen'
