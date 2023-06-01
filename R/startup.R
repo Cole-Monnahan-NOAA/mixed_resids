@@ -12,7 +12,7 @@ library(snowfall)
 library(R.utils)
 library(Matrix)
 library(goftest)
-
+library(tweedie)
 
 ## Some global settings
 ggwidth <- 7

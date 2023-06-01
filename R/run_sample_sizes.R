@@ -13,7 +13,7 @@ dharma.methods <- c('uncond', 'cond',
 
 ### randomwalk
 runtimes <- mles <- pvals <- list(); k <- 1
-(nobsvec <- 2^c(5:12))
+(nobsvec <- 2^c(6:12))
 for(nobs in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
