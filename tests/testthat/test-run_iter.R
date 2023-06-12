@@ -42,7 +42,7 @@ mods <- c('linmod', 'simpleGLMM', 'spatial')
 for(m in 1:length(mods)){
   test_that(paste0(mods[m], ' overdispersion'),{
     N <- 100; Ng <- 10 #Ng only used if mod == 'simpleGLMM'
-    true.parms <- setup_trueparms(mods[m],'overdispersion')
+    true.parms <- setup_trueparms(mods[m],'overdispersion', fam = "Gaussian", link = "identity")
     dat <- simdat(n=N, ng = 10, mod=mods[m], trueparms = true.parms, misp = 'overdispersion', seed=1)
     mod.true <- run_iter_test(ii=1, n=N, ng = Ng, mod = mods[m], misp = 'overdispersion', fit.true = TRUE)  
     
@@ -103,7 +103,7 @@ mods <- c('linmod', 'randomwalk')
 for(m in 1:length(mods)){ 
   test_that(paste0(mods[m], ' outliers'),{
     N <- 100; Ng <- 10 #Ng only used if mod == 'simpleGLMM'
-    true.parms <- setup_trueparms(mods[m],'outliers')
+    true.parms <- setup_trueparms(mods[m],'outliers', fam = "Gaussian", link = "identity")
     dat <- simdat(n=N, ng = 10, mod=mods[m], trueparms = true.parms, misp = 'outliers', seed=1)
     mod.true <- run_iter_test(ii=1, n=N, ng = Ng, mod = mods[m], misp = 'outliers', fit.true = TRUE)  
     
@@ -165,7 +165,7 @@ mods <- c('linmod', 'simpleGLMM', 'spatial')
 for(m in 1:length(mods)){ 
   test_that(paste0(mods[m], ' misscov'),{
     N <- 100; Ng <- 10 #Ng only used if mod == 'simpleGLMM'
-    true.parms <- setup_trueparms(mods[m],'misscov')
+    true.parms <- setup_trueparms(mods[m],'misscov', fam = "Gaussian", link = "identity")
     dat <- simdat(n=N, ng = 10, mod=mods[m], trueparms = true.parms, misp = 'misscov', seed=1)
     mod.true <- run_iter_test(ii=1, n=N, ng = Ng, mod = mods[m], misp = 'misscov', fit.true = TRUE)  
     
@@ -220,7 +220,7 @@ for(m in 1:length(mods)){
 context('mu0 test')
 test_that('randomwalk mu0',{
   N <- 100
-  true.parms <- setup_trueparms('randomwalk','mu0')
+  true.parms <- setup_trueparms('randomwalk','mu0', fam = "Gaussian", link = "identity")
   dat <- simdat(n=N, ng = 10, mod='randomwalk', trueparms = true.parms, misp = 'mu0', seed=1)
   mod.true <- run_iter_test(ii=1, n=N, ng = Ng, mod ='randomwalk', misp = 'mu0', fit.true = TRUE)  
   
@@ -236,7 +236,7 @@ test_that('randomwalk mu0',{
 context('mispomega test')
 test_that('spatial, mispomega',{
   
-  true.parms <- setup_trueparms('spatial','mispomega')
+  true.parms <- setup_trueparms('spatial','mispomega', fam = "Gaussian", link = "identity")
   dat <- simdat(n=100, mod='spatial', trueparms = true.parms, misp = 'mispomega', seed=1)
   mod.true <- run_iter_test(ii=1, n=100, ng=0, mod = 'spatial', misp = 'mispomega', fit.true = TRUE) 
   Kappa <- sqrt(8)/true.parms$sp.parm
