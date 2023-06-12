@@ -148,15 +148,17 @@ extractOSA <- function(obj, observation.name=NULL,
     pred$Fx <- 1/(1 + exp(pred$nlcdf.lower - pred$nlcdf.upper))
     pred$px <- 1/(exp(-pred$nlcdf.lower + pred$nll) +
                   exp(-pred$nlcdf.upper + pred$nll))
-    if (discrete) {
-      if (!is.null(seed)) {
+    if(discrete){
+      if(!is.null(seed)){
+        ## Restore RNG on exit:
         Random.seed <- .GlobalEnv$.Random.seed
         on.exit(.GlobalEnv$.Random.seed <- Random.seed)
         set.seed(seed)
       }
-      U <- runif(nrow(pred))
-    }
-    else {
+      intidx <- which(round(obs) == obs)
+      U <- rep(0, nrow(pred))
+      U[intidx] <- runif(length(intidx))
+    } else {
       U <- 0
     }
     pred$residual <- qnorm(pred$Fx - U * pred$px)
