@@ -76,6 +76,15 @@ run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm',
   ## sfExport('run.linmod.iter', 'sim.omega', 'cMatern', 'sim.data',
   ##          'rmvnorm_prec', 'add_aic')
   sfExportAll()
+  sfLibrary(TMB)
+  sfLibrary(DHARMa)
+  sfLibrary(INLA)
+  sfLibrary(dplyr)
+  sfLibrary(tidyr)
+  sfLibrary(R.utils)
+  sfLibrary(goftest)
+  sfLibrary(tweedie)
+
 
   message("Starting parallel runs...")
   results <- sfLapply(reps, function(ii) run_iter(ii, n, ng, mod, cov.mod,
