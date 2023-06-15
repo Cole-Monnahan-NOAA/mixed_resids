@@ -28,7 +28,7 @@ packageVersion('DHARMa')                # 0.3.3.0
 (cpus <- parallel::detectCores()-1)
 reps <- 1:1000
 
-do.true <- TRUE
+do.true <- FALSE
 
 
 ### LM
@@ -39,12 +39,14 @@ do.true <- TRUE
 ## Set osa.methods and dharma.methods to NULL to turn off
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'pears')
 dharma.methods <- c('uncond_nrot', 'cond_nrot')
-run_model(reps, mod='linmod', misp='overdispersion', do.true = do.true)
+test <- run_model(reps, mod='linmod', misp='overdispersion', do.true = do.true)
+
+
 
 ### Random walk from the paper =================================================
 ## possible mispecifications: mu0, outliers, normal
-osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc','pears') dharma.methods <- c('uncond', 'cond',
-                    'uncond_nrot', 'cond_nrot' )
+osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc','pears')
+dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
 run_model(reps, mod='randomwalk', misp='mu0', do.true = do.true)
 
 ### simpleGLMM with 5 groups===================================================
@@ -89,8 +91,8 @@ for(i in seq_along(metric.nms)){
 ## Generate new seeds
 reps <- 1001:(999+length(idx)); rm(pvals, idx, i, metric.nms)
 ## Rerun new reps for do.true = TRUE and do.true = FALSE
-run_model(reps, n=100, mod='spatial', misp='mispomega', do.true = TRUE)
-run_model(reps, n=100, mod='spatial', misp='mispomega', do.true = FALSE)
+run_model(reps, n=100, mod='spatial', misp='mispomega', do.true = do.true)
+## run_model(reps, n=100, mod='spatial', misp='mispomega', do.true = FALSE)
 run_model(reps, n=100, mod='spatial', misp='misscov', cov.mod = 'unif', do.true = do.true)
 osa.methods <- c('gen', 'cdf', 'mcmc', 'pears') #only 'cdf' and 'gen' suitable for discrete distributions
 run_model(reps, n=200, mod='spatial', misp='dropRE',

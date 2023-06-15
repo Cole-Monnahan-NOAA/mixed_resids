@@ -95,7 +95,7 @@ for(nobs in nobsvec){
                                      model='spatial',  misp='mispomega')
   sfStop()
 }
-#plot_sample_sizes(results.spatial)
+plot_sample_sizes(results.spatial)
 
 ## bunch of machinery here to look at more than runtimes which is
 ## turned off for now
