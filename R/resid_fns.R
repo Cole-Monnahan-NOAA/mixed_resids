@@ -261,8 +261,8 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
           if(doTrue){
             ad <- goftest::ad.test(res.obj[[method[m]]],'pnorm', estimated = FALSE)$p.value #assume mean=0,sd=1?
           } else {
-            ad <- goftest::ad.test(res.obj[[method[m]]],'pnorm', mean=mean(res.obj[[method[m]]]),
-                                   sd=sd(res.obj[[method[m]]]), estimated = TRUE)$p.value
+            res.real <- res.obj[[method[m]]][!is.na(res.obj[[method[m]]])]
+            ad <- goftest::ad.test(res.real,'pnorm', estimated = TRUE)$p.value
           }
           ks <- suppressWarnings(ks.test(res.obj[[method[m]]],'pnorm')$p.value)
           df <- rbind(df, data.frame(type='osa', method=method[m], model=mod, test='GOF.ad', version = version, pvalue = ad))
