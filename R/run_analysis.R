@@ -28,7 +28,7 @@ packageVersion('DHARMa')                # 0.3.3.0
 (cpus <- parallel::detectCores()-1)
 reps <- 1:1000
 
-do.true <- FALSE
+do.true <- TRUE
 
 
 ### LM
@@ -71,12 +71,16 @@ dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
 run_model(reps, n=100, mod='spatial', misp='mispomega', do.true = do.true)
 #h1 mispomega models occasionally fail b/c the exp(omega) leads to convergence issues.
 #Repeat failed model runs with new seed for h0 and h1:
+
 pvals <- lapply(list.files('results', pattern='_pvals.RDS',
                            full.names=TRUE), readRDS) %>% bind_rows
-pvals <- dplyr::filter(pvals, model == "spatial" & misp == "mispomega" &
-                         do.true == FALSE & version == "h1")
+pvals.true <- dplyr::filter(pvals, model == "spatial" & misp == "mispomega" &
+                         do.true == TRUE & version == "h1")
+pvals.est <- dplyr::filter(pvals, model == "spatial" & misp == "mispomega" &
+                             do.true == FALSE & version == "h1")
+true.reps <- unique(pvals.true$replicate)
 ##bad reps
-idx <- which(!(1:1000 %in% unique(pvals$replicate) ))
+idx <- which(!(true.reps %in% unique(pvals.est$replicate) ))
 #delete from spatial_mispomega_true...
 metric.nms <- c("stats", "resids", "pvals", "mles")
 for(i in seq_along(metric.nms)){
@@ -89,13 +93,15 @@ for(i in seq_along(metric.nms)){
                 ".RDS"))
 }
 ## Generate new seeds
-reps <- 1001:(999+length(idx)); rm(pvals, idx, i, metric.nms)
+reps <- (max(true.reps)+1):(max(true.reps)+length(idx)) 
+rm(pvals, idx, i, metric.nms)
 ## Rerun new reps for do.true = TRUE and do.true = FALSE
-run_model(reps, n=100, mod='spatial', misp='mispomega', do.true = do.true)
-## run_model(reps, n=100, mod='spatial', misp='mispomega', do.true = FALSE)
+run_model(reps, n=100, mod='spatial', misp='mispomega', do.true = TRUE)
+run_model(reps, n=100, mod='spatial', misp='mispomega', do.true = FALSE)
 run_model(reps, n=100, mod='spatial', misp='misscov', cov.mod = 'unif', do.true = do.true)
+
 osa.methods <- c('gen', 'cdf', 'mcmc', 'pears') #only 'cdf' and 'gen' suitable for discrete distributions
-run_model(reps, n=200, mod='spatial', misp='dropRE',
+run_model(reps, n=100, mod='spatial', misp='dropRE',
           family = "Poisson", link = "log", do.true = do.true)
 
 ## stop clusters
