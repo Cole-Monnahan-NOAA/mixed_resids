@@ -39,7 +39,7 @@ do.true <- TRUE
 ## Set osa.methods and dharma.methods to NULL to turn off
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'pears')
 dharma.methods <- c('uncond_nrot', 'cond_nrot')
-test <- run_model(reps, mod='linmod', misp='overdispersion', do.true = do.true)
+run_model(reps, mod='linmod', misp='overdispersion', do.true = do.true)
 
 
 
@@ -53,8 +53,6 @@ run_model(reps, mod='randomwalk', misp='mu0', do.true = do.true)
 ## possible mispecifications: overdispersion,  missnormcov, missunifcov, deltagamma
 ##! outliers not set up correctly when distribution not normal (lognormal better misp?)
 ##! misp cannot be overdispersion when fam = Tweedie
-osa.methods <- c('fg', 'osg', 'cdf', 'mcmc', 'pears')
-dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
 run_model(reps, ng = 5, mod='simpleGLMM', misp='missnormcov', do.true = do.true)
 run_model(reps, ng = 5, mod='simpleGLMM', misp='missunifcov', do.true = do.true)
 osa.methods <- c('mcmc', 'pears')
@@ -67,7 +65,6 @@ run_model(reps, ng = 5, mod='simpleGLMM', misp='dropRE',
 ## dropRE, aniso - outliers not set up correctly when
 ## distribution not normal
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 'pears')
-dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
 run_model(reps, n=100, mod='spatial', misp='mispomega', do.true = do.true)
 #h1 mispomega models occasionally fail b/c the exp(omega) leads to convergence issues.
 #Repeat failed model runs with new seed for h0 and h1:
@@ -81,6 +78,8 @@ pvals.est <- dplyr::filter(pvals, model == "spatial" & misp == "mispomega" &
 true.reps <- unique(pvals.true$replicate)
 ##bad reps
 idx <- which(!(true.reps %in% unique(pvals.est$replicate) ))
+reps <- true.reps[idx]
+#re-run with reps 35:47 and repeat; remove rep 34 from true
 #delete from spatial_mispomega_true...
 metric.nms <- c("stats", "resids", "pvals", "mles")
 for(i in seq_along(metric.nms)){
@@ -98,6 +97,8 @@ rm(pvals, idx, i, metric.nms)
 ## Rerun new reps for do.true = TRUE and do.true = FALSE
 run_model(reps, n=100, mod='spatial', misp='mispomega', do.true = TRUE)
 run_model(reps, n=100, mod='spatial', misp='mispomega', do.true = FALSE)
+
+reps <- 1:1000
 run_model(reps, n=100, mod='spatial', misp='misscov', cov.mod = 'unif', do.true = do.true)
 
 osa.methods <- c('gen', 'cdf', 'mcmc', 'pears') #only 'cdf' and 'gen' suitable for discrete distributions
