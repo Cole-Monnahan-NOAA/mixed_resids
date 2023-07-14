@@ -205,3 +205,24 @@ get.value <- function(x, val, nobs){
   else
     data.frame(nobs=nobs, extract_runtime(x[['stats']]))
 }
+
+get.bad.reps <- function(df, Mod, Misp, doTrue){
+  reps <- dplyr::filter(df, model == Mod & misp == Misp &
+                  do.true == doTrue) %>%
+    dplyr::pull(replicate) %>% unique() 
+  idx <- which(!(1:1000 %in% reps ))
+  return(idx)
+}
+
+
+#' 'squeeze' transform 
+#'
+#' @param u input
+#'
+#' @return [0,1] -> (0,1) to machine tolerance 
+#'
+squeeze <- function(u){
+  eps <- .Machine$double.eps
+  u = (1.0 - eps) * (u - .5) + .5
+  return(u)
+}
