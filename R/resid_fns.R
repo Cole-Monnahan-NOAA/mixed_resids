@@ -315,9 +315,10 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
           }
           
           if(doTrue){
-            ad <- goftest::ad.test(res.obj[[method[m]]]$out$scaledResiduals,'punif')$p.value #assume mean=0,sd=1?
+            #use squeeze [0,1] -> (0,1) for ad.test
+            ad <- goftest::ad.test(squeeze(res.obj[[method[m]]]$out$scaledResiduals),'punif')$p.value 
           } else {
-            ad <- goftest::ad.test(res.obj[[method[m]]]$out$scaledResiduals,'punif', estimated = TRUE)$p.value
+            ad <- goftest::ad.test(squeeze(res.obj[[method[m]]]$out$scaledResiduals),'punif', estimated = TRUE)$p.value
           }
           ks <- suppressWarnings(ks.test(res.obj[[method[m]]]$out$scaledResiduals,'punif')$p.value)
   
