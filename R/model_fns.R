@@ -469,11 +469,11 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
                            osa.osg=osa.out[[h]]$osg,
                            osa.mcmc=osa.out[[h]]$mcmc, 
                            pears=osa.out[[h]]$pears,
-                           sim_cond= dharma.out[[h]]$cond$resids,
-                           sim_uncond=dharma.out[[h]]$uncond$resids) #difficult to include b/c diff dimension from data
-      if(ii == 1){
-        
-      }
+                           sim_cond_rot= dharma.out[[h]]$cond$resids,
+                           sim_uncond_rot=dharma.out[[h]]$uncond$resids,
+                           sim_cond_nrot= dharma.out[[h]]$cond_nrot$resids,
+                           sim_uncond_nrot=dharma.out[[h]]$uncond_nrot$resids) 
+     
       out[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
                              replicate = ii, maxgrad=maxgrad, converge=converge,
                              AIC=AIC, AICc=AICc)
