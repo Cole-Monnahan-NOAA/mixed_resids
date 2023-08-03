@@ -5,7 +5,7 @@ source("R/startup.R")
 
 cpus <- parallel::detectCores()-1
 
-Nreps <- 30
+Nreps <- 100
 do.true <- FALSE
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc')
 dharma.methods <- c('uncond', 'cond',
@@ -13,7 +13,7 @@ dharma.methods <- c('uncond', 'cond',
 
 ### randomwalk
 runtimes <- mles <- pvals <- list(); k <- 1
-(nobsvec <- 2^c(6:12))
+(nobsvec <- 2^c(5:11))
 for(nobs in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
@@ -38,7 +38,7 @@ for(nobs in nobsvec){
 ## matters
 runtimes <- mles <- pvals <- list(); k <- 1
 # fixing group size or fixing obs produce the same results, just need to run one
-# (ngroupsvec <- 2^c(4:11))
+# (ngroupsvec <- 2^c(5:11))
 # nobs <- 8
 # for(nxng in ngroupsvec){
 #   sfInit( parallel=cpus>1, cpus=cpus )
@@ -57,7 +57,7 @@ runtimes <- mles <- pvals <- list(); k <- 1
 #   sfStop()
 # }
 
-(nobsvec <- 2^c(5:12))
+(nobsvec <- 2^c(5:11))
 ngroups <- 4
 for(nxng in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
@@ -104,7 +104,7 @@ plot_sample_sizes(results.spatial)
 # osa.methods <- c('fg', 'osg', 'gen', 'cdf')
 # dharma.methods <- c('uncond_nrot', 'cond_nrot')
 # runtimes <- mles <- pvals <- list(); k <- 1
-# (nobsvec <- 2^c(4:12))
+# (nobsvec <- 2^c(5:11))
 # for(nobs in nobsvec){
 #   sfInit( parallel=cpus>1, cpus=cpus )
 #   sfExportAll()
