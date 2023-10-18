@@ -257,11 +257,11 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
       for(m in 1:length(method)){
         if(is.numeric(res.obj[[method[m]]])){
           #outlier, disp, GOF.ad, GOF.ks !outlier test not available yet for osa
-  
+          #remove NA values from residual vector
+          res.real <- res.obj[[method[m]]][!is.na(res.obj[[method[m]]])]
           if(doTrue){
-            ad <- goftest::ad.test(res.obj[[method[m]]],'pnorm', estimated = FALSE)$p.value #assume mean=0,sd=1?
+            ad <- goftest::ad.test(res.real,'pnorm', estimated = FALSE)$p.value #assume mean=0,sd=1?
           } else {
-            res.real <- res.obj[[method[m]]][!is.na(res.obj[[method[m]]])]
             ad <- goftest::ad.test(res.real,'pnorm', estimated = TRUE)$p.value
           }
           ks <- suppressWarnings(ks.test(res.obj[[method[m]]],'pnorm')$p.value)
@@ -315,9 +315,10 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
           }
           
           if(doTrue){
-            ad <- goftest::ad.test(res.obj[[method[m]]]$out$scaledResiduals,'punif')$p.value #assume mean=0,sd=1?
+            #use squeeze [0,1] -> (0,1) for ad.test
+            ad <- goftest::ad.test(squeeze(res.obj[[method[m]]]$out$scaledResiduals),'punif')$p.value 
           } else {
-            ad <- goftest::ad.test(res.obj[[method[m]]]$out$scaledResiduals,'punif', estimated = TRUE)$p.value
+            ad <- goftest::ad.test(squeeze(res.obj[[method[m]]]$out$scaledResiduals),'punif', estimated = TRUE)$p.value
           }
           ks <- suppressWarnings(ks.test(res.obj[[method[m]]]$out$scaledResiduals,'punif')$p.value)
   

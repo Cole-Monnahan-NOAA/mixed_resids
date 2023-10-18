@@ -288,14 +288,16 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
 
       expr <- expression(obj$simulate()$y)
       
-      if(mod == 'simpleGLMM' & h == 1){
-        n <- n*ng
+      if(mod == 'simpleGLMM'){
+        n_ <- n*ng
+      } else {
+        n_ <- n
       }
      
       if('cond' %in% dharma.methods){
         dharma.out[[h]]$cond <- 
           calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]],
-                           idx = 1:n, fpr=mod.out[[h]]$report$fpr, 
+                           idx = 1:n_, fpr=mod.out[[h]]$report$fpr, 
                            int.resp = disc, rot = rot)
       } else {
         dharma.out[[h]]$cond <- list()
@@ -306,7 +308,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
       if('cond_nrot' %in% dharma.methods){
         dharma.out[[h]]$cond_nrot <- 
           calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]],
-                           idx = 1:n, fpr=mod.out[[h]]$report$fpr, 
+                           idx = 1:n_, fpr=mod.out[[h]]$report$fpr, 
                            int.resp = disc, rot = NULL)
       } else {
         dharma.out[[h]]$cond_nrot <- list()
@@ -324,7 +326,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
       if('uncond_nrot' %in% dharma.methods){
         dharma.out[[h]]$uncond_nrot <- 
           calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], 
-                           idx = 1:n, fpr=mod.out[[h]]$report$fpr, 
+                           idx = 1:n_, fpr=mod.out[[h]]$report$fpr, 
                            int.resp = disc, rot = NULL)
       } else {
         dharma.out[[h]]$uncond_nrot <- list()
@@ -335,7 +337,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
       if('uncond' %in% dharma.methods){
         dharma.out[[h]]$uncond <- 
           calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], 
-                           idx = 1:n, fpr=mod.out[[h]]$report$fpr, 
+                           idx = 1:n_, fpr=mod.out[[h]]$report$fpr, 
                            int.resp = disc, rot = rot)
       } else {
         dharma.out[[h]]$uncond <- list()
@@ -469,11 +471,11 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
                            osa.osg=osa.out[[h]]$osg,
                            osa.mcmc=osa.out[[h]]$mcmc, 
                            pears=osa.out[[h]]$pears,
-                           sim_cond= dharma.out[[h]]$cond$resids,
-                           sim_uncond=dharma.out[[h]]$uncond$resids) #difficult to include b/c diff dimension from data
-      if(ii == 1){
-        
-      }
+                           sim_cond_rot= dharma.out[[h]]$cond$resids,
+                           sim_uncond_rot=dharma.out[[h]]$uncond$resids,
+                           sim_cond_nrot= dharma.out[[h]]$cond_nrot$resids,
+                           sim_uncond_nrot=dharma.out[[h]]$uncond_nrot$resids) 
+     
       out[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
                              replicate = ii, maxgrad=maxgrad, converge=converge,
                              AIC=AIC, AICc=AICc)
@@ -704,6 +706,7 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
       if(!doTrue) par0$beta <- c(0,0)
     }
     if(Misp == 'dropRE'){
+      par1$u <- rep(0, length(par0$u))
       par1$ln_sig_u <- numeric(0)
     }
   }
