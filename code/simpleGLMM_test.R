@@ -1,34 +1,76 @@
+# Reproduce analysis for the simpleGLMM model 
+# with a uniformally distributed covariate
+
 library(goftest)
 library(DHARMa)
 library(TMB)
-compile('models/simpleGLMM.cpp')
-dyn.load(dynlib('models/simpleGLMM'))
 library(tmbstan)
-source("code/startup.R")
+source("R/startup.R")
+dyn.load(dynlib('src/simpleGLMM'))
 
-simulate.simpleGLMM <- function(seed = NULL, b0 = 4, sig2 = c(.5,10), ngroups=3, nobs=10){
-  sig2.y <- sig2[1] # within group variance
-  sig2.u <- sig2[2] # between group variance
+simulate.simpleGLMM <- function(seed = NULL, b0 = 4, 
+                                sig.y = 0.5,
+                                sig.u = 2,
+                                ngroups=5, nobs=100){
+
+  #reproduce simulation steps and simulation seeds
   set.seed(seed)
-  u <- rnorm(ngroups, 0, sqrt(sig2.u))
+  X <- cbind(rep(1, nobs), runif(nobs, -.5, .5))
+  
+  set.seed(seed)
+  u <- rnorm(ngroups, 0, sig.u)
+  
+  set.seed(seed*2)
   y <- matrix(0, nobs, ngroups)
-  for(j in 1:ngroups){
-    y[,j] <- rnorm(nobs, b0 + u[j], sqrt(sig2.y))
+  for(i in 1:nobs){
+    for(j in 1:ngroups){
+      y[,j] <- rnorm(nobs, b0 + u[j], sig.y)
+    }
   }
 
-  Dat <- data.frame(y = as.vector(y), group = rep(1:ngroups, each = nobs))
-  Data <- list(y = Dat[,1], group = Dat[,2]-1, sim_re = 0)
-  Par <- list(b0=0, ln_sig_u=0, ln_sig_y=0, u=rep(0, ngroups))
-  return(list(Data=Data, Par=Par, u = u, y=y, sig2=sig2))
+  Dat <- list(y = as.vector(y), X = X,
+              group = rep(1:ngroups, each = nobs) - 1, #C++ starts indexing at 0
+              obs = rep(1:nobs, ngroups) - 1, #C++ starts indexing at 0
+              family = 0, link = 2, #family = gaussian(link = identity)
+              sim_re = 0)
+  Par <- list(beta = c(0,0), ln_sig_y = 0, ln_sig_u = 0, ln_sig_v = numeric(0),
+              u=rep(0, ngroups), v = rep(0, nobs))
+  return(list(Data = Dat, Par = Par, u = u, y = y, sdvec = c(sig.u, sig.y)))
 }
 
-#check consistency
-n.groups <- 10; n.obs <- 15
-out <- simulate.simpleGLMM(141, ngroups=n.groups, nobs=n.obs)
-out$Data$sim_re <- 1
-obj <- MakeADFun(out$Data, out$Par, random = "u", DLL = "simpleGLMM", silent = TRUE)
+#Single model run
+n.gr=5; n.obs=100
+out <- simulate.simpleGLMM(seed = 1, ngroups=n.gr, nobs=n.obs)
+obj <- MakeADFun(out$Data, out$Par, 
+                 random = "u", 
+                 map = list(v = rep(factor(NA), n.obs)), #fix v at 0
+                 DLL = "simpleGLMM", silent = TRUE)
 opt <- nlminb(obj$par, obj$fn, obj$gr)
-print(checkConsistency(obj))
+report <- obj$report(obj$env$last.par.best)
+
+#ecdf residuals from DHARMa
+#Conditional
+dharma.cond <- createDHARMa(replicate(1000, obj$simulate()$y),
+                            observedResponse = out$Data$y,
+                            fittedPredictedResponse = report$fpr)
+ks.test(dharma.cond$scaledResiduals, "punif")
+
+#Unconditional
+#turn on RE simulation in TMB model 
+#(corresponds to running line 90 in simpleGLMM.cpp)
+obj$env$data$sim_re <- 1
+dharma.uncond <- createDHARMa(replicate(1000, obj$simulate()$y),
+                            observedResponse = out$Data$y,
+                            fittedPredictedResponse = report$fpr)
+ks.test(dharma.uncond$scaledResiduals, "punif")
+
+#Unconditional with rotation
+dharma.uncond.rot <- createDHARMa(replicate(1000, obj$simulate()$y),
+                              observedResponse = out$Data$y,
+                              fittedPredictedResponse = report$fpr,
+                              rotation = "estimated")
+ks.test(dharma.uncond.rot$scaledResiduals, "punif")
+
 
 ## Now quick simulation testing of pvalues
 nsim <- 5000
