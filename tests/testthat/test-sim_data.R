@@ -24,322 +24,384 @@ test_that("cMatern",{
 })
 
 ## test sim_data.R
-context("general simdat tests")
-test_that('general simdat tests',{
-  expect_error(new.fn <- simdat(n=50, mod='linmod', 
-                                trueparms = list(theta=c(4,-5), sd.vec=1, sp.parm=0, sp.fam = NULL, sp.link = NULL), 
-                                misp='overdisp', seed=123))
-  expect_error(new.fn <- simdat(n=50, mod='linmodel',
-                                trueparms = list(theta=c(4,-5), sd.vec=1, sp.parm=0, sp.fam = NULL, sp.link = NULL), 
-                                misp='overdispersion', seed=123))
-})
-
 context("simdat linmod tests")
 simulate_linmod <- function(seed, n){
   intercept <- 4
   slope <- -5
-  sigma <- 1
   set.seed(seed)
   x <- rnorm(n)
   set.seed(seed*2)
-  eps <- rnorm(n, 0, sigma)
-  y <- eps + intercept+slope*x
-  Data <- list(y=y, x=x)
+  eps <- rnorm(n)
+  y0 <- eps + intercept+slope*x
+  set.seed(seed*3)
+  y1 <- y0*exp(rnorm(n))
+  Data <- list(y0 = y0, y1 = y1, x=x)
   Par <- list(b0=intercept, b1=0, logsigma=0)
   return(list(Data=Data, Par=Par))
 }
 
-old.fn <- simulate_linmod(123,50)
-y0 <-  old.fn$Data$y
-new.fn <- simdat(n=50, mod='linmod', 
-                 trueparms = list(theta=c(4,-5), sd.vec=1, sp.parm=0, sp.fam = NULL, sp.link = NULL), 
-                 misp='outliers', seed=123)
-
-set.seed(123)
-noutlier <- 5
-y1 <- y0
-ind <- sample(1:50, size=noutlier)
-y1[ind] <- y0[ind]+rnorm(noutlier, 0, 4)
-
-test_that('linmod, misp=outliers',{
-  expect_equal(old.fn$Data$x, new.fn$x[,2])
-  expect_equal(y0, as.vector(new.fn$y0))
-  expect_equal(y1, as.vector(new.fn$y1))
-})
-
-new.fn <- simdat(n=50, mod='linmod', 
-                 trueparms = list(theta=c(4,-5), sd.vec=1, sp.parm=0, sp.fam = NULL, sp.link = NULL),
-                 misp='misscov', seed=123)
-test_that('linmod, misp=misscov',{
-  expect_equal(old.fn$Data$x, new.fn$x[,2])
-  expect_equal(y0, as.vector(new.fn$y0))
-  expect_equal(y0, as.vector(new.fn$y1))
-})
-
-set.seed(123*3)
-y0 <- old.fn$Dat$y
-y1 <- y0* exp(rnorm(50,0,log(4)))
-new.fn <- simdat(n=50, mod='linmod', 
-                 trueparms = list(theta=c(4,-5), sd.vec=c(1,log(4)), sp.parm=0, sp.fam = NULL, sp.link = NULL), 
+old.fn <- simulate_linmod(seed = 123, n = 50)
+y0 <-  old.fn$Data$y0
+y1 <-  old.fn$Data$y1
+new.fn <- simdat(n=50, mod='linmod', cov.mod = "norm",
+                 trueparms = list(theta=c(4,-5), sd.vec=c(1,1), fam = NULL, link = NULL), 
                  misp='overdispersion', seed=123)
+
+
 test_that('linmod, misp=overdispersion',{
   expect_equal(old.fn$Data$x, new.fn$x[,2])
-  expect_equal(y0, as.vector(new.fn$y0))
-  expect_equal(y1, as.vector(new.fn$y1))
+  expect_equal(y0, as.vector(new.fn$y0[[1]]))
+  expect_equal(y1, as.vector(new.fn$y1[[1]]))
 })
-
-test_that('linmod, invalid misp',{
-  expect_error(simdat(n=50, mod='linmod', 
-                      trueparms = list(theta=c(4,-5), sd.vec=1, sp.parm=0, sp.fam = NULL, sp.link = NULL), 
-                      misp='mu0', seed=123))
-  expect_error(simdat(n=50, mod='linmod', 
-                      trueparms = list(theta=c(4,-5), sd.vec=1, sp.parm=0, sp.fam = NULL, sp.link = NULL), 
-                      misp='mispomega', seed=123))
-})
-rm(y0,y1,old.fn,new.fn,ind,noutlier,simulate_linmod)
+rm(y0,y1,old.fn,new.fn,simulate_linmod)
 
 context("simdat randomwalk tests")
-simulate_randomwalk <- function(seed,n){
+simulate_randomwalk <- function(seed, n, type, sd.vec, init_u){
   set.seed(seed)
-  mu <- .75
-  sigma <- 1
-  tau <- 1
+  if(type == "LMM") mu <- 2
+  if(type == "GLMM") mu <- .1
+  sig_y <- sd.vec[1]
+  sig_u <- sd.vec[2]
   huge <- 1e3
   ## simulate random track
-  X <- rnorm(n,mean=0,sd=tau)
+  set.seed(seed)
+  u <- rnorm(n-1,mean=0,sd=sig_u)
   Ypred <- rep(NA, n)
-  Ypred[1] <- X[1]
-  for(t in 2:n) Ypred[t] <- Ypred[t-1]+X[t]+mu
+  Ypred[1] <- init_u
+  for(t in 2:n) Ypred[t] <- Ypred[t-1]+u[t-1]+mu
   ## simulate random measurements
-  Y <- rnorm(n, Ypred, sd=sigma)
-  out <- list(y=Y,x=X)
+  set.seed(seed)
+  if(type == "LMM"){
+    Y <- rnorm(n, Ypred, sd=sig_y)
+  } 
+  if(type == "GLMM"){
+    Y <- rgamma(n, 1/sig_y^2, scale = exp(Ypred)*sig_y^2)
+  }
+  out <- list(y=Y,u=Ypred)
 }
-old.fn <- simulate_randomwalk(123,50)
+old.fn <- simulate_randomwalk(123,50,"LMM", sd.vec = c(1,1), init_u = 5)
 new.fn <- simdat(n=50, mod='randomwalk', 
-                 trueparms = list(theta=.75, sd.vec=c(1,1), sp.parm=0, sp.fam = NULL, sp.link = NULL), 
-                 misp='mu0', seed=123)
-test_that('randomwalk, misp=mu0',{
-  expect_equal(matrix(1,50,1), new.fn$x)
+                 trueparms = list(theta=2, sd.vec=c(1,1), init.u = 5, 
+                 fam = "Gaussian", link = "identity"), 
+                 misp=c('missre', 'normal-lognorm', 'mu0'), seed=123)
+test_that('randomwalk, LMM',{
   expect_equal(old.fn$y, new.fn$y0)
-  expect_equal(old.fn$y, new.fn$y1)
+  expect_equal(old.fn$y, new.fn$y1[[1]])
+  expect_equal(old.fn$y, new.fn$y1[[2]])
+  expect_equal(old.fn$y, new.fn$y1[[3]])
 })
+min.y <- rep(-999, 1000)
+for(i in 1:1000){
+  old.fn <- simulate_randomwalk(i,50,"LMM", sd.vec = c(1,1), init_u = 5)
+  min.y[i] <- min(old.fn$y)
+}
+test_that('randomwalk, "min y',{
+  expect_equal(TRUE, min(min.y) > 0 )
+} )
 
-y0 <- old.fn$y
-set.seed(123)
-noutlier <- 5
-y1 <- y0
-ind <- sample(1:50, size=noutlier)
-y1[ind] <- y0[ind]+rnorm(noutlier, 0, 4)
+old.fn <- simulate_randomwalk(123, 50, "GLMM", sd.vec = c(.5,.05), init_u = 1)
 new.fn <- simdat(n=50, mod='randomwalk', 
-                 trueparms = list(theta=.75, sd.vec=c(1,1), sp.parm=0, sp.fam = NULL, sp.link = NULL), 
-                 misp='outliers', seed=123)
-test_that('randomwalk, misp=outliers',{
-  expect_equal(y0, new.fn$y0)
-  expect_equal(y1, new.fn$y1)
+                 trueparms = list(theta=.1, sd.vec=c(.5,.05), init.u = 1, fam = "Gamma", link = "log"), 
+                 misp=c('missre', 'normal-lognorm', 'mu0'), seed=123)
+test_that('randomwalk, misp=mu0',{
+  expect_equal(old.fn$y, new.fn$y0)
+  expect_equal(old.fn$y, new.fn$y1[[1]])
+  expect_equal(old.fn$y, new.fn$y1[[2]])
+  expect_equal(old.fn$y, new.fn$y1[[3]])
 })
-test_that('randomwalk, invalid misp',{
-  expect_error(simdat(n=50, mod='randomwalk', 
-                      trueparms = list(theta=.75, sd.vec=c(1,1), sp.parm=0, sp.fam = NULL, sp.link = NULL), 
-                      misp='misscov', seed=123))
-  expect_error(simdat(n=50, mod='randomwalk', 
-                      trueparms = list(theta=.75, sd.vec=c(1,1), sp.parm=0, sp.fam = NULL, sp.link = NULL), 
-                      misp='overdispersion', seed=123))
-  expect_error(simdat(n=50, mod='randomwalk', 
-                      trueparms = list(theta=.75, sd.vec=c(1,1), sp.parm=0, sp.fam = NULL, sp.link = NULL), 
-                      misp='mispomega', seed=123))
-})
+min.y <- max.y <- rep(-999,1000)
+for(i in 1:1000){
+  old.fn <- simulate_randomwalk(i,50,"GLMM", sd.vec = c(.5,.05), init_u = 1)
+  min.y[i] <- min(old.fn$y)
+  max.y[i] <- max(old.fn$y)
+}
+test_that('randomwalk, "min y',{
+  expect_equal(TRUE, min(min.y) > 0 )
+  expect_equal(TRUE, max(max.y) < 3000 )
+} )
 
-rm(y0,y1,old.fn,new.fn,ind,noutlier,simulate_randomwalk)
+
+rm(old.fn,new.fn,min.y,max.y,simulate_randomwalk)
 
 
 context("simdat simpleGLMM tests")
-simulate_simpleGLMM <- function(seed, n=10, ng=3, cov.mod='rnorm', misp){
-  ## ngroups <- 3 #number of subjects
-  ## nobs <- 10 #number of observations
-  b0 <- 4
-  sig2.y <- .5 #obs variance
-  #groups are being simulated with high overlap - hard for model to differentiate
-  #need to implement sum-to-zero constraint in u
-  sig2.u <- 10 # between group variance
+simulate_simpleGLMM <- function(seed, n=100, ng=5, 
+  cov.mod=NULL, type){
+  
+  ## ngroups <- 5 #number of subjects
+  ## nobs <- 100 #number of observations
+  if(type == "LMM"){
+    beta <- c(4,-8)
+    sig.y <- 0.5
+    sig.u <- 2
+  }
+  if(type == "GLMM"){
+    beta <- log(.5)
+    size <- .6
+    sig.u <- .8 #sig_u
+    theta <- size
+  }
+
+  #Set up cpvariate
+  if(!is.null(cov.mod)){
+    set.seed(seed)
+    if(cov.mod == 'norm') X <- cbind(rep(1,n), rnorm(n))
+    if(cov.mod == 'unif') X <- cbind(rep(1,n), runif(n, -.5,.5))
+  } else {
+    X <- matrix(1, n, 1)
+  }
+  mu <- X %*% beta
+
+  #Simulate RE
   set.seed(seed)
+  u <- rnorm(ng, 0, sig.u)
+ 
+  y0 <- y1 <- matrix(0, n, ng)
+  if(type == "LMM"){
+    set.seed(seed*2)
+    for(j in 1:ng){
+      y0[,j] <- rnorm(n, mu + u[j], sig.y)
+    }
+    set.seed(seed*2)
+    for(j in 1:ng){
+      y1[,j] <- rnorm(n, mu + exp(u[j]), sig.y)
+    }
+  }
+  
 
-  u <- rnorm(ng, 0, sqrt(sig2.u))
-  v <- rep(0,n)
-  if(misp == 'overdispersion'){
-    set.seed(seed*3)
-    v <- rnorm(n)
+  if(type == "GLMM"){
+    set.seed(seed*2)
+    for(j in 1:ng){
+      y0[,j] <- rnbinom(n, size, mu = exp(mu + u[j]))
+    }
+    set.seed(seed*2)
+    for(j in 1:ng){
+      y1[,j] <- rnbinom(n, size, mu = exp(mu + exp(u[j])))
+    }
   }
-  y <- matrix(0, n, ng)
-  set.seed(seed*2)
-  for(j in 1:ng){
-    y[,j] <- rnorm(n, b0 + u[j] + v, sqrt(sig2.y))
-  }
-  ## boxplot(y)
-  Dat <- data.frame(y = as.vector(y), group = rep(1:ng, each = n))
-  Data <- list(y = Dat[,1], group = Dat[,2]-1, u = u, sim_re = 0)
-  Par <- list(b0=0, ln_sig_u=0, ln_sig_y=0, u=rep(0, ng))
-  return(list(Data=Data, Par=Par))
+  out <- list(y0 = as.vector(y0), y1 = as.vector(y1), u=u)
+  return(out)
 }
-old.fn <- simulate_simpleGLMM(123,10,5,misp = 'outliers')
-new.fn <- simdat(n=10, ng=5, mod='simpleGLMM', 
-                 trueparms = list(theta=4, sd.vec=sqrt(c(.5,10)), sp.parm=0, 
-                                  fam = 'Gaussian', link = 'identity'), 
-                 misp='outliers', seed=123)
-y0 <- old.fn$Data$y
-set.seed(123)
-noutlier <- 5
-y1 <- y0
-ind <- sample(1:50, size=noutlier)
-y1[ind] <- y0[ind]+rnorm(noutlier, 0, 4*sqrt(.5))
+old.fn <- simulate_simpleGLMM(seed = 123, n = 100, ng = 5,
+                              cov.mod = "unif",
+                              type = "LMM")
 
-test_that('simpleGLMM, misp=outliers',{
-  expect_equal(y0, new.fn$y0)
-  expect_equal(y1, new.fn$y1)
+new.fn <- simdat(n=100, ng=5, mod='simpleGLMM', cov.mod = "unif",
+                 trueparms = list(beta=c(4,-8), sd.vec=c(.5,2), 
+                                  fam = 'Gaussian', link = 'identity'), 
+                 misp = c('missre', 'missunifcov', 'mispre'), 
+                 seed = 123, type = "LMM")
+
+test_that('simpleGLMM, type = LMM',{
+  expect_equal(old.fn$y0, new.fn$y0)
+  expect_equal(old.fn$y0, new.fn$y1[[1]])
+  expect_equal(old.fn$y0, new.fn$y1[[2]])
+  expect_equal(old.fn$y1, new.fn$y1[[3]])
+})
+old.fn <- simulate_simpleGLMM(seed = 123, n = 100, ng = 5,
+                              type = "GLMM")
+new.fn <- simdat(n=100, ng=5, mod='simpleGLMM',
+                 trueparms = list(beta=log(.5), sd.vec=c(NA,.8),
+                                  theta = .6, 
+                                  fam = 'NB', link = 'log'), 
+                 misp = c('missre', 'nb-pois', 'mispre'), 
+                 seed = 123, type = "GLMM")
+
+test_that('simpleGLMM, type = GLMM',{
+  expect_equal(old.fn$y0, new.fn$y0)
+  expect_equal(old.fn$y0, new.fn$y1[[1]])
+  expect_equal(old.fn$y0, new.fn$y1[[2]])
+  expect_equal(old.fn$y1, new.fn$y1[[3]])
 })
 
-old.fn <- simulate_simpleGLMM(123,10,5,misp = 'overdispersion')
-y0 <- y1 <- old.fn$Data$y
-new.fn <- simdat(n=10, ng=5, mod='simpleGLMM', 
-                 trueparms = list(theta=4, sd.vec=c(sqrt(c(.5,10)),1), sp.parm = 0, 
-                                  fam = 'Gaussian', link = 'identity'), 
-                 misp='overdispersion', seed=123)
-test_that('simpleGLMM, misp=overdispersion',{
-  expect_equal(y0, as.vector(new.fn$y0))
-  expect_equal(y1, as.vector(new.fn$y1))
-})
-
-set.seed(123)
-X <- cbind(rep(1,10), rnorm(10))
-mu <- X%*%c(4,-5)
-y0 <- matrix(0, 10, 5)
-set.seed(123*2)
-for(j in 1:5){
-  for(i in 1:10){
-    y0[i,j] <- rnorm(1, mu[i] + old.fn$Data$u[j], sd=sqrt(0.5))
-  }
+min.y0 <- max.y0 <- rep(-999,1000)
+min.y1 <- max.y1 <- rep(-999,1000)
+for(i in 1:1000){
+  old.fn <- simulate_simpleGLMM(seed = i, n = 100, ng = 5,
+                              cov.mod = "unif",
+                              type = "LMM")
+  min.y0[i] <- min(old.fn$y0)
+  max.y0[i] <- max(old.fn$y0)
+  min.y1[i] <- min(old.fn$y1)
+  max.y1[i] <- max(old.fn$y1)
 }
-y0 <- as.vector(y0)
-y1 <- y0
+test_that('simpleGLMM, "min/max y',{
+  expect_equal(TRUE, max(max.y0 - min.y0) < 100 )
+  expect_equal(TRUE, max(max.y1 - min.y1) < 3000 )
+} )
 
-new.fn <- simdat(n=10, ng=5, mod='simpleGLMM', 
-                 trueparms = list(theta=c(4,-5), sd.vec=sqrt(c(.5,10)), sp.parm=0, fam = 'Gaussian', sp.link = 'identity'), 
-                 misp='misscov', seed=123)
-test_that('simpleGLMM, misp=misscov',{
-  expect_equal(X[,2], as.vector(new.fn$x[,2]))
-  expect_equal(y0, as.vector(new.fn$y0))
-  expect_equal(y1, as.vector(new.fn$y0))
-  expect_equal(y1, as.vector(new.fn$y1))
-})
+max.y0 <- rep(-999,1000)
+max.y1 <- rep(-999,1000)
+for(i in 1:1000){
+  old.fn <- simulate_simpleGLMM(seed = i, n = 100, ng = 5,
+                              type = "GLMM")
+  max.y0[i] <- max(old.fn$y0)
+  max.y1[i] <- max(old.fn$y1)
+}
+test_that('simpleGLMM, "min/max y',{
+  expect_equal(TRUE, max(max.y0) < 100 )
+  #expect_equal(TRUE, max(max.y1) < 100 )
+} )
 
-test_that('simpleGLMM, invalid misp',{
-  expect_error(simdat(n=10, ng=5, mod='simpleGLMM', 
-                      trueparms = list(theta=4, sd.vec=sqrt(c(.5,10)), sp.parm=0, sp.fam = NULL, sp.link = NULL), 
-                      misp='mu0', seed=123))
-  expect_error(simdat(n=10, ng=5, mod='simpleGLMM', 
-                      trueparms = list(theta=4, sd.vec=sqrt(c(.5,10)), sp.parm=0, sp.fam = NULL, sp.link = NULL), 
-                                       misp='mispomega', seed=123))
-})
-rm(y0,y1,old.fn,new.fn,ind,noutlier,simulate_simpleGLMM)
+rm(min.y,max.y,old.fn,new.fn,simulate_simpleGLMM)
 
 
 context('simdat spatial tests')
-simulate_spatial <- function(seed,n){#},Fam,Link, misp){
-  library(TMB)
-  dyn.load(dynlib('../../src/spatial'))
+setup_mesh <- function(n, seed, sp.parm){
   set.seed(seed)
-  sp.var <- 0.5
-  sd.obs <- .5
-  Range <- 20
-  ## Simulate spatial random effects
-  Loc <- matrix(runif(n*2,0,n),ncol=2)
-  dmat <- as.matrix(dist(Loc))
-  mesh <- try(
-    R.utils::withTimeout( INLA::inla.mesh.2d(Loc, max.edge = c(Range/3, Range), offset = c(2, Range*.75)),
-                 timeout = 30, onTimeout = 'silent' ))
-  if(is.character(mesh)){
+  if(n < 500){
+    nspobs <- 500
+  } else {
+    nspobs <- n
+  }
+  #simulate spatial
+  Loc <- matrix(runif(nspobs*2,0,100),ncol=2)
+  samp.idx <- sample(1:nspobs, n)
+  loc <- Loc[samp.idx,]
+  mesh <- R.utils::withTimeout( 
+      fmesher::fm_mesh_2d(loc, max.edge = c(sp.parm/3,sp.parm), 
+                          offset = c(sp.parm/10,sp.parm*2), min.angle = 26),
+      timeout = 30, onTimeout = 'silent' )
+  if(is.null(mesh)){
     system("Taskkill /IM fmesher.exe /F")
-   # warning("mesh failed in rep=", ii)
+    # warning("mesh failed in rep=", ii)
     return(NULL)
   }
-  Omega <- sim_omega(Range,sp.var,dmat,method="TMB.spde",mesh=mesh)
-  return(Omega[mesh$idx$loc])
+  out <- list(Loc = Loc, mesh = mesh, samp.idx = samp.idx)
+  return(out)
+}
+class.vec <- rep(NA, 1000)
+for(i in 1:1000){
+  if(!is.null(setup_mesh(100,i,50)$mesh)  ){
+    class.vec[i] <- 1
+  }
+}
+expect_equal(1000, sum(class.vec, na.rm = TRUE))
+
+simulate_spatial <- function(seed, n, misp=NULL, 
+                             fam = NULL, type){
+  sp.parm <- 50
+  if(type == "LMM"){
+    beta <- 20
+    sp.var <- 1
+    sig.y <- 1
+  }
+
+  if(type == "GLMM"){
+    if(fam == "Poisson"){
+      beta <- 0.5
+      sp.var <- 0.25
+    }
+  }
+
+  ## Simulate spatial random effects
+  sp.dat <- setup_mesh(n,seed,sp.parm)
+  dmat <- as.matrix(dist(sp.dat$Loc))
+  set.seed(seed)
+  Omega <- sim_omega(sp.parm,sp.var,dmat,method="R.matern")
+  omega0 <- Omega[sp.dat$samp.idx]
+
+  y0 <- rep(NA, n)
+  if(type == "LMM"){
+    set.seed(seed)
+    y0 <- rnorm(n, beta + omega0, sig.y)
+    set.seed(seed)
+    y1 <- rnorm(n, beta + exp(omega0), sig.y)
+  }
+  if(type == "GLMM"){
+    set.seed(seed)
+    y0 <- rpois(n, exp(beta + omega0))
+    y1 <- list()
+    for(m in 1:length(misp)){
+      if(misp[m] == "mispre"){
+        set.seed(seed)
+        y1[[m]] <- rpois(n, exp(beta + exp(omega0)))
+      } else {
+        y1[[m]] <- y0
+      }
+      if(misp[m] == "pois-zip"){
+        set.seed(seed)
+        y1[[m]] <- y1[[m]] * rbinom(n, 1, 0.7)
+      }
+    }
+  }
+  out <- list(y0 = y0, y1 = y1, omega = omega0)
+  return(out)
 }
 
 
-old.fn <- simulate_spatial(123,50)#,'Poisson','log', misp='outliers')
-X <- matrix(1,nrow=50)
-mu <- X%*%2
-set.seed(123)
-y <- sim_y(Eta=mu, omega=old.fn,
-            parm=0.5, fam='Poisson', link='log')
-new.fn <- simdat(n=50, mod='spatial', 
-                 trueparms = list(theta=2, sd.vec=c(.5,sqrt(0.5)), 
-                                  sp.parm = 20, fam = 'Poisson', link = 'log'),
-                 misp='outliers', seed=123)
-y0 <- y
-set.seed(123)
-noutlier <- 5
-y1 <- y0
-ind <- sample(1:50, size=noutlier)
-y1[ind] <- y0[ind]+rnorm(noutlier, 0, 4*.5)
-test_that('spatial, misp=outliers',{
-  expect_equal(X,new.fn$x)
-  expect_equal(y0, new.fn$y0)
-  expect_equal(y1, new.fn$y1)
+old.fn <- simulate_spatial(123, 100, type = "LMM")
+new.fn <- simdat(n=100, mod='spatial', type = "LMM", 
+                      trueparms = list(beta=20, sd.vec=c(1,1), 
+                                       sp.parm = 50, fam = 'Gaussian', 
+                                       link = 'identity'),
+                      misp = c("missre", "normal-gamma", "mispre"), seed=123)
+
+test_that('spatial, LMM',{
+  expect_equal(old.fn$y0, new.fn$y0)
+  expect_equal(old.fn$y0, new.fn$y1[[1]])
+  expect_equal(old.fn$y0, new.fn$y1[[2]])
+  expect_equal(old.fn$y1, new.fn$y1[[3]])
 })
 
-set.seed(123)
-X <- cbind(rep(1,50), rnorm(50))
-mu <- X%*%c(1,2)
-set.seed(123)
-y <- sim_y(Eta=mu, omega=old.fn,
-           parm=0.5, fam='Poisson', link='log')
-new.fn <- simdat(n=50, mod='spatial', 
-                 trueparms = list(theta=c(1,2), sd.vec=c(.5,sqrt(0.5)), 
-                                  sp.parm = 20, fam = 'Poisson', link = 'log'),
-                 misp='misscov', seed=123)
-test_that('spatial, misp=misscov',{
-  expect_equal(X,new.fn$x)
-  expect_equal(y, new.fn$y0)
-  expect_equal(y, new.fn$y1)
+# One misp fits a gamma model to normal data,
+# make sure no values are below zero in simulations,
+# also no extreme values
+min.y0 <- max.y0 <- 
+  min.y1 <- max.y1 <-rep(NA, 1000)
+for(i in 1:1000){
+  old.fn <- simulate_spatial(i, 100, type = "LMM")
+  min.y0[i] <- min(old.fn$y0)
+  max.y0[i] <- max(old.fn$y0)
+  min.y1[i] <- min(old.fn$y1)
+  max.y1[i] <- max(old.fn$y1)
+}
+test_that('spatial, LMM, bounds',{
+  expect_gt(min(min.y0), 0)
+  expect_gt(min(min.y1), 0)
+  expect_lt(max(max.y0), 100)
+  expect_lt(max(max.y1), 100)
 })
 
-X <- matrix(1,nrow=50)
-set.seed(123)
-mu <- X%*%2 + rnorm(50,0,0.5*2)
-set.seed(123)
-y <- sim_y(Eta=mu, omega=old.fn,
-           parm=0.5, fam='Poisson', link='log')
 
-new.fn <- simdat(n=50, mod='spatial', 
-                 trueparms = list(theta=2, sd.vec=c(.5,sqrt(0.5),0.5*2),
-                                  sp.parm = 20, fam = 'Poisson', link = 'log'),
-                 misp='overdispersion', seed=123)
-test_that('spatial, misp=misscov',{
-  expect_equal(X,new.fn$x)
-  expect_equal(y, new.fn$y0)
-  expect_equal(y, new.fn$y1)
+old.fn <- simulate_spatial(123, 100, 
+                           misp = c("missre", "pois-zip", "mispre"), 
+                           fam = "Poisson", type = "GLMM")
+new.fn <- simdat(n=100, mod='spatial', type = "GLMM", 
+                      trueparms = list(beta=0.5, sd.vec=c(NA,sqrt(.25)), 
+                                       sp.parm = 50, fam = 'Poisson', 
+                                       link = 'log'),
+                      misp = c("missre", "pois-zip", "mispre"), seed=123)
+
+
+test_that('spatial, GLMM',{
+  expect_equal(old.fn$omega, new.fn$random$omega0)
+  expect_equal(old.fn$y0, new.fn$y0)
+  expect_equal(old.fn$y1[[1]], new.fn$y1[[1]])
+  expect_equal(old.fn$y1[[2]], new.fn$y1[[2]])
+  expect_equal(old.fn$y1[[3]], new.fn$y1[[3]])
 })
 
-X <- matrix(1,nrow=50)
-mu <- X%*%2
-set.seed(123)
-y0 <- sim_y(Eta=mu, omega=old.fn,
-           parm=0.5, fam='Poisson', link='log')
-set.seed(123)
-y1 <- sim_y(Eta=mu, omega=exp(old.fn),
-            parm=0.5, fam='Poisson', link='log')
-new.fn <- simdat(n=50, mod='spatial', 
-                 trueparms = list(theta=2, sd.vec=c(.5,sqrt(0.5)), 
-                                  sp.parm = 20, fam = 'Poisson', link = 'log'),
-                 misp='mispomega', seed=123)
-test_that('spatial, misp=misscov',{
-  expect_equal(X,new.fn$x)
-  expect_equal(y0, new.fn$y0)
-  expect_equal(y1, new.fn$y1)
-})
-test_that('spatial, invalid misp',{
-  expect_error(simdat(n=50, mod='spatial', 
-                      trueparms = list(theta=2, sd.vec=c(.5,sqrt(0.5)), sp.parm = 20, sp.fam = 'Poisson', sp.link = 'log'),
-                      misp='mu0', seed=123))
+# test upper bound and %zero inflation
+y0.max <- rep(NA, 1000)
+y1.max <- y.zip <- list()
+y1.max[[1]] <- y1.max[[2]] <- y1.max[[3]] <- rep(NA, 1000)
+y.zip[[1]] <- y.zip[[2]] <- rep(NA, 0)
+for(i in 1:1000){
+  old.fn <- simulate_spatial(i, 100, 
+                           misp = c("missre", "pois-zip", "mispre"), 
+                           fam = "Poisson", type = "GLMM")
+  y0.max[i] <- max(old.fn$y0)
+  y1.max[[1]][i] <- max(old.fn$y1[[1]])
+  y1.max[[2]][i] <- max(old.fn$y1[[2]])
+  y1.max[[3]][i] <- max(old.fn$y1[[3]])
+  y.zip[[1]][i] <- sum(old.fn$y0 == 0)
+  y.zip[[2]][i] <- sum(old.fn$y1[[2]] == 0)
+}
+
+test_that('spatial, GLMM, bounds', {
+  expect_lt(max(y0.max), 10000)
+  expect_lt(max(y1.max[[3]]), 10000)
+  expect_lt(max(y.zip[[1]]), 55)
+  expect_gt(min(y.zip[[2]] - y.zip[[1]]), 0)
 })

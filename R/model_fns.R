@@ -1,163 +1,179 @@
-setup_trueparms <- function(mod, misp, fam, link){
+setup_trueparms <- function(mod, misp, fam, link, type){
   true.comp <- list()
-  if(mod=='linmod'){
-    theta <- c(4,-5)
-    sd.vec <- 1
-    true.comp[[1]] <- true.comp[[2]] <-
-      list(beta_1 = theta[1], beta_2 = theta[2],
-                      ln_sig = log(sd.vec))
-    sp.parm <- 0
-    if(misp == 'overdispersion'){
-      #sd.vec <- c(sd.vec, sd.vec*log(4))
-      sd.vec <- c(sd.vec, 1)
+
+  if(mod == 'linmod'){
+    true.pars <- setup_linmod(mod, misp, fam, link)
+  }
+
+  if(mod == 'randomwalk'){
+    true.pars <- setup_linmod(mod, misp, fam, link, type)
+  }
+
+  if(mod == 'simpleGLMM'){
+    true.pars <- setup_linmod(mod, misp, fam, link)
+  }
+
+  if(mod == 'spatial'){
+    true.pars <- setup_linmod(mod, misp, fam, link)
+  } 
+  return(true.pars)
+}
+
+setup_linmod <- function(mod, misp, fam, link){
+  beta <- c(4,-5)
+  sd.vec <- 1
+  true.comp <- list()
+  true.comp[[1]] <- true.comp[[2]] <-
+    list(beta_1 = beta[1], beta_2 = beta[2],
+      ln_sig = log(sd.vec))
+  
+  if(misp == 'overdispersion'){
+    sd.vec <- c(sd.vec, 1)
+  }
+  if(misp == 'misscov'){
+    true.comp[[2]] <- list(beta = beta[1],
+                           ln_sig = log(sd.vec[1]))
+  }
+  true.pars <- list(beta=beta, sd.vec=sd.vec, 
+    fam=fam, link=link, true.comp=true.comp)
+  return(true.parms)
+}
+
+setup_randomwalk <- function(mod, misp, fam, link, type){
+  if(type == "LMM"){
+    beta <- 2
+    sd.vec <- c(1,1)
+    init.u <- 5
+  }
+  if(type = "GLMM"){
+    beta <- 0.1
+    sd.vec <- c(0.5, 0.05)
+    init.u <- 1
+  }
+  
+  true.comp <- list()
+  true.comp[[1]] <- list(mu = beta, ln_sig_y = log(sd.vec[1]),
+          ln_sig_u = log(sd.vec[2]))
+  for(i in 1:length(misp)){
+    if(misp[i] == 'mu0'){
+      true.comp[[i+1]] <- list(ln_sig_y = log(sd.vec[1]),
+                               ln_sig_u = log(sd.vec[2]))
+    } 
+    if(misp[i] == 'missre'){
+      true.comp[[i+1]] <- list(mu = beta, ln_sig_y = log(sd.vec[1]))
     }
-    if(misp == 'misscov'){
-      true.comp[[2]] <- list(beta = theta[1],
-                          ln_sig = log(sd.vec[1]))
+    if(misp[i] == 'gamma-lognorm' | misp[i] == 'normal-lognorm'){
+      true.comp[[i+1]] <- true.comp[[1]]
     }
   }
-  if(mod=='randomwalk'){
-    if(misp == "normal"){
-      theta = 0.05
-      sd.vec = c(0.5, 0.5)
-    } else {
-      theta <- 2
-      sd.vec <- c(1,1)
-    }
-    sp.parm <- 0
-    true.comp[[1]] <- list(mu = theta, ln_sig = log(sd.vec[1]),
-           ln_tau = log(sd.vec[2]))
-    if(misp == 'mu0'){
-      true.comp[[2]] <- list(ln_sig = log(sd.vec[1]),
-                             ln_tau = log(sd.vec[2]))
-    } else {
-      true.comp[[2]] <- true.comp[[1]]
-    }
+
+  true.pars <- list(beta=beta, sd.vec=sd.vec, init.u,
+    fam=fam, link=link, true.comp=true.comp)
+
+  return(true.parms)
+}
+
+setup_simpleGLMM <- function(mod, misp, fam, link, type){
+  theta <- NA
+  if(type == "LMM"){
+    #currently only misp = misscovunif or misscovnorm is implemented
+    beta <- c(4,-8)
+    sd.vec <- c(0.5, 2)
+
+    true.comp <- list()
+    true.comp[[1]] <- list(beta_1 = beta[1], beta_2 = beta[2],
+                           ln_sig_y = log(sd.vec[1]),
+                           ln_sig_u = log(sd.vec[2]))
+   
   }
-  if(mod=='simpleGLMM'){
-    theta <- 1
-    sd.vec <- sqrt(c(2,4))
-    if(fam == "Tweedie"){
-      theta <- 1.5
-      pow <- 1.2
-      sd.vec <- sqrt(c(2,2))
-    }
-    if(fam == "Poisson"){
-      theta <- 1.5
-      sd.vec <- sqrt(c(.5,2))
+
+  if(type == "GLMM"){
+    sd.vec <- rep(NA, 2)
+
+    if(fam == "NB"){
+      beta <- log(.5)
+      size <- .6
+      sd.vec[2] <- .8 #sig_u
+      theta <- size
+
+      true.comp[[1]] <- list(beta = beta,
+                             theta = log(size),
+                             ln_sig_u = log(sd.vec[2]))
+
     }
 
-    sp.parm <- 0
-    if(misp=='misscov'){
-       #parms when fam = 'Gaussian';link='identity
-       theta <- c(4,-8)
-       sd.vec[1] <- 0.5
-      #parms when link function on logscale
-      # theta <- c(4,-.4)
-       true.comp[[1]] <- list(beta_1 = theta[1], beta_2 = theta[2],
-                              ln_sig_y = log(sd.vec[1]),
-                              ln_sig_u = log(sd.vec[2]))
-       true.comp[[2]] <- list(beta = theta[1],
-                              ln_sig_y = log(sd.vec[1]),
+    if(fam == "Poisson"){
+      beta <- 0.5
+      sd.vec[2] <- sqrt(0.5) #sig_u
+
+       true.comp[[1]] <- list(beta = beta[1],
                               ln_sig_u = log(sd.vec[2]))
     }
-    if(misp=='overdispersion') {
-      sd.vec <- c(sd.vec, 1)
-      true.comp[[1]] <- list(beta = theta,
+
+    if(fam == "Tweedie"){
+      beta <- 1.5
+      pow <- 1.3
+      sd.vec <- c(1.7,1) #phi, sig_u
+      theta <- pow
+
+      true.comp[[1]] <- list(beta = beta,
                              ln_sig_y = log(sd.vec[1]),
-                             ln_sig_u = log(sd.vec[2]),
-                             ln_sig_v = log(sd.vec[3]))
-      true.comp[[2]] <- list(beta = theta[1],
-                             ln_sig_y = log(sd.vec[1]),
+                             theta = log((pow-1)/(2-pow))),
                              ln_sig_u = log(sd.vec[2]))
     }
-    if(misp == 'outliers'){
-      true.comp[[1]] <- true.comp[[2]] <-
-        list(beta = theta[1],
-             ln_sig_y = log(sd.vec[1]),
-             ln_sig_u = log(sd.vec[2]))
+  }
+
+  for(i in 1:length(misp)){
+  true.comp[[i+1]] <- true.comp[1]
+    if(misp[i] == 'missunifcov' | misp[i] == 'missnormcov'){
+      true.comp[[i+1]]$beta <- list(beta = beta[1]
     }
-    if(fam == 'Poisson'){
-      true.comp[[1]]$ln_sig_y <- NULL
-      true.comp[[2]]$ln_sig_y <- NULL
+    if(misp[i] == 'missre'){
+      true.comp[[i+1]]$ln_sig_u <- NULL
     }
-    if(fam == 'Tweedie'){
-      sd.vec[3] <- pow
-      if(misp == 'deltagamma'){
-        #convert sd of tweedie to sd of gamma, tweedie: var(y) = mu^pow*phi
-        sd.y <- sqrt(theta^pow*sd.vec[1]) 
-        true.comp[[1]] <- list(beta = theta,
-                               ln_sig_y = log(sd.vec[1]),
-                               ln_sig_u = log(sd.vec[2]))
-        true.comp[[2]] <- list(beta = theta,
-                               ln_sig_y = log(sd.y/theta), #cv
-                               ln_sig_u = log(sd.vec[2]))
-        #lambda definition based on Compound Poisson-Gamma relationship to Tweedie
-        #Prob(Y==0) = exp(-lambda) based on Poisson 
-        lambda <- (exp(theta)^(2 - pow))/((2-pow)*sd.vec[1])
-        pz <- exp(-lambda)
-        #logit transform of the probability of zero
-        
-        true.comp[[1]]$ln_sig_y[2] <- log((pow-1)/(2-pow))
-        true.comp[[2]]$ln_sig_y[2] <- log(pz/(1-pz))
-      }
-      if(misp == 'dropRE'){
-        true.comp[[1]] <- list(beta = theta,
-                               ln_sig_y = c(log(sd.vec[1]),
-                                            log((pow-1)/(2-pow))),
-                               ln_sig_u = log(sd.vec[2]))
-        true.comp[[2]] <- list(beta = theta,
-                               ln_sig_y = c(log(sd.vec[1]),
-                                            log((pow-1)/(2-pow))))
-      }
-      true.comp[[1]]$ln_sig_y[2] <- log((pow-1)/(2-pow))
-      
+    if(misp[i] == 'nb-pois'){
+      true.comp[[i+1]]$theta <- NULL
     }
   }
-  if(mod=='spatial'){
-    sp.parm <- 50
-    if(fam == "Poisson"){
-      theta <- 0.5
-      sd.vec <- c(0.5, sqrt(2))
-    }
+  true.pars <- list(beta = beta, sd.vec=sd.vec, theta = theta,
+    fam=fam, link=link, true.comp=true.comp)
 
-    if(fam == 'Gaussian'){
-      theta <- 1
-      sd.vec <- c(0.5, 1)
-    }
+  return(true.parms)
+}
 
-    true.comp[[1]] <- true.comp[[2]] <-
-      list(beta = theta, theta = log(sd.vec[1]),
+
+setup_spatial<- function(mod, misp, fam, link, type){
+  sp.parm <- 50
+  true.comp <- list()
+  if(type == "LMM"){
+    beta <- 20
+    sd.vec <- c(1, 1)
+
+    true.comp[[1]] <- list(beta = beta, theta = log(sd.vec[1]),
            ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd))
            ln_kappa = log(sqrt(8)/sp.parm))
+  }
 
-    if(misp=='misscov'){
-      theta <- c(0.5,1.5)
-      true.comp[[1]] <-
-        list(beta_1 = theta[1], beta_2 = theta[2], theta = log(sd.vec[1]),
-             ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd))
-             ln_kappa = log(sqrt(8)/sp.parm))
-      true.comp[[2]] <-
-        list(beta = theta[1], theta = log(sd.vec[1]),
-             ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd))
-             ln_kappa = log(sqrt(8)/sp.parm))
-    }
-    if(misp=='overdispersion'){
-      sd.vec <- c(sd.vec, sd.vec[2]*.5) #overdispersion variance = 0.5*spatial variance
-      true.comp[[1]]$ln_sig_v <- log(sd.vec[3])
-    }
-    if(misp == 'dropRE'){
-      true.comp[[2]] <- list(beta = theta, theta = log(sd.vec[1]))
-    }
-    # if(misp == 'mispomega'){
-    #   sd.vec[2] <- sd.vec[2]/3
-    # }
+  if(type == "GLMM"){
     if(fam == "Poisson"){
-      true.comp[[1]]$theta <- NULL
-      true.comp[[2]]$theta <- NULL
+      beta <- 0.5
+      sd.vec <- c(NA, sqrt(0.25))  
+    }
+    true.comp[[1]] <- list(beta = beta, 
+           ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2]))), #1/(2*sqrt(pi)*kappa*sp.sd))
+           ln_kappa = log(sqrt(8)/sp.parm))
+  }
+
+  for(i in 1:length(misp)){
+    true.comp[[i+1]] <- true.comp[1]
+    if(misp[i] == "missre"){
+      true.comp[[i+1]]$ln_tau <- NULL
+      true.comp[[i+1]]$ln_kappa <- NULL
     }
   }
-  true.pars <- list(theta=theta, sd.vec=sd.vec, sp.parm=sp.parm,
+
+  
+  true.pars <- list(beta=beta, sd.vec=sd.vec, sp.parm=sp.parm,
                     fam=fam, link=link, true.comp=true.comp)
   return(true.pars)
 }

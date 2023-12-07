@@ -7,20 +7,20 @@ Type objective_function<Type>::operator()()
   DATA_VECTOR_INDICATOR(keep,y);
   PARAMETER_VECTOR(beta); //intercept
   PARAMETER(ln_sig);
-  Type sig = exp(ln_sig);
+  Type sig_y = exp(ln_sig);
   Type nll = 0;
   Type cdf;
 
   vector<Type> mu = X * beta; 
   for(int i=0; i<y.size(); i++){
-    nll -= dnorm(y(i), mu(i), sig, true);
-    cdf = squeeze(pnorm(y(i),  mu(i), sig ));
+    nll -= dnorm(y(i), mu(i), sig_y, true);
+    cdf = squeeze(pnorm(y(i),  mu(i), sig_y ));
     nll -= keep.cdf_lower(i) * log( cdf );
     nll -= keep.cdf_upper(i) * log( 1.0 - cdf );
   }
 
   SIMULATE{
-    y = rnorm(mu, sig);
+    y = rnorm(mu, sig_y);
     REPORT(y);
   }
   
@@ -29,6 +29,6 @@ Type objective_function<Type>::operator()()
   REPORT(mu);
   REPORT(exp_val);
   REPORT(fpr);
-  REPORT(sig);
+  REPORT(sig_y);
   return(nll);
 }

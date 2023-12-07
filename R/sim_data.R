@@ -14,195 +14,257 @@
 #' @param sp.fam observation family, specific to spatial case
 #' @param sp.link observation link, specific to spatial case
 #' @param misp model misspecification, options are:
-#' * outliers: randomly added outlier terms
-#' * misscov: missing coviariate
-#' * overdispersion: observation level random error added to observations
+#' * missunifcov: missing uniform coviariate
+#' * missnormcov: missing normal covariate
+#' * missre: missing random effect
 #' * mu0: missing drift term, specific to linmod
-#' * mispomega: non-normal spatial effect, specific to spatial
+#' * mispre: mispecified random effect, exp(re)
+#' * nb-pois: misspecified distribution (nb data fit to poisson)
+#' * overdispersion: misspecified distribution (lognormal data fit to normal)
+#' * gamma-lognorm: misspecified distribution (gamma data fit to lognormal)
+#' * normal-lognorm: misspecified distribution (gamma data fit to lognormal)
+#' * mispzip: zero-inflated data fit to non-zero inflated data
 #' @param seed
 #'
 #' @return
 #' @export
 #'
 #' @examples
-simdat <- function(n, ng=0, mod, cov.mod = 'norm',
-                   trueparms = list(theta, sd.vec, sp.parm, fam, link),
-                   misp, seed){
-  if(!(misp %in% c('outliers', 'misscov', 'overdispersion', 
-                   'mu0', 'normal', 'mispomega', 'dropRE', 
-                   'deltagamma', 'aniso'))){
+simdat <- function(n, ng=0, mod, cov.mod = NULL, type = NULL,
+                   trueparms = list(beta, sd.vec, sp.parm, fam, link),
+                   misp, seed) {
+  for(i in 1:length(misp)){
+  if(!(misp[i] %in% c('missunifcov', 'missnormcov', 'missre', 
+                   'mu0', 'mispre', 'nb-pois', 'overdispersion', 
+                   'gamma-lognorm', 'normal-lognorm', 'pois-zip',
+                   'normal-gamma'))){
     stop('incorrect mis-specification name')
-  } 
+  } }
   if(!(mod %in% c('linmod', 'randomwalk', 'simpleGLMM', 'spatial'))) stop('incorrect model name')
-
-  list2env(trueparms, envir = environment(simdat))
-
+  
   #Simulate Covariate
-  set.seed(seed)
-  N <- n
-  if(mod == 'simpleGLMM') N <- n*ng
-  if(misp == 'misscov' | mod == 'linmod'){
+  if(!is.null(cov.mod)){
+    set.seed(seed)
     if(cov.mod == 'norm') X <- cbind(rep(1,n), rnorm(n))
     if(cov.mod == 'unif') X <- cbind(rep(1,n), runif(n, -.5,.5))
   } else {
     X <- matrix(1, n, 1)
   }
-  mu <- X %*% theta
 
   if(mod == 'linmod'){
-    set.seed(seed*2)
-    eps <- rnorm(N, 0, sd.vec[1])
-    y0 <- eps + mu
-    v <- NULL
-    if(misp == 'mu0' | misp == 'mispomega') stop("Misspecification not available for linmod")
-    if(misp == 'overdispersion'){
-      set.seed(seed*3)
-      v <- rnorm(N,0,sd.vec[2])  #sd.vec[2] = sd.vec[1]*log(4)
-      y1 <- y0*exp(v)
-    }
-    if(misp == 'misscov'){
-      y1 <- y0
-    }
-    random <- list(v=v)
+    dat.out <- simdat.linmod(n, mod, cov.mod, type,
+                   trueparms, misp, seed, X)
+  }
+  if(mod == 'randomwalk'){
+    dat.out <- simdat.randomwalk(n, mod, cov.mod, type,
+                   trueparms, misp, seed, X)
+  }
+  if(mod == 'simpleGLMM'){
+    dat.out <- simdat.simpleGLMM(n, ng, mod, cov.mod, type,
+                   trueparms, misp, seed, X)
+  }
+  if(mod == 'spatial'){
+    dat.out <- simdat.spatial(n, mod, type,
+                   trueparms, misp, seed, X)
   }
 
-  if(mod == 'randomwalk'){
-    if(misp == 'overdispersion' | misp == 'misscov'| misp == 'mispomega'){
+  return(dat.out)
+}
+
+simdat.linmod <- function(n, mod, cov.mod, type, 
+  trueparms, misp, seed, X){
+    if(misp != 'overdispersion') stop("Misspecification not available for linmod")
+    list2env(trueparms, envir = environment(simdat.linmod))
+    mu <- X %*% beta
+    #Correctly specified data
+    set.seed(seed*2)
+    eps <- rnorm(n, 0, sd.vec[1])
+    y0 <- eps + mu
+    # Mis-specified data
+    set.seed(seed*3)
+    v <- rnorm(n,0,sd.vec[2])  #sd.vec[2] = sd.vec[1]*log(4)
+    y1 <- y0*exp(v)
+
+    dat.out <- list(y0 = list(y0), y1 = list(y1), x = X)
+    return(dat.out)
+  }
+
+simdat.randomwalk <- function(n, mod, cov.mod, type, 
+  trueparms, misp, seed, X){
+  for(i in 1:length(misp)){
+    if(!(misp[i] %in% c('missre', 'normal-lognorm', 'mu0'))) {
       stop("Misspecification not available for random walk")
     }
-    set.seed(seed)
-    ## Simulate random measurements
-    u0 <- c(0,cumsum(rnorm(N-1,mean=mu,sd=sd.vec[2])))
-    set.seed(seed)
-    #used only for theoretical mis-specified
-    u1 <- c(0,cumsum(rnorm(N-1,mean=0,sd=sd.vec[2])))
-    if(misp == "normal"){
-      y0 <- rlnorm(N, u0, sd.vec[1])
-    } else {
-      y0 <- u0 + rnorm(N,sd=sd.vec[1])
-    }
-    
-    y1 <- y0
-    if(misp == "normal"){
-      y1 <- log(y0)
-    }
-    
-    random <- list(u0=u0, u1=u1)
   }
+  list2env(trueparms, envir = environment(simdat.randomwalk))
+  mu <- X %*% theta
+  ## Simulate random measurements
+  set.seed(seed)
+  u0 <- cumsum( c(init.u, rnorm(n-1, mu, sd.vec[2]) ))
+  set.seed(seed)
+  y0 <- sim_y(Eta = u0, omega = rep(0, n), parm = sd.vec[1], 
+    fam = fam, link = link)
+  u1 <- list()
+  y1 <- list()
+    
+  for(i in 1:length(misp)){
+    u1[[i]] <- u0
+    y1[[i]] <- y0
+  }
+ 
+    
+  random <- list(u0 = u0, u1 = u1)
 
-  if(mod == 'simpleGLMM'){ 
-    if(misp == 'mu0'| misp == 'mispomega') stop("Misspecification not available for simpleGLMM")
-    set.seed(seed)
-    u <- rnorm(ng, 0, sd=sd.vec[2])
-    y0 <- eta <- matrix(0, n, ng)
-    v <- rep(0, n)
-    if(misp == 'overdispersion'){
-      set.seed(seed*3)
-      v <- rnorm(n,0,sd.vec[3]) #sd.vec[3] = 1
+  dat.out <- list(y0 = y0, y1 = y1, random = random)
+  return(dat.out)
+}
+ 
+
+simdat.simpleGLMM <- function(n, ng, mod, cov.mod, type, 
+  trueparms, misp, seed, X){
+  for(i in 1:length(misp)){
+    if(!(misp[i] %in% c('missre', 'nb-pois', 'mispre', 
+      'missunifcov', 'misscovnorm'))) {
+      stop("Misspecification not available for simpleGLMM")
     }
-    set.seed(seed*2)
+  }
+  list2env(trueparms, envir = environment(simdat.simpleGLMM))
+  mu <- X %*% beta 
+  set.seed(seed)
+  u0 <- rnorm(ng, 0, sd=sd.vec[2])
+  y0 <- eta <- matrix(0, n, ng)
+
+  inits <- NA
+  if(type == "LMM"){
     inits <- sd.vec[1]
-    for(j in 1:ng){
-      for(i in 1:n){
-        eta[i,j] <- mu[i] + u[j] + v[i]
-        # will not work if Tweedie and misp = overdispersion
-        if(fam == 'Tweedie') inits <- c(inits, sd.vec[3])
-        y0[i,j] <- sim_y(as.matrix(eta[i,j]), 0, parm=inits, fam=fam, link=link)
-      }
+  }
+  if(type == "GLMM"){
+    if(fam == "NB"){
+      inits <- theta
     }
-    y0 <- as.vector(y0)
-    y1 <- y0
-    random <- list(u=u,v=v)
+    if(fam == "Tweedie"){
+      inits <- c(sd.vec[1], theta)
+    }
   }
 
-  if(mod == 'spatial'){
-    ## Simulate spatial random effects
-    set.seed(seed)
-    if(N < 500){
-      nspobs <- 500
+  set.seed(seed*2)
+  for(j in 1:ng){
+    for(i in 1:n){
+      eta[i,j] <- mu[i] + u0[j] 
+      y0[i,j] <- sim_y(as.matrix(eta[i,j]), 0, parm=inits, fam=fam, link=link)
+    }
+  }
+  y0 <- as.vector(y0)
+  u1 <- list()
+  y1 <- list()
+
+  set.seed(seed*2)
+  for(m in 1:length(misp)){
+    if(misp[m] == "mispre"){
+      ymisp <- eta <- matrix(0, n, ng)
+      for(j in 1:ng){
+        for(i in 1:n){
+          eta[i,j] <- mu[i] + exp(u0[j]) 
+          ymisp[i,j] <- sim_y(as.matrix(eta[i,j]), 0, parm=inits, 
+                                fam=fam, link=link)
+        }
+      }
+      u1[[m]] <- exp(u0)
+      y1[[m]] <- as.vector(ymisp)
     } else {
-      nspobs <- N
+      u1[[m]] <- u0
+      y1[[m]] <- y0
     }
-    Loc <- matrix(runif(nspobs*2,0,100),ncol=2)
-    dmat <-  as.matrix(dist(Loc))
-    Sigma <- sd.vec[2]^2 * cMatern(dmat,1,sqrt(8)/sp.parm)
-    Omega <- t(mvtnorm::rmvnorm(1, rep(0,nrow(Sigma)), 
-                                sigma = Sigma, method = 'chol'))
-    samp.idx <- sample(1:nspobs, N)
-    loc <- Loc[samp.idx,]
-    omega <- Omega[samp.idx]
+  }
+  random <- list(u0=u0, u1=u1)
+  dat.out <- list(y0 = y0, y1 = y1, random = random)
+  return(dat.out)
+}
+
+simdat.spatial <- function(n, mod, type, trueparms, 
+                           misp, seed, X){
+  for(i in 1:length(misp)){
+    if(!(misp[i] %in% c('missre', 'pois-zip', 'mispre', 
+      'normal-gamma'))) {
+      stop(paste0("Misspecification", misp[i]," not available for spatial"))
+    }
+  }
+  list2env(trueparms, envir = environment(simdat.spatial))
+  mu <- X %*% beta 
+  set.seed(seed)
+  #simulate Omega with at least a 500x500 spatial "grid"
+  if(n < 500){
+    nspobs <- 500
+  } else {
+    nspobs <- n
+  }
+  #simulate spatial
+  Loc <- matrix(runif(nspobs*2,0,100),ncol=2)
+  dmat <-  as.matrix(dist(Loc))
+  Sigma <- sd.vec[2]^2 * cMatern(dmat,1,sqrt(8)/sp.parm)
+  set.seed(seed)
+  Omega <- t(mvtnorm::rmvnorm(1, rep(0,nrow(Sigma)), 
+                              sigma = Sigma, method = 'chol'))
+  samp.idx <- sample(1:nspobs, n)
+  loc <- Loc[samp.idx,]
+  omega0 <- Omega[samp.idx]
+  #generate mesh using lower resolution location matrix
+  mesh <- try(
+    R.utils::withTimeout( 
+      fmesher::fm_mesh_2d(loc, max.edge = c(sp.parm/3,sp.parm), 
+                          offset = c(sp.parm/10,sp.parm*2), min.angle = 26),
+      timeout = 30, onTimeout = 'silent' ))
     
-    mesh <- try(
+  if("aniso" %in% misp){
+    loc.aniso <- loc
+    rad <- 45*pi/180
+    R <- rbind(c(cos(rad), sin(rad)), c(-sin(rad), cos(rad)))
+    S <- rbind(c(sqrt(10), 0), c(0, 1/sqrt(10)))
+    for(s in 1:nrow(loc)){
+      loc.aniso[s,] <- loc[s,]%*% solve(S) %*% solve(R)
+    }
+    mesh.aniso <- try(
       R.utils::withTimeout( 
-        INLA::inla.mesh.2d(loc, max.edge = c(sp.parm/3,sp.parm), 
-                           offset = c(sp.parm/10,sp.parm*2), min.angle = 26),
+        fmesher::fm_mesh_2d(loc.aniso, max.edge = c(sp.parm/3,sp.parm), 
+                            offset = c(sp.parm/10,sp.parm*2), min.angle = 26),
         timeout = 30, onTimeout = 'silent' ))
-    
-    if(misp == "aniso"){
-      loc.aniso <- loc
-      rad <- 45*pi/180
-      R <- rbind(c(cos(rad), sin(rad)), c(-sin(rad), cos(rad)))
-      S <- rbind(c(sqrt(10), 0), c(0, 1/sqrt(10)))
-      for(s in 1:nrow(loc)){
-        loc.aniso[s,] <- loc[s,]%*% solve(S) %*% solve(R)
-      }
-      mesh.aniso <- try(
-        R.utils::withTimeout( 
-          INLA::inla.mesh.2d(loc.aniso, max.edge = c(sp.parm/3,sp.parm), 
-                             offset = c(sp.parm/10,sp.parm*2), min.angle = 26),
-          timeout = 30, onTimeout = 'silent' ))
-    }
-   
-    if(is.character(mesh)){
-      system("Taskkill /IM fmesher.exe /F")
-     # warning("mesh failed in rep=", ii)
-      return(NULL)
-    }
-    # Omega <- sim_omega(sp.parm,sd.vec[2]^2,dmat,method="R.matern",mesh=mesh)
-    # if(length(Omega)>n){
-    #   omega <- Omega[mesh$idx$loc]
-    # } else {
-    #   omega <- Omega
-    # }
-    v <- rep(0, n)
-    if(misp == 'overdispersion'){
-      set.seed(seed)
-      v <- rnorm(N,0,sd.vec[3]) #sd.vec[3] = sd.vec[1]*2
-      mu <- mu + v
-    }
-    set.seed(seed)
-    y0 <- sim_y(Eta = mu, omega=omega,
-                  parm=sd.vec[1], fam=fam, link=link)
+  }
+  
+  if(is.character(mesh)){
+    system("Taskkill /IM fmesher.exe /F")
+    # warning("mesh failed in rep=", ii)
+    return(NULL)
+  }
+  
+  set.seed(seed)
+  y0 <- sim_y(Eta = mu, omega=omega0,
+              parm=sd.vec[1], fam=fam, link=link)
+  omega1 <- list()
+  y1 <- list()
 
-
-    if(misp == 'mu0') stop("Misspecification not available for spatial")
-    if(misp == 'misscov' | misp == 'overdispersion' | 
-       misp == 'dropRE' | misp == "aniso"){
-      y1 <- y0
-    }
-    if(misp=='mispomega'){
+  for(m in 1:length(misp)){
+    omega1[[m]] <- omega0
+    y1[[m]] <- y0
+    if(misp[m] == "mispre"){
       set.seed(seed)
-      y1 <- sim_y(Eta = mu, omega=exp(omega),
-                  parm=sd.vec, fam=fam, link=link)
+      y1[[m]] <- sim_y(Eta = mu, omega=exp(omega0),
+              parm=sd.vec[1], fam=fam, link=link)
+     
+      omega1[[m]] <- exp(omega0)
+    } 
+    if(misp[[m]] == "pois-zip"){
+      set.seed(seed)
+      y1[[m]] <- rbinom(n, 1, 0.7) * y1[[m]]
     }
-    random <- list(omega=omega, v=v)
+  
   }
 
-  if(misp == 'outliers'){
-    set.seed(seed)
-    noutlier <- 5
-    y1 <- y0
-    ind <- sample(1:N, size=noutlier)
-    y1[ind] <- y0[ind]+rnorm(noutlier, 0, sd.vec[1]*4)
-  }
-
-  dat.out <- list(y0=y0, y1=y1, x=X, random=random)
-  if(mod == 'spatial'){
-    dat.out$loc = loc
-    dat.out$mesh = mesh
-    if(misp == "aniso"){
-      dat.out$mesh.aniso = mesh.aniso
-    }
+  random <- list(omega0 = omega0, omega1 = omega1)
+  dat.out <- list(y0 = y0, y1 = y1, random = random)
+  dat.out$loc = loc
+  dat.out$mesh = mesh
+  if("aniso" %in% misp){
+    dat.out$mesh.aniso = mesh.aniso
   }
   return(dat.out)
 }
@@ -214,7 +276,7 @@ cMatern <- function(H, Nu, Kap) {
 }
 
 # Simulate spatial field
-sim_omega <- function(Range, sig2, Dmat, Nu = 1, method, mesh){
+sim_omega <- function(Range, sig2, Dmat, Nu = 1, method, mesh=NULL){
   Kappa <- sqrt(8)/Range
   Phi <- Range
   Tau <- sqrt(1/(4*pi*Kappa^2*sig2))
@@ -266,7 +328,8 @@ sim_omega <- function(Range, sig2, Dmat, Nu = 1, method, mesh){
 # Simulate data
 sim_y <- function(Eta, omega, parm, fam, link){
   Eta <- Eta + omega
-  N <- nrow(Eta)
+  if(is.vector(Eta)) N <- length(Eta)
+  if(is.matrix(Eta)) N <- nrow(Eta)
   if(link == 'identity'){
     mu <- Eta
   }
@@ -274,17 +337,23 @@ sim_y <- function(Eta, omega, parm, fam, link){
     mu <- exp(Eta)
   }
   if(fam == 'Gamma'){
+    #parm = CV
     Y <- rgamma(N,1/parm[1]^2,scale=mu*parm[1]^2)
   }
   if(fam == 'Poisson'){
     Y <- rpois(N, mu)
   }
   if(fam == 'Tweedie'){
+    #parm = (phi, power)
     Y <- tweedie::rtweedie(N, mu = mu, phi = parm[1], power = parm[2])
   }
   if(fam == 'Gaussian'){
     ## assuming parm[1] is SD of sampling process
     Y <- rnorm(N, mu, parm[1])
+  }
+  if(fam == 'NB'){
+    #parm = size
+    Y <- rnbinom(N, size = parm[1], mu = mu)
   }
   return(Y)
 }

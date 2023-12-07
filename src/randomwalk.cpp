@@ -25,29 +25,38 @@ Type objective_function<Type>::operator()()
   //DATA_SCALAR(huge);
   PARAMETER_VECTOR(u);
   PARAMETER(mu);
-  PARAMETER(ln_sig);
-  PARAMETER(ln_tau);
+  PARAMETER(ln_sig_y);
+  PARAMETER_VECTOR(ln_sig_u); 
 
-  Type sig=exp(ln_sig);	// observation sd
-  Type tau=exp(ln_tau);		// process sd
-  // Initial condition
-  Type nll = -dnorm(u(0), Type(0), Type(1000), true);
-  if(sim_re == 1){
-    SIMULATE{
-      u(0) = rnorm(Type(0), tau); 
-    }
-  }
-  // Increments
-  vector<Type> ypred(u.size());
-  ypred.setZero();
-  ypred(0) = u(0);
+  
+  //only fit random effect if ln_sig_u isn't null
+  bool u_flag = (ln_sig_u.size()>0);
 
-  for (int i = 1; i < u.size(); ++i){
-    ypred(i) = u(i - 1) + mu;
-    nll -= dnorm(u(i), ypred(i), tau, true);
+  Type sig_y = exp(ln_sig_y);	// observation sd
+
+  if(u_flag){
+    vector<Type> sig_u = exp(ln_sig_u);		// process sd
+    // Initial condition
+    Type nll = -dnorm(u(0), Type(0), Type(1000), true);
+    /* Turn off simulation of initial condition
     if(sim_re == 1){
       SIMULATE{
-        u(i) = rnorm(ypred(i), tau);
+        u(0) = rnorm(Type(0), sig_u); 
+      }
+    }
+    */
+    // Increments
+    vector<Type> ypred(u.size());
+    ypred.setZero();
+    ypred(0) = u(0);
+
+    for (int i = 1; i < u.size(); ++i){
+      ypred(i) = u(i - 1) + mu;
+      nll -= dnorm(u(i), ypred(i), sig_u, true);
+      if(sim_re == 1){
+        SIMULATE{
+          u(i) = rnorm(ypred(i), sig_u);
+        }
       }
     }
   }
@@ -56,26 +65,36 @@ Type objective_function<Type>::operator()()
   Type cdf = 0;
   for (int i = 0; i < y.size(); ++i){
     if(mod == 0){
-      nll -= keep(i) * dnorm(y(i), u(i), sig, true);
-      cdf = squeeze( pnorm(y(i), u(i), sig) );
+      nll -= keep(i) * dnorm(y(i), u(i), sig_y, true);
+      cdf = squeeze( pnorm(y(i), u(i), sig_y) );
+      SIMULATE {
+        y(i) = rnorm(u(i), sig); // conditional
+      }
     }
     if(mod == 1){
-      nll -= keep(i) * dlnorm(y(i), u(i), sig, true);
-      cdf = squeeze( pnorm(log(y(i)), u(i), sig) );
+      nll -= keep(i) * dlnorm(y(i), u(i), sig_y, true);
+      cdf = squeeze( pnorm(log(y(i)), u(i), sig_y) );
+      SIMULATE {
+        y(i) = exp(rnorm(u(i), sig)); // conditional
+      }
+    }
+    if(mod == 2){ 
+      nll -= keep(i) * dgamma( y(i), 1/pow(sig_y,2), exp(u(i))*pow(sig_y,2), true);
+      cdf = squeeze( pgamma(y(i), 1/pow(sig_y,2), exp(u(i))*pow(sig_y,2)) );
+      SIMULATE{
+        y(i) = rgamma( 1/pow(sig_y,2), exp(u(i))*pow(sig_y,2) );
+      }
     }
     nll -= keep.cdf_lower(i) * log( cdf );
     nll -= keep.cdf_upper(i) * log( 1.0 - cdf );
-    SIMULATE {
-      y(i) = rnorm(u(i), sig); // conditional
-      if(mod == 1){
-        y(i) = exp(y(i));
-      }
-    }
+
   }
   
   SIMULATE{
-    if(sim_re==1){
-      REPORT(u);
+    if(u_flag){
+      if(sim_re==1){
+        REPORT(u);
+      }
     }
     REPORT(y);
   }
@@ -87,9 +106,11 @@ Type objective_function<Type>::operator()()
   REPORT(u);
   REPORT(exp_val);
   REPORT(fpr);
-  REPORT(ypred);
-  REPORT(tau);
-  REPORT(sig);
+  if(u_flag){
+    REPORT(ypred);
+  }
+  REPORT(sig_u);
+  REPORT(sig_y);
   REPORT(nll);
   
   return nll;
