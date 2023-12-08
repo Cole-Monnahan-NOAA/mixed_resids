@@ -71,7 +71,7 @@ simdat <- function(n, ng=0, mod, cov.mod = NULL, type = NULL,
   return(dat.out)
 }
 
-simdat.linmod <- function(n, mod, cov.mod, type, 
+simdat.linmod <- function(n, mod, cov.mod, type=NULL, 
   trueparms, misp, seed, X){
     if(misp != 'overdispersion') stop("Misspecification not available for linmod")
     list2env(trueparms, envir = environment(simdat.linmod))
@@ -97,7 +97,7 @@ simdat.randomwalk <- function(n, mod, cov.mod, type,
     }
   }
   list2env(trueparms, envir = environment(simdat.randomwalk))
-  mu <- X %*% theta
+  mu <- X %*% beta
   ## Simulate random measurements
   set.seed(seed)
   u0 <- cumsum( c(init.u, rnorm(n-1, mu, sd.vec[2]) ))

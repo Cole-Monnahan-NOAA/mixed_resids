@@ -6,15 +6,15 @@ setup_trueparms <- function(mod, misp, fam, link, type){
   }
 
   if(mod == 'randomwalk'){
-    true.pars <- setup_linmod(mod, misp, fam, link, type)
+    true.pars <- setup_randomwalk(mod, misp, fam, link, type)
   }
 
   if(mod == 'simpleGLMM'){
-    true.pars <- setup_linmod(mod, misp, fam, link)
+    true.pars <- setup_simpleGLMM(mod, misp, fam, link, type)
   }
 
   if(mod == 'spatial'){
-    true.pars <- setup_linmod(mod, misp, fam, link)
+    true.pars <- setup_spatial(mod, misp, fam, link, type)
   } 
   return(true.pars)
 }
@@ -34,7 +34,7 @@ setup_linmod <- function(mod, misp, fam, link){
     true.comp[[2]] <- list(beta = beta[1],
                            ln_sig = log(sd.vec[1]))
   }
-  true.pars <- list(beta=beta, sd.vec=sd.vec, 
+  true.parms <- list(beta=beta, sd.vec=sd.vec, 
     fam=fam, link=link, true.comp=true.comp)
   return(true.parms)
 }
@@ -45,7 +45,7 @@ setup_randomwalk <- function(mod, misp, fam, link, type){
     sd.vec <- c(1,1)
     init.u <- 5
   }
-  if(type = "GLMM"){
+  if(type == "GLMM"){
     beta <- 0.1
     sd.vec <- c(0.5, 0.05)
     init.u <- 1
@@ -67,7 +67,7 @@ setup_randomwalk <- function(mod, misp, fam, link, type){
     }
   }
 
-  true.pars <- list(beta=beta, sd.vec=sd.vec, init.u,
+  true.parms <- list(beta=beta, sd.vec=sd.vec, init.u = init.u,
     fam=fam, link=link, true.comp=true.comp)
 
   return(true.parms)
@@ -118,7 +118,7 @@ setup_simpleGLMM <- function(mod, misp, fam, link, type){
 
       true.comp[[1]] <- list(beta = beta,
                              ln_sig_y = log(sd.vec[1]),
-                             theta = log((pow-1)/(2-pow))),
+                             theta = log((pow-1)/(2-pow)),
                              ln_sig_u = log(sd.vec[2]))
     }
   }
@@ -126,7 +126,7 @@ setup_simpleGLMM <- function(mod, misp, fam, link, type){
   for(i in 1:length(misp)){
   true.comp[[i+1]] <- true.comp[1]
     if(misp[i] == 'missunifcov' | misp[i] == 'missnormcov'){
-      true.comp[[i+1]]$beta <- list(beta = beta[1]
+      true.comp[[i+1]]$beta <- beta[1]
     }
     if(misp[i] == 'missre'){
       true.comp[[i+1]]$ln_sig_u <- NULL
@@ -135,7 +135,7 @@ setup_simpleGLMM <- function(mod, misp, fam, link, type){
       true.comp[[i+1]]$theta <- NULL
     }
   }
-  true.pars <- list(beta = beta, sd.vec=sd.vec, theta = theta,
+  true.parms <- list(beta = beta, sd.vec=sd.vec, theta = theta,
     fam=fam, link=link, true.comp=true.comp)
 
   return(true.parms)
@@ -160,7 +160,7 @@ setup_spatial<- function(mod, misp, fam, link, type){
       sd.vec <- c(NA, sqrt(0.25))  
     }
     true.comp[[1]] <- list(beta = beta, 
-           ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2]))), #1/(2*sqrt(pi)*kappa*sp.sd))
+           ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd))
            ln_kappa = log(sqrt(8)/sp.parm))
   }
 
@@ -173,9 +173,9 @@ setup_spatial<- function(mod, misp, fam, link, type){
   }
 
   
-  true.pars <- list(beta=beta, sd.vec=sd.vec, sp.parm=sp.parm,
+  true.parms <- list(beta=beta, sd.vec=sd.vec, sp.parm=sp.parm,
                     fam=fam, link=link, true.comp=true.comp)
-  return(true.pars)
+  return(true.parms)
 }
 
 run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, 

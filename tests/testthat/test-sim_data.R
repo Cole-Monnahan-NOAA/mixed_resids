@@ -1,5 +1,6 @@
 ## Unit tests for functions from sim_data.R
 source('../../R/sim_data.R')
+source('../../R/model_fns.R')
 
 ## test cMatern using function defined in geoR::matern
 context("cMatern unit test")
@@ -44,7 +45,9 @@ old.fn <- simulate_linmod(seed = 123, n = 50)
 y0 <-  old.fn$Data$y0
 y1 <-  old.fn$Data$y1
 new.fn <- simdat(n=50, mod='linmod', cov.mod = "norm",
-                 trueparms = list(theta=c(4,-5), sd.vec=c(1,1), fam = NULL, link = NULL), 
+                 trueparms = setup_trueparms(mod ='linmod', 
+                                             misp='overdispersion', 
+                                             fam = NULL, link = NULL), 
                  misp='overdispersion', seed=123)
 
 
@@ -81,8 +84,10 @@ simulate_randomwalk <- function(seed, n, type, sd.vec, init_u){
 }
 old.fn <- simulate_randomwalk(123,50,"LMM", sd.vec = c(1,1), init_u = 5)
 new.fn <- simdat(n=50, mod='randomwalk', 
-                 trueparms = list(theta=2, sd.vec=c(1,1), init.u = 5, 
-                 fam = "Gaussian", link = "identity"), 
+                 trueparms = setup_trueparms(mod ='randomwalk', 
+                                             misp=c('missre', 'normal-lognorm', 'mu0'), 
+                                             fam = "Gaussian", link = "identity",
+                                             type = "LMM"), 
                  misp=c('missre', 'normal-lognorm', 'mu0'), seed=123)
 test_that('randomwalk, LMM',{
   expect_equal(old.fn$y, new.fn$y0)
@@ -101,7 +106,10 @@ test_that('randomwalk, "min y',{
 
 old.fn <- simulate_randomwalk(123, 50, "GLMM", sd.vec = c(.5,.05), init_u = 1)
 new.fn <- simdat(n=50, mod='randomwalk', 
-                 trueparms = list(theta=.1, sd.vec=c(.5,.05), init.u = 1, fam = "Gamma", link = "log"), 
+                 trueparms = setup_trueparms(mod ='randomwalk', 
+                                             misp=c('missre', 'normal-lognorm', 'mu0'), 
+                                             fam = "Gamma", link = "log",
+                                             type = "GLMM"), 
                  misp=c('missre', 'normal-lognorm', 'mu0'), seed=123)
 test_that('randomwalk, misp=mu0',{
   expect_equal(old.fn$y, new.fn$y0)
@@ -186,9 +194,11 @@ old.fn <- simulate_simpleGLMM(seed = 123, n = 100, ng = 5,
                               cov.mod = "unif",
                               type = "LMM")
 
-new.fn <- simdat(n=100, ng=5, mod='simpleGLMM', cov.mod = "unif",
-                 trueparms = list(beta=c(4,-8), sd.vec=c(.5,2), 
-                                  fam = 'Gaussian', link = 'identity'), 
+new.fn <- simdat(n=100, ng=5, mod='simpleGLMM', cov.mod = "unif", 
+                 trueparms = setup_trueparms(mod ='simpleGLMM', 
+                                             misp=c('missre', 'missunifcov', 'mispre'), 
+                                             fam = "Gaussian", link = "identity",
+                                             type = "LMM"), 
                  misp = c('missre', 'missunifcov', 'mispre'), 
                  seed = 123, type = "LMM")
 
@@ -201,9 +211,10 @@ test_that('simpleGLMM, type = LMM',{
 old.fn <- simulate_simpleGLMM(seed = 123, n = 100, ng = 5,
                               type = "GLMM")
 new.fn <- simdat(n=100, ng=5, mod='simpleGLMM',
-                 trueparms = list(beta=log(.5), sd.vec=c(NA,.8),
-                                  theta = .6, 
-                                  fam = 'NB', link = 'log'), 
+                 trueparms = setup_trueparms(mod ='simpleGLMM', 
+                                             misp=c('missre', 'nb-pois', 'mispre'), 
+                                             fam = "NB", link = "log",
+                                             type = "GLMM"), 
                  misp = c('missre', 'nb-pois', 'mispre'), 
                  seed = 123, type = "GLMM")
 
@@ -243,7 +254,7 @@ test_that('simpleGLMM, "min/max y',{
   #expect_equal(TRUE, max(max.y1) < 100 )
 } )
 
-rm(min.y,max.y,old.fn,new.fn,simulate_simpleGLMM)
+rm(min.y0,min.y1,max.y0,max.y1,old.fn,new.fn,simulate_simpleGLMM)
 
 
 context('simdat spatial tests')
@@ -276,7 +287,9 @@ for(i in 1:1000){
     class.vec[i] <- 1
   }
 }
-expect_equal(1000, sum(class.vec, na.rm = TRUE))
+test_that("successful mesh", {
+  expect_equal(1000, sum(class.vec, na.rm = TRUE))
+})
 
 simulate_spatial <- function(seed, n, misp=NULL, 
                              fam = NULL, type){
@@ -331,10 +344,11 @@ simulate_spatial <- function(seed, n, misp=NULL,
 
 
 old.fn <- simulate_spatial(123, 100, type = "LMM")
-new.fn <- simdat(n=100, mod='spatial', type = "LMM", 
-                      trueparms = list(beta=20, sd.vec=c(1,1), 
-                                       sp.parm = 50, fam = 'Gaussian', 
-                                       link = 'identity'),
+new.fn <- simdat(n=100, mod='spatial', type = "LMM",
+                 trueparms = setup_trueparms(mod ='spatial', 
+                                             misp=c('missre', 'normal-gamma', 'mispre'), 
+                                             fam = "Gaussian", link = "identity",
+                                             type = "LMM"), 
                       misp = c("missre", "normal-gamma", "mispre"), seed=123)
 
 test_that('spatial, LMM',{
@@ -368,9 +382,10 @@ old.fn <- simulate_spatial(123, 100,
                            misp = c("missre", "pois-zip", "mispre"), 
                            fam = "Poisson", type = "GLMM")
 new.fn <- simdat(n=100, mod='spatial', type = "GLMM", 
-                      trueparms = list(beta=0.5, sd.vec=c(NA,sqrt(.25)), 
-                                       sp.parm = 50, fam = 'Poisson', 
-                                       link = 'log'),
+                 trueparms = setup_trueparms(mod ='spatial', 
+                                             misp=c('missre', 'pois-zip', 'mispre'), 
+                                             fam = "Poisson", link = "log",
+                                             type = "GLMM"), 
                       misp = c("missre", "pois-zip", "mispre"), seed=123)
 
 
