@@ -59,6 +59,7 @@ Type objective_function<Type>::operator()()
   DATA_VECTOR_INDICATOR(keep,y);
 
   Type sig_y = 0;
+  Type sig_u = 0;
   Type power = 0;
   Type pz = 0;
   Type size = 0;
@@ -97,6 +98,7 @@ Type objective_function<Type>::operator()()
   vector<Type> eta = X*beta;
   vector<Type> fpr(y.size());
   vector<Type> mu(y.size());
+  Type s1, s2;
   // Likelihood
   for(int i=0; i<y.size(); i++){
     fpr(i) = eta(obs(i));
@@ -140,12 +142,12 @@ Type objective_function<Type>::operator()()
           y(i) = rtweedie(mu(i), sig_y, power);
         }
         break;
-      case: NB_family //variance = mu(1 + mu/size)
+      case NB_family: //variance = mu(1 + mu/size)
         //use dnbinom_robust(y, log(mu), log(var-mu))
         //log(size) = 2 x log(mu) - log(var-mu)
         //log(var-mu) = 2 x log(mu) - log(size)
         s1 = log(mu(i)); // log(mu_i)
-        s2 = 2. * s1 - theta; // log(var - mu) //s2 is m (size); 
+        s2  = 2. * s1 - theta; // log(var - mu) //s2 is m (size); 
         nll -= keep(i) * dnbinom_robust(y(i), s1, s2, true);
         //cdf method not possible as no qnbinom in TMB
         SIMULATE { // from glmmTMB: uses rnbinom2(mu, var)

@@ -119,7 +119,7 @@ Type objective_function<Type>::operator() ()
   Type cdf;
   //Data Likelihood
   for(int i=0; i<n; i++){    
-    eta(i) += omega(mesh_i(i))
+    eta(i) += omega(mesh_i(i));
     mu(i) = inverse_linkfun(eta(i), link);
 
     switch(family){

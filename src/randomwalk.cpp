@@ -23,21 +23,24 @@ Type objective_function<Type>::operator()()
   DATA_VECTOR_INDICATOR(keep, y);  // For one-step predictions
 
   //DATA_SCALAR(huge);
-  PARAMETER_VECTOR(u);
   PARAMETER(mu);
   PARAMETER(ln_sig_y);
   PARAMETER_VECTOR(ln_sig_u); 
+  PARAMETER_VECTOR(u);
 
   
   //only fit random effect if ln_sig_u isn't null
   bool u_flag = (ln_sig_u.size()>0);
-
   Type sig_y = exp(ln_sig_y);	// observation sd
-
+  vector<Type> sig_u(ln_sig_u.size());
+  Type nll = 0;
+  vector<Type> ypred(u.size());
+  ypred.setZero();
+  
   if(u_flag){
-    vector<Type> sig_u = exp(ln_sig_u);		// process sd
+    sig_u = exp(ln_sig_u);		// process sd
     // Initial condition
-    Type nll = -dnorm(u(0), Type(0), Type(1000), true);
+    nll -= dnorm(u(0), Type(0), Type(1000), true);
     /* Turn off simulation of initial condition
     if(sim_re == 1){
       SIMULATE{
@@ -46,20 +49,18 @@ Type objective_function<Type>::operator()()
     }
     */
     // Increments
-    vector<Type> ypred(u.size());
-    ypred.setZero();
     ypred(0) = u(0);
 
     for (int i = 1; i < u.size(); ++i){
       ypred(i) = u(i - 1) + mu;
-      nll -= dnorm(u(i), ypred(i), sig_u, true);
+      nll -= dnorm(u(i), ypred(i), sig_u(0), true);
       if(sim_re == 1){
         SIMULATE{
-          u(i) = rnorm(ypred(i), sig_u);
+          u(i) = rnorm(ypred(i), sig_u(0));
         }
       }
     }
-  }
+ }
 
   // Observations
   Type cdf = 0;
@@ -68,14 +69,14 @@ Type objective_function<Type>::operator()()
       nll -= keep(i) * dnorm(y(i), u(i), sig_y, true);
       cdf = squeeze( pnorm(y(i), u(i), sig_y) );
       SIMULATE {
-        y(i) = rnorm(u(i), sig); // conditional
+        y(i) = rnorm(u(i), sig_y); // conditional
       }
     }
     if(mod == 1){
       nll -= keep(i) * dlnorm(y(i), u(i), sig_y, true);
       cdf = squeeze( pnorm(log(y(i)), u(i), sig_y) );
       SIMULATE {
-        y(i) = exp(rnorm(u(i), sig)); // conditional
+        y(i) = exp(rnorm(u(i), sig_y)); // conditional
       }
     }
     if(mod == 2){ 
@@ -106,9 +107,7 @@ Type objective_function<Type>::operator()()
   REPORT(u);
   REPORT(exp_val);
   REPORT(fpr);
-  if(u_flag){
-    REPORT(ypred);
-  }
+  REPORT(ypred);
   REPORT(sig_u);
   REPORT(sig_y);
   REPORT(nll);
