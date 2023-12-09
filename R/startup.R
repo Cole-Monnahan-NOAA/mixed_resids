@@ -25,7 +25,7 @@ source('R/resid_fns.R')
 
 
 message("Compiling models if needed...")
-TMB::compile('src/linmod.cpp')
-TMB::compile('src/randomwalk.cpp')
-TMB::compile('src/simpleGLMM.cpp')
+TMB::compile('src/linmod.cpp', framework = "TMBad")
+TMB::compile('src/randomwalk.cpp', framework = "TMBad")
+TMB::compile('src/simpleGLMM.cpp', framework = "TMBad")
 TMB::compile('src/spatial.cpp', framework = "TMBad")
