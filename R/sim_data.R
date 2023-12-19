@@ -177,7 +177,7 @@ simdat.simpleGLMM <- function(n, ng, mod, cov.mod, type,
     }
   }
   random <- list(u0=u0, u1=u1)
-  dat.out <- list(y0 = y0, y1 = y1, random = random)
+  dat.out <- list(y0 = y0, y1 = y1, random = random, x = X)
   return(dat.out)
 }
 
@@ -260,7 +260,7 @@ simdat.spatial <- function(n, mod, type, trueparms,
   }
 
   random <- list(omega0 = omega0, omega1 = omega1)
-  dat.out <- list(y0 = y0, y1 = y1, random = random)
+  dat.out <- list(y0 = y0, y1 = y1, random = random, x = X)
   dat.out$loc = loc
   dat.out$mesh = mesh
   if("aniso" %in% misp){
