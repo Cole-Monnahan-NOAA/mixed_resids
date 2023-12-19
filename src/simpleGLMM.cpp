@@ -39,6 +39,13 @@ Type inverse_linkfun(Type eta, int link){
   return ans; 
 }
 
+//see pnbinom_mu at: https://github.com/SurajGupta/r-source/blob/a28e609e72ed7c47f6ddfbb86c85279a0750f0b7/src/nmath/pnbinom.c
+template<class Type>
+Type pnbinom(Type x, Type mu, Type size) {
+  Type pr = size/(size + mu);
+  return 1. - pbeta(pr, size, x+1);
+}
+
 template<class Type>
 Type objective_function<Type>::operator()()
 {
@@ -137,7 +144,11 @@ Type objective_function<Type>::operator()()
         break;
       case Tweedie_family:
         nll -= keep(i) * dtweedie(y(i), mu(i), sig_y, power, true);
-        //cdf method not possible as no qtweedie in TMB
+        /* avilable on TMB's ptweedie branch
+        cdf = squeeze( ptweedie(y(i), mu(i), sig_y, power) );
+        nll -= keep.cdf_lower(i) * log( cdf );
+        nll -= keep.cdf_upper(i) * log( 1.0 - cdf );
+        */
         SIMULATE{
           y(i) = rtweedie(mu(i), sig_y, power);
         }
@@ -147,8 +158,11 @@ Type objective_function<Type>::operator()()
         //log(size) = 2 x log(mu) - log(var-mu)
         //log(var-mu) = 2 x log(mu) - log(size)
         s1 = log(mu(i)); // log(mu_i)
-        s2  = 2. * s1 - theta; // log(var - mu) //s2 is m (size); 
+        s2  = 2. * s1 - theta; // log(var - mu) 
         nll -= keep(i) * dnbinom_robust(y(i), s1, s2, true);
+        cdf = squeeze( pnbinom(y(i), mu(i), size) );
+        nll -= keep.cdf_lower(i) * log( cdf );
+        nll -= keep.cdf_upper(i) * log( 1.0 - cdf );
         //cdf method not possible as no qnbinom in TMB
         SIMULATE { // from glmmTMB: uses rnbinom2(mu, var)
           s1 = mu(i);
