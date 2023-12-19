@@ -62,13 +62,18 @@ add_aic <- function(opt,n){
 
 
 run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm',
-                      misp, family = "Gaussian", link = "identity",
+                      misp, type, family = "Gaussian", link = "identity",
                       do.true = FALSE, savefiles=TRUE){
-
+  if(do.true){
+    mod.name <- paste0(mod, "_true")
+  } else {
+    mod.name <- mod
+  }
+  res.name <- paste0('results/', mod.name, '_', type)
   ## Clean up the old runs
-  unlink(paste0('results/',mod,'_resids', TRUE))
-  unlink(paste0('results/',mod,'_pvals', TRUE))
-  unlink(paste0('results/', mod,'_mles', TRUE))
+  unlink(paste0('results/', res.name))
+  unlink(paste0('results/', res.name))
+  unlink(paste0('results/', res.name))
 
   message(mod,": Preparing workspace to run ", length(reps), " iterations in parallel...")
   ## TMB::compile(paste0("src/",mod,".cpp")) # modified for simulation
@@ -78,7 +83,7 @@ run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm',
   sfExportAll()
   sfLibrary(TMB)
   sfLibrary(DHARMa)
-  sfLibrary(INLA)
+  sfLibrary(fmesher)
   sfLibrary(dplyr)
   sfLibrary(tidyr)
   sfLibrary(R.utils)
@@ -88,7 +93,7 @@ run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm',
 
   message("Starting parallel runs...")
   results <- sfLapply(reps, function(ii) run_iter(ii, n, ng, mod, cov.mod,
-                                                  misp, family, link,
+                                                  misp, type, family, link,
                                                   do.true, savefiles))
   #results <- sapply(reps, function(ii) run_iter(ii, n, ng, mod, cov.mod, misp, do.true, savefiles))
 
@@ -107,21 +112,20 @@ run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm',
 
   sfStop()
   message("Processing and saving final results...")
-  if(do.true) mod <- paste0(mod, "_true")
   ## Read results back in from file
-  fs <- list.files(paste0('results/',mod, '_', misp, '_pvals/'), full.names=TRUE)
+  fs <- list.files(paste0('results/', res.name, '_pvals/'), full.names=TRUE)
   pvals <- lapply(fs, readRDS) %>% bind_rows %>% filter(!is.na(pvalue))
-  saveRDS(pvals, file=paste0('results/',mod, '_', misp, '_pvals.RDS'))
+  saveRDS(pvals, file=paste0('results/', res.name, '_pvals.RDS'))
   ## Read in residuals
-  fs <- list.files(paste0('results/',mod, '_', misp, '_resids/'), full.names=TRUE)
+  fs <- list.files(paste0('results/', res.name, '_resids/'), full.names=TRUE)
   resids <- lapply(fs, readRDS) %>% bind_rows
-  saveRDS(resids, file=paste0('results/',mod, '_', misp,'_resids.RDS'))
-  fs <- list.files(paste0('results/',mod, '_', misp,'_mles/'), full.names=TRUE)
+  saveRDS(resids, file=paste0('results/', res.name,'_resids.RDS'))
+  fs <- list.files(paste0('results/', res.name,'_mles/'), full.names=TRUE)
   mles <- lapply(fs, readRDS) %>% bind_rows
-  saveRDS(mles, file=paste0('results/',mod, '_', misp,'_mles.RDS'))
-  fs <- list.files(paste0('results/',mod, '_', misp,'_stats/'), full.names=TRUE)
+  saveRDS(mles, file=paste0('results/', res.name,'_mles.RDS'))
+  fs <- list.files(paste0('results/', res.name,'_stats/'), full.names=TRUE)
   stats <- lapply(fs, readRDS) %>% bind_rows
-  saveRDS(stats, file=paste0('results/',mod, '_', misp,'_stats.RDS'))
+  saveRDS(stats, file=paste0('results/', res.name,'_stats.RDS'))
   return(invisible(results))
 }
 

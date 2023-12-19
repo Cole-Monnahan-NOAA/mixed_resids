@@ -124,9 +124,11 @@ setup_simpleGLMM <- function(mod, misp, fam, link, type){
   }
 
   for(i in 1:length(misp)){
-  true.comp[[i+1]] <- true.comp[1]
+  true.comp[[i+1]] <- unlist(true.comp[1])
     if(misp[i] == 'missunifcov' | misp[i] == 'missnormcov'){
-      true.comp[[i+1]]$beta <- beta[1]
+      true.comp[[i+1]]$beta_1 <- beta[1]
+      true.comp[[i+1]]$beta_2 <- NULL
+      names(true.comp[[i+1]])[1] = "beta"
     }
     if(misp[i] == 'missre'){
       true.comp[[i+1]]$ln_sig_u <- NULL
@@ -195,7 +197,6 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
     mod.name <- mod
   }
   res.name <- paste0('results/', mod.name, '_', type)
-  misp.name <- misp
 
   if(mod == 'linmod'){
     Random <- FALSE
@@ -230,22 +231,49 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
   init.par <- mkTMBpar(true.parms, sim.dat, mod, misp, type, do.true)
   init.random <- mkTMBrandom(mod, misp)
   init.map <- mkTMBmap(init.par, mod, misp, type)
-  mod.out <- osa.out <- dharma.out <- list(h0 = NULL, h1 = NULL)
-  pvals <- data.frame(id = character(), type = character(), method = character(),
+  mod.out <- osa.out <- dharma.out <- list()
+  pvals <- data.frame(id = character(), type = character(), misp = character(),
+                      res.type = character(), method = character(),
                       model = character(), test = character(), 
                       version = character(), pvalue = numeric())
   mles <-  r <- out <- list()
 
-  for(h in 1:2){
+  for(h in 1:(length(misp)+1)){
+    message(ii, ": Optimizing  models...")
+    if(h == 1){
+      misp.name <- "correct"
+      id <- paste0(mod, '_', do.true, '_', type, '_correct_h0_', ii)
+    } else {
+      id <- paste0(mod, '_', do.true, '_', type, '_', misp[h-1], '_h', h-1, '_', ii)
+      misp.name <- misp[h-1]
+    }
 
-    message(ii, ": Optimizing two competing models...")
+    # Set the distribution based on the true or mis-specified likelihood
+    mod.fam <- "Gaussian"
+    if(!is.null(true.parms$fam)){
+      mod.fam <- true.parms$fam
+    }
+    if(h > 1){
+      if(misp[h-1] == "nb-pois"){
+        mod.fam <- "Poisson"
+      }
+      if(misp[h-1] == "gamma-lognorm" | misp[h-1] == "normal-lognorm"){
+        mod.fam <- "Lognormal"
+      }
+      if(misp[h-1] == "norm-gamma"){
+        mod.fam <- "Gamma"
+      }
+    }
 
-    id <- paste0(mod, '_', misp, '_', do.true, '_h', h-1, '_', ii)
-
-    init.obj <- list(data = init.dat[[h]], parameters = init.par[[h]], 
-                     map = init.map[[h]], random = init.random[[h]], DLL = mod)
-    
-    if(is.null(init.random[[h]])) Random <- FALSE
+    if(h == 1){
+      init.obj <- list(data = init.dat[[h]], parameters = init.par[[h]], 
+                      map = init.map[[h]], random = init.random[[h]], DLL = mod)
+      if(is.null(init.random[[h]])) Random <- FALSE
+    } else {
+      init.obj <- list(data = init.dat$h1[[h-1]], parameters = init.par$h1[[h-1]], 
+                      map = init.map$h1[[h-1]], random = init.random$h1[[h-1]], DLL = mod)
+      if(is.null(init.random$h1[[h-1]])) Random <- FALSE
+    }
     
     if(Random) init.obj$hessian <- TRUE
     
@@ -261,10 +289,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
         tmp1 <- true.parms$true.comp[[h]]
         tmp2 <- mod.out[[h]]$opt$par
         stopifnot(length(tmp2)>0)
-        ##if('fam' %in% names(tmp1)){
-        tmp1$fam <- NULL
-        tmp1$link <- NULL
-        ##}
+        
         tmp1 <- unlist(tmp1)
         ## super hacky way to get unique names when there are vectors
         names(tmp2) <- unlist(sapply(unique(names(tmp2)), function(x) {
@@ -277,7 +302,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
                                 true=as.numeric(tmp1),
                                 bias = tmp2-tmp1)
         mles[[h]] <- cbind(mles[[h]], id=id, replicate=ii,
-                           do.true=do.true,  model=mod, misp=misp,
+                           do.true=do.true,  model=mod, misp=misp.name,
                            n=n)
       } else {
         ## otherwise just NULL b/c nothing estimated
@@ -286,21 +311,19 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
 
       message(ii, ": Calculating residuals..")
       disc <- FALSE; ran <- c(-Inf,Inf); rot <- NULL
-      if(!is.null(true.parms$fam)){
-        if(true.parms$fam == 'Poisson'){
+      if(mod.fam == 'Poisson' | mod.fam == 'NB' | mod.fam == "Tweedie"){
           disc <- TRUE
           ran <- c(0,Inf)
-        }
-        if(true.parms$fam == 'Gamma') ran <- c(0,Inf)
-        if(true.parms$fam == 'Tweedie'){
-          disc <- TRUE
-          ran <- c(0,Inf)
-        }
-          
       }
+      if(mod.fam == 'Gamma' | mod.fam == 'Lognormal'){
+        ran <- c(0,Inf)
+      } 
+        
       if(mod == 'randomwalk' | mod == 'spatial' | mod == 'simpleGLMM') rot <- "estimated"
       
-      osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, methods=osa.methods, observation.name='y', Discrete = disc, Range = ran)
+      osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, methods=osa.methods, 
+                                    observation.name='y', Discrete = disc, 
+                                    Range = ran)
 
       expr <- expression(obj$simulate()$y)
       
@@ -309,10 +332,16 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
       } else {
         n_ <- n
       }
-     
+
+      if(h == 1){
+        init.obs <- sim.dat[[h]]
+      } else {
+        init.obs <- sim.dat$y1[[h-1]]
+      }
+      dharma.out[[h]] <- list()
       if('cond' %in% dharma.methods){
         dharma.out[[h]]$cond <- 
-          calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]],
+          calculate.dharma(mod.out[[h]]$obj, expr, obs = init.obs,
                            idx = 1:n_, fpr=mod.out[[h]]$report$fpr, 
                            int.resp = disc, rot = rot)
       } else {
@@ -323,7 +352,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
       
       if('cond_nrot' %in% dharma.methods){
         dharma.out[[h]]$cond_nrot <- 
-          calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]],
+          calculate.dharma(mod.out[[h]]$obj, expr, obs = init.obs,
                            idx = 1:n_, fpr=mod.out[[h]]$report$fpr, 
                            int.resp = disc, rot = NULL)
       } else {
@@ -341,7 +370,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
       
       if('uncond_nrot' %in% dharma.methods){
         dharma.out[[h]]$uncond_nrot <- 
-          calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], 
+          calculate.dharma(mod.out[[h]]$obj, expr, obs = init.obs, 
                            idx = 1:n_, fpr=mod.out[[h]]$report$fpr, 
                            int.resp = disc, rot = NULL)
       } else {
@@ -352,7 +381,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
 
       if('uncond' %in% dharma.methods){
         dharma.out[[h]]$uncond <- 
-          calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], 
+          calculate.dharma(mod.out[[h]]$obj, expr, obs = init.obs, 
                            idx = 1:n_, fpr=mod.out[[h]]$report$fpr, 
                            int.resp = disc, rot = rot)
       } else {
@@ -365,21 +394,33 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
       ## are RE - turning on when do.true == TRUE (AMH, 6/3/2022)
       if('mcmc' %in% osa.methods){
         t0 <- Sys.time()
-        if(!(misp == "dropRE" & h == 2)){
+        if(!(misp.name == "missre")){
           ## Build up TMB obj again
           if(do.true)  FE <- mod.out[[h]]$obj$par # true FE
           if(!do.true) FE <- mod.out[[h]]$opt$par # estimated FE
           ## make into list; https://stackoverflow.com/questions/46251725/convert-named-vector-to-list-in-r/46251794
           FE <- split(unname(FE),names(FE))
-          MLE <- modifyList(init.par[[h]], FE) #
-          ## Get FE and map them off
-          xx <- names(MLE)[-which(names(MLE) %in% init.random[[h]])]
-          map <- lapply(names(FE), function(x) factor(FE[[x]]*NA))
-          names(map) <- names(FE)
-          map <- c(map, init.map[[h]])
-          ## Rebuild with original FE mapped off and RE as FE
-          objmle <- MakeADFun(data=init.dat[[h]], parameters=MLE,
-                              map=map, DLL=mod.out[[h]]$obj$env$DLL)
+          if(h == 1){
+            MLE <- modifyList(init.par[[h]], FE) #
+            ## Get FE and map them off
+            xx <- names(MLE)[-which(names(MLE) %in% init.random[[h]])]
+            map <- lapply(names(FE), function(x) factor(FE[[x]]*NA))
+            names(map) <- names(FE)
+            map <- c(map, init.map[[h]])
+            ## Rebuild with original FE mapped off and RE as FE
+            objmle <- MakeADFun(data=init.dat[[h]], parameters=MLE,
+                                map=map, DLL=mod.out[[h]]$obj$env$DLL)
+          } else {
+            MLE <- modifyList(init.par$h1[[h-1]], FE) #
+            ## Get FE and map them off
+            xx <- names(MLE)[-which(names(MLE) %in% init.random$h1[[h-1]])]
+            map <- lapply(names(FE), function(x) factor(FE[[x]]*NA))
+            names(map) <- names(FE)
+            map <- c(map, init.map$h1[[h-1]])
+            objmle <- MakeADFun(data=init.dat$h1[[h-1]], parameters=MLE,
+                                map=map, DLL=mod.out[[h]]$obj$env$DLL)
+          }
+          
           fitmle <- tmbstan::tmbstan(objmle, chains=1, warmup=300, iter=301, seed=ii, refresh=-1)
           postmle <- as.numeric(as.matrix(fitmle)) ## single sample
           postmle <- postmle[-length(postmle)] # drop lp__ value
@@ -387,84 +428,20 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
           tmp <- objmle$report(postmle)
         }
         #if no random effect in model mispecification, return the quantile residual
-        if(misp == "dropRE" & h == 2){ 
+        if(misp.name == "missre"){ 
           tmp <- mod.out[[h]]$report
         }
-        if(is.null(true.parms$fam)){
-          sig <- if(is.null(tmp$sig)) tmp$sig_y else tmp$sig
-          Fx <- pnorm(q=init.dat[[h]]$y, mean= tmp$exp_val, sd=sig)
-          osa.out[[h]]$mcmc <-  qnorm(Fx)
+        
+        # Calculate quantile residual
+        if(h == 1){
+          osa.out[[h]]$mcmc <- calc.quantile(mod.fam, tmp, init.dat[[h]]$y)
         } else {
-          if(true.parms$fam == 'Poisson'){
-            Fx <- ppois(init.dat[[h]]$y, tmp$exp_val)
-            px <- dpois(init.dat[[h]]$y, tmp$exp_val)
-            u <- runif(length(Fx))
-            osa.out[[h]]$mcmc <- qnorm(Fx - u * px)
-          }
-          if(true.parms$fam == 'Gamma'){
-            sig <- if(is.null(tmp$sig)) tmp$sig_y else tmp$sig
-            Fx <- pgamma(init.dat[[h]]$y, shape = 1/sig^2, scale = tmp$exp_val*sig^2)
-            osa.out[[h]]$mcmc <-  qnorm(Fx)
-          }
-          if(true.parms$fam == 'Gaussian'){
-            sig <- if(is.null(tmp$sig)) tmp$sig_y else tmp$sig
-            Fx <- pnorm(q=init.dat[[h]]$y, mean= tmp$exp_val, sd=sig)
-            osa.out[[h]]$mcmc <-  qnorm(Fx)
-          }
-          if(mod == 'simpleGLMM'){
-            if(init.dat[[h]]$family == 400){
-              
-              grp.idx <- init.dat[[h]]$group + 1
-              res <- NULL
-              p <- tmp$power
-              phi <- tmp$sig_y
-              if(misp != "dropRE"){
-                #calculate by group as ptweedie relies on pop min/max
-                for(j in 1:ng){
-                  idx <- which(grp.idx == j)
-                  y <- init.dat[[h]]$y[idx]
-                  mu <- tmp$exp_val[idx]
-                  Fx <- ptweedie(q = y, mu = mu, 
-                                 phi = phi, power = p)
-                  zero.idx <- which(y == 0)
-                  #as implemented in statmod::qres.tweedie
-                  Fx[zero.idx] <- runif(length(zero.idx), 0, Fx[zero.idx])
-                  res <- c(res, qnorm(Fx))
-                }
-              }
-              if(misp == "dropRE"){
-                for(j in 1:ng){
-                  idx <- which(grp.idx == j)
-                  y <- init.dat[[h]]$y[idx]
-                  mu <- tmp$exp_val[idx]
-                  Fx <- ptweedie(q = y, mu = mu, 
-                                 phi = phi, power = p)
-                  zero.idx <- which(y == 0)
-                  #as implemented in statmod::qres.tweedie
-                  Fx[zero.idx] <- runif(length(zero.idx), 0, Fx[zero.idx])
-                  res <- c(res, qnorm(Fx))
-                }
-              }
-              osa.out[[h]]$mcmc <- res
-            }
-            if(init.dat[[h]]$family == 500){
-              zero.idx <- which(init.dat[[h]]$y == 0)
-              pos.idx <- which(init.dat[[h]]$y > 0)
-              sig <- tmp$sig_y
-              Fx <- rep(0,length(init.dat[[h]]$y))
-              Fx[pos.idx] <- pgamma(init.dat[[h]]$y[pos.idx], shape = 1/sig^2, 
-                                    scale = tmp$exp_val[pos.idx]*sig^2)
-              Fx[zero.idx] <- runif(length(zero.idx), 0, 1)
-              osa.out[[h]]$mcmc <- qnorm(Fx)
-            }
-          }
-
+          osa.out[[h]]$mcmc <- calc.quantile(mod.fam, tmp, init.dat$h1[[h-1]]$y)
         }
         osa.out[[h]]$runtime.mcmc <- as.numeric(Sys.time()-t0, 'secs')
-        
-      }else {
+      
+      } else {
         osa.out[[h]]$mcmc <- osa.out[[h]]$runtime.mcmc <- NA
-        #
       }
     
       AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC) #!doesn't work if doTrue == TRUE
@@ -478,8 +455,9 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
           converge <- 0
         }
       }
-      r[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
-                           replicate=ii, y=sim.dat[[h]],
+      r[[h]] <- data.frame(id=id, model=mod, type = type, misp = misp.name, 
+                           version = paste0("h", h-1),
+                           replicate=ii, y=init.obs,
                            ypred=mod.out[[h]]$report$exp_val,
                            osa.cdf = osa.out[[h]]$cdf, 
                            osa.gen = osa.out[[h]]$gen,
@@ -492,8 +470,9 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
                            sim_cond_nrot= dharma.out[[h]]$cond_nrot$resids,
                            sim_uncond_nrot=dharma.out[[h]]$uncond_nrot$resids) 
      
-      out[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
-                             replicate = ii, maxgrad=maxgrad, converge=converge,
+      out[[h]] <- data.frame(id=id, model=mod, type = type, misp = misp.name, 
+                             version = paste0("h", h-1), replicate = ii, 
+                             maxgrad=maxgrad, converge=converge,
                              AIC=AIC, AICc=AICc)
       out[[h]][names(osa.out[[h]])[grep("runtime", names(osa.out[[h]]))]] <- 
         sapply(grep("runtime", names(osa.out[[h]])), function(x) osa.out[[h]][[x]] )
@@ -501,25 +480,27 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
         sapply(names(dharma.out[[1]])[!grepl("re", names(dharma.out[[1]]))], function(x) dharma.out[[h]][[x]]$runtime)
         
     
-      pvals <- rbind(pvals, cbind(id,calc.pvals( type = 'osa', method = osa.methods, mod = mod,
-                                        res.obj = osa.out[[h]], version = names(mod.out)[h],
-                                        fam = true.parms$fam, do.true )))
-      pvals <- rbind(pvals, cbind(id,calc.pvals( type = 'sim', method = dharma.methods, mod = mod,
-                                        res.obj = dharma.out[[h]], version = names(mod.out)[h],
-                                        fam = true.parms$fam, do.true )))
+      pvals <- rbind(pvals, cbind(id = id, type = type, misp = misp.name,
+                                  calc.pvals( res.type = 'osa', method = osa.methods, mod = mod,
+                                              res.obj = osa.out[[h]], version = paste0("h", h-1),
+                                              fam = true.parms$fam, do.true )))
+      pvals <- rbind(pvals, cbind(id = id, type = type, misp = misp.name, 
+                                  calc.pvals( res.type = 'sim', method = dharma.methods, mod = mod,
+                                              res.obj = dharma.out[[h]], version = paste0("h", h-1),
+                                              fam = true.parms$fam, do.true )))
       if(mod == 'spatial'){
         if(!is.null(osa.methods)){
           sac.pvals <- calc.sac( type = 'osa', 
                                  dat = sim.dat, 
                                  res.obj = osa.out[[h]],
-                                 version = names(mod.out)[h])
+                                 version = paste0("h", h-1))
           pvals <- rbind(pvals, cbind(id, sac.pvals))
         } 
         if(!is.null(dharma.methods)){
           sac.pvals <- calc.sac( type = 'sim', 
                                  dat = sim.dat, 
                                  res.obj = dharma.out[[h]],
-                                 version = names(mod.out)[h])
+                                 version = paste0("h", h-1))
           pvals <- rbind(pvals, cbind(id, sac.pvals))
         } 
       }
@@ -530,9 +511,6 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
   resids <- rbind(r[[1]], r[[2]])
   stats <- rbind(out[[1]], out[[2]])
   pvals$replicate <- ii
-  pvals$misp <- misp.name
-  stats$misp <- misp.name
-  resids$misp <- misp.name
   ## Tack this on for plotting later
   resids$do.true <- do.true
   pvals$do.true <- do.true

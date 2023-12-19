@@ -115,6 +115,55 @@ calculate.dharma <- function(obj, expr, N=1000, obs, idx, fpr, int.resp, rot){
               # pval.ad=pval.ad))
 }
 
+calc.quantile <- function(fam, report, y){
+  out <- NA
+  if(fam == 'Gaussian'){
+    Fx <- pnorm(q = y, mean = report$exp_val, sd = report$sig_y)
+    out <-  qnorm(Fx)
+  }
+  if(fam == 'Lognormal'){
+    Fx <- pnorm(q = log(y), mean = report$exp_val, sd = report$sig_y)
+    out <-  qnorm(Fx)
+  }
+  if(fam == 'Gamma'){
+    Fx <- pgamma(q = y, shape = 1/report$sig_y^2, scale = report$exp_val*report$sig_y^2)
+    out <-  qnorm(Fx)
+  }
+  if(fam == 'Poisson'){
+    Fx <- ppois(y, report$exp_val)
+    px <- dpois(y, report$exp_val)
+    u <- runif(length(Fx))
+    out <- qnorm(Fx - u * px)
+  }
+  if(fam == 'NB'){
+    Fx <- pnbinom(y, size = report$size, mu = report$exp_val)
+    px <- dnbinom(y, size = report$size, mu = report$exp_val)
+    u <- runif(length(Fx))
+    out <- qnorm(Fx - u * px)
+  }  
+  if(fam == "Tweedie"){
+    grp.idx <- group + 1
+    p <- report$power
+    phi <- report$sig_y
+    Fx <- ptweedie(q = y, mu = report$exp_val, phi = phi, power = p)
+    zero.idx <- which(y == 0)
+    #as implemented in statmod::qres.tweedie
+    Fx[zero.idx] <- runif(length(zero.idx), 0, Fx[zero.idx])
+    out <- qnorm(Fx)
+  }
+  if(family == "Delta_Gamma"){
+    zero.idx <- which(y == 0)
+    pos.idx <- which(y > 0)
+    sig <- tmp$sig_y
+    Fx <- rep(0,length(y))
+    Fx[pos.idx] <- pgamma(y[pos.idx], shape = 1/report$sig_y^2, 
+                          scale = report$exp_val[pos.idx]*report$sig_y^2)
+    Fx[zero.idx] <- runif(length(zero.idx), 0, 1)
+    out <- qnorm(Fx)
+  }
+  return(out)
+}
+
 #duplicated functions, rewrite each test (eg. dispersion, spatial outlier) separately rather than use this code
 # calc.dharma.pvals <-
 #   function(dharma, alternative = c("two.sided", "greater", "less")){
@@ -249,11 +298,11 @@ calc.sac <- function(type, dat, res.obj, version){
 }
 
 
-calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
-  df <- data.frame(type = character(), method = character(), model = character(),
+calc.pvals <- function(res.type, method, mod, res.obj, version, fam, doTrue){
+  df <- data.frame(res.type = character(), method = character(), model = character(),
                    test = character(), version = character(), pvalue = numeric())
   if(!is.null(method)){
-    if(type == 'osa'){
+    if(res.type == 'osa'){
       for(m in 1:length(method)){
         if(is.numeric(res.obj[[method[m]]])){
           #outlier, disp, GOF.ad, GOF.ks !outlier test not available yet for osa
@@ -265,24 +314,24 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
             ad <- goftest::ad.test(res.real,'pnorm', estimated = TRUE)$p.value
           }
           ks <- suppressWarnings(ks.test(res.obj[[method[m]]],'pnorm')$p.value)
-          df <- rbind(df, data.frame(type='osa', method=method[m], model=mod, test='GOF.ad', version = version, pvalue = ad))
-          df <- rbind(df, data.frame(type='osa', method=method[m], model=mod, test='GOF.ks', version = version, pvalue = ks))
+          df <- rbind(df, data.frame(res.type='osa', method=method[m], model=mod, test='GOF.ad', version = version, pvalue = ad))
+          df <- rbind(df, data.frame(res.type='osa', method=method[m], model=mod, test='GOF.ks', version = version, pvalue = ks))
         }
       }
       if(!is.null(fam)){
         if(all(fam == 'Poisson' & !is.na(res.obj$pears))){
           disp <- 1 - pchisq(sum(res.obj$pears^2), res.obj$pears.df)
-          df <- rbind(df, data.frame(type='osa', method='pears', model=mod, test='disp',
+          df <- rbind(df, data.frame(res.type='osa', method='pears', model=mod, test='disp',
                                      version = version, pvalue = disp))
         }
       }
   
     }
-    if(type == 'sim'){
+    if(res.type == 'sim'){
       alt <- 'two.sided'
       marg <- 'both'
       if(!is.null(fam)){
-        if(fam == 'Poisson' | fam == 'Gamma'){
+        if(fam == 'Poisson' | fam == 'Gamma' | fam == 'Lognormal' | fam == 'NB'){
           alt <- 'greater'
           marg <- 'upper'
         }
@@ -299,19 +348,19 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
               outlier <- testOutliers(res.obj[[method[m]]]$out, alternative = alt,
                                       margin = marg, type='bootstrap', plot=FALSE)$p.value
   
-              df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='disp',version = version, pvalue = disp))
-              df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
+              df <- rbind(df, data.frame(res.type='sim', method=method[m], model=mod, test='disp',version = version, pvalue = disp))
+              df <- rbind(df, data.frame(res.type='sim', method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
             } else {
               #outlier test type = 'binomial' only appropriate for continuous distributions
               outlier <- testOutliers(res.obj[[method[m]]]$out, alternative = alt,
                                       margin = marg, type='binomial', plot=FALSE)$p.value
-              df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
+              df <- rbind(df, data.frame(res.type='sim', method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
             }
           } else {
             #outlier test type = 'binomial' only appropriate for continuous distributions
             outlier <- testOutliers(res.obj[[method[m]]]$out, alternative = alt,
                                     margin = marg, type='binomial', plot=FALSE)$p.value
-            df <- rbind(df,  data.frame(type='sim',method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
+            df <- rbind(df,  data.frame(res.type='sim',method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
           }
           
           if(doTrue){
@@ -322,8 +371,8 @@ calc.pvals <- function(type, method, mod, res.obj, version, fam, doTrue){
           }
           ks <- suppressWarnings(ks.test(res.obj[[method[m]]]$out$scaledResiduals,'punif')$p.value)
   
-          df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='GOF.ad', version = version, pvalue = ad))
-          df <- rbind(df, data.frame(type='sim', method=method[m], model=mod, test='GOF.ks', version = version, pvalue = ks))
+          df <- rbind(df, data.frame(res.type='sim', method=method[m], model=mod, test='GOF.ad', version = version, pvalue = ad))
+          df <- rbind(df, data.frame(res.type='sim', method=method[m], model=mod, test='GOF.ks', version = version, pvalue = ks))
         }
       }
     }
