@@ -1,172 +1,189 @@
-setup_trueparms <- function(mod, misp, fam, link){
+setup_trueparms <- function(mod, misp, fam, link, type){
   true.comp <- list()
-  if(mod=='linmod'){
-    theta <- c(4,-5)
-    sd.vec <- 1
-    true.comp[[1]] <- true.comp[[2]] <-
-      list(beta_1 = theta[1], beta_2 = theta[2],
-                      ln_sig = log(sd.vec))
-    sp.parm <- 0
-    if(misp == 'overdispersion'){
-      #sd.vec <- c(sd.vec, sd.vec*log(4))
-      sd.vec <- c(sd.vec, 1)
-    }
-    if(misp == 'misscov'){
-      true.comp[[2]] <- list(beta = theta[1],
-                          ln_sig = log(sd.vec[1]))
-    }
-  }
-  if(mod=='randomwalk'){
-    if(misp == "normal"){
-      theta = 0.05
-      sd.vec = c(0.5, 0.5)
-    } else {
-      theta <- 2
-      sd.vec <- c(1,1)
-    }
-    sp.parm <- 0
-    true.comp[[1]] <- list(mu = theta, ln_sig = log(sd.vec[1]),
-           ln_tau = log(sd.vec[2]))
-    if(misp == 'mu0'){
-      true.comp[[2]] <- list(ln_sig = log(sd.vec[1]),
-                             ln_tau = log(sd.vec[2]))
-    } else {
-      true.comp[[2]] <- true.comp[[1]]
-    }
-  }
-  if(mod=='simpleGLMM'){
-    theta <- 1
-    sd.vec <- sqrt(c(2,4))
-    if(fam == "Tweedie"){
-      theta <- 1.5
-      pow <- 1.2
-      sd.vec <- sqrt(c(2,2))
-    }
-    if(fam == "Poisson"){
-      theta <- 1.5
-      sd.vec <- sqrt(c(.5,2))
-    }
 
-    sp.parm <- 0
-    if(misp=='misscov'){
-       #parms when fam = 'Gaussian';link='identity
-       theta <- c(4,-8)
-       sd.vec[1] <- 0.5
-      #parms when link function on logscale
-      # theta <- c(4,-.4)
-       true.comp[[1]] <- list(beta_1 = theta[1], beta_2 = theta[2],
-                              ln_sig_y = log(sd.vec[1]),
-                              ln_sig_u = log(sd.vec[2]))
-       true.comp[[2]] <- list(beta = theta[1],
-                              ln_sig_y = log(sd.vec[1]),
-                              ln_sig_u = log(sd.vec[2]))
-    }
-    if(misp=='overdispersion') {
-      sd.vec <- c(sd.vec, 1)
-      true.comp[[1]] <- list(beta = theta,
-                             ln_sig_y = log(sd.vec[1]),
-                             ln_sig_u = log(sd.vec[2]),
-                             ln_sig_v = log(sd.vec[3]))
-      true.comp[[2]] <- list(beta = theta[1],
-                             ln_sig_y = log(sd.vec[1]),
-                             ln_sig_u = log(sd.vec[2]))
-    }
-    if(misp == 'outliers'){
-      true.comp[[1]] <- true.comp[[2]] <-
-        list(beta = theta[1],
-             ln_sig_y = log(sd.vec[1]),
-             ln_sig_u = log(sd.vec[2]))
-    }
-    if(fam == 'Poisson'){
-      true.comp[[1]]$ln_sig_y <- NULL
-      true.comp[[2]]$ln_sig_y <- NULL
-    }
-    if(fam == 'Tweedie'){
-      sd.vec[3] <- pow
-      if(misp == 'deltagamma'){
-        #convert sd of tweedie to sd of gamma, tweedie: var(y) = mu^pow*phi
-        sd.y <- sqrt(theta^pow*sd.vec[1]) 
-        true.comp[[1]] <- list(beta = theta,
-                               ln_sig_y = log(sd.vec[1]),
-                               ln_sig_u = log(sd.vec[2]))
-        true.comp[[2]] <- list(beta = theta,
-                               ln_sig_y = log(sd.y/theta), #cv
-                               ln_sig_u = log(sd.vec[2]))
-        #lambda definition based on Compound Poisson-Gamma relationship to Tweedie
-        #Prob(Y==0) = exp(-lambda) based on Poisson 
-        lambda <- (exp(theta)^(2 - pow))/((2-pow)*sd.vec[1])
-        pz <- exp(-lambda)
-        #logit transform of the probability of zero
-        
-        true.comp[[1]]$ln_sig_y[2] <- log((pow-1)/(2-pow))
-        true.comp[[2]]$ln_sig_y[2] <- log(pz/(1-pz))
-      }
-      if(misp == 'dropRE'){
-        true.comp[[1]] <- list(beta = theta,
-                               ln_sig_y = c(log(sd.vec[1]),
-                                            log((pow-1)/(2-pow))),
-                               ln_sig_u = log(sd.vec[2]))
-        true.comp[[2]] <- list(beta = theta,
-                               ln_sig_y = c(log(sd.vec[1]),
-                                            log((pow-1)/(2-pow))))
-      }
-      true.comp[[1]]$ln_sig_y[2] <- log((pow-1)/(2-pow))
-      
-    }
+  if(mod == 'linmod'){
+    true.pars <- setup_linmod(mod, misp, fam, link)
   }
-  if(mod=='spatial'){
-    sp.parm <- 50
-    if(fam == "Poisson"){
-      theta <- 0.5
-      sd.vec <- c(0.5, sqrt(2))
-    }
 
-    if(fam == 'Gaussian'){
-      theta <- 1
-      sd.vec <- c(0.5, 1)
-    }
-
-    true.comp[[1]] <- true.comp[[2]] <-
-      list(beta = theta, theta = log(sd.vec[1]),
-           ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd))
-           ln_kappa = log(sqrt(8)/sp.parm))
-
-    if(misp=='misscov'){
-      theta <- c(0.5,1.5)
-      true.comp[[1]] <-
-        list(beta_1 = theta[1], beta_2 = theta[2], theta = log(sd.vec[1]),
-             ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd))
-             ln_kappa = log(sqrt(8)/sp.parm))
-      true.comp[[2]] <-
-        list(beta = theta[1], theta = log(sd.vec[1]),
-             ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd))
-             ln_kappa = log(sqrt(8)/sp.parm))
-    }
-    if(misp=='overdispersion'){
-      sd.vec <- c(sd.vec, sd.vec[2]*.5) #overdispersion variance = 0.5*spatial variance
-      true.comp[[1]]$ln_sig_v <- log(sd.vec[3])
-    }
-    if(misp == 'dropRE'){
-      true.comp[[2]] <- list(beta = theta, theta = log(sd.vec[1]))
-    }
-    # if(misp == 'mispomega'){
-    #   sd.vec[2] <- sd.vec[2]/3
-    # }
-    if(fam == "Poisson"){
-      true.comp[[1]]$theta <- NULL
-      true.comp[[2]]$theta <- NULL
-    }
+  if(mod == 'randomwalk'){
+    true.pars <- setup_randomwalk(mod, misp, fam, link, type)
   }
-  true.pars <- list(theta=theta, sd.vec=sd.vec, sp.parm=sp.parm,
-                    fam=fam, link=link, true.comp=true.comp)
+
+  if(mod == 'simpleGLMM'){
+    true.pars <- setup_simpleGLMM(mod, misp, fam, link, type)
+  }
+
+  if(mod == 'spatial'){
+    true.pars <- setup_spatial(mod, misp, fam, link, type)
+  } 
   return(true.pars)
 }
 
-run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, 
+setup_linmod <- function(mod, misp, fam, link){
+  beta <- c(4,-5)
+  sd.vec <- 1
+  true.comp <- list()
+  true.comp[[1]] <- true.comp[[2]] <-
+    list(beta_1 = beta[1], beta_2 = beta[2],
+      ln_sig = log(sd.vec))
+  
+  if(misp == 'overdispersion'){
+    sd.vec <- c(sd.vec, 1)
+  }
+  if(misp == 'misscov'){
+    true.comp[[2]] <- list(beta = beta[1],
+                           ln_sig = log(sd.vec[1]))
+  }
+  true.parms <- list(beta=beta, sd.vec=sd.vec, 
+    fam=fam, link=link, true.comp=true.comp)
+  return(true.parms)
+}
+
+setup_randomwalk <- function(mod, misp, fam, link, type){
+  if(type == "LMM"){
+    beta <- 2
+    sd.vec <- c(1,1)
+    init.u <- 5
+  }
+  if(type == "GLMM"){
+    beta <- 0.05
+    sd.vec <- c(0.5, 0.05)
+    init.u <- 0.1
+  }
+  
+  true.comp <- list()
+  true.comp[[1]] <- list(mu = beta, ln_sig_y = log(sd.vec[1]),
+          ln_sig_u = log(sd.vec[2]))
+  for(i in 1:length(misp)){
+    if(misp[i] == 'mu0'){
+      true.comp[[i+1]] <- list(ln_sig_y = log(sd.vec[1]),
+                               ln_sig_u = log(sd.vec[2]))
+    } 
+    if(misp[i] == 'missre'){
+      true.comp[[i+1]] <- list(mu = beta, ln_sig_y = log(sd.vec[1]))
+    }
+    if(misp[i] == 'gamma-lognorm' | misp[i] == 'normal-lognorm'){
+      true.comp[[i+1]] <- true.comp[[1]]
+    }
+  }
+
+  true.parms <- list(beta=beta, sd.vec=sd.vec, init.u = init.u,
+    fam=fam, link=link, true.comp=true.comp)
+
+  return(true.parms)
+}
+
+setup_simpleGLMM <- function(mod, misp, fam, link, type){
+  theta <- NA
+  true.comp <- list()
+  if(type == "LMM"){
+    #currently only misp = misscovunif or misscovnorm is implemented
+    beta <- c(4,-8)
+    sd.vec <- c(0.5, 2)
+    true.comp[[1]] <- list(beta_1 = beta[1], beta_2 = beta[2],
+                           ln_sig_y = log(sd.vec[1]),
+                           ln_sig_u = log(sd.vec[2]))
+   
+  }
+
+  if(type == "GLMM"){
+    sd.vec <- rep(NA, 2)
+
+    if(fam == "NB"){
+      beta <- log(.5)
+      size <- .6
+      sd.vec[2] <- .8 #sig_u
+      theta <- size
+
+      true.comp[[1]] <- list(beta = beta,
+                             theta = log(size),
+                             ln_sig_u = log(sd.vec[2]))
+
+    }
+
+    if(fam == "Poisson"){
+      beta <- 0.5
+      sd.vec[2] <- sqrt(0.5) #sig_u
+
+       true.comp[[1]] <- list(beta = beta[1],
+                              ln_sig_u = log(sd.vec[2]))
+    }
+
+    if(fam == "Tweedie"){
+      beta <- 1.5
+      pow <- 1.3
+      sd.vec <- c(1.7,1) #phi, sig_u
+      theta <- pow
+
+      true.comp[[1]] <- list(beta = beta,
+                             ln_sig_y = log(sd.vec[1]),
+                             theta = log((pow-1)/(2-pow)),
+                             ln_sig_u = log(sd.vec[2]))
+    }
+  }
+
+  for(i in 1:length(misp)){
+  true.comp[[i+1]] <- unlist(true.comp[1])
+    if(misp[i] == 'missunifcov' | misp[i] == 'missnormcov'){
+      true.comp[[i+1]]$beta_1 <- beta[1]
+      true.comp[[i+1]]$beta_2 <- NULL
+      names(true.comp[[i+1]])[1] = "beta"
+    }
+    if(misp[i] == 'missre'){
+      true.comp[[i+1]]$ln_sig_u <- NULL
+    }
+    if(misp[i] == 'nb-pois'){
+      true.comp[[i+1]]$theta <- NULL
+    }
+  }
+  true.parms <- list(beta = beta, sd.vec=sd.vec, theta = theta,
+    fam=fam, link=link, true.comp=true.comp)
+
+  return(true.parms)
+}
+
+
+setup_spatial<- function(mod, misp, fam, link, type){
+  sp.parm <- 50
+  true.comp <- list()
+  if(type == "LMM"){
+    beta <- 20
+    sd.vec <- c(1, 1)
+
+    true.comp[[1]] <- list(beta = beta, theta = log(sd.vec[1]),
+           ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd))
+           ln_kappa = log(sqrt(8)/sp.parm))
+  }
+
+  if(type == "GLMM"){
+    if(fam == "Poisson"){
+      beta <- 0.5
+      sd.vec <- c(NA, sqrt(0.25))  
+    }
+    true.comp[[1]] <- list(beta = beta, 
+           ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd))
+           ln_kappa = log(sqrt(8)/sp.parm))
+  }
+
+  for(i in 1:length(misp)){
+    true.comp[[i+1]] <- true.comp[1]
+    if(misp[i] == "missre"){
+      true.comp[[i+1]]$ln_tau <- NULL
+      true.comp[[i+1]]$ln_kappa <- NULL
+    }
+  }
+
+  
+  true.parms <- list(beta=beta, sd.vec=sd.vec, sp.parm=sp.parm,
+                    fam=fam, link=link, true.comp=true.comp)
+  return(true.parms)
+}
+
+run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
                      family, link, do.true = FALSE, savefiles=TRUE){
   library(TMB)
   library(DHARMa)
-  library(INLA)
+  library(fmesher)
   library(dplyr)
   library(tidyr)
   library(R.utils)
@@ -178,8 +195,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
   } else {
     mod.name <- mod
   }
-  res.name <- paste0('results/', mod.name, '_', misp)
-  misp.name <- misp
+  res.name <- paste0('results/', mod.name, '_', type)
 
   if(mod == 'linmod'){
     Random <- FALSE
@@ -187,49 +203,76 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
     Random <- TRUE
   }
   
-  if(misp == "missnormcov"){
-    cov.mod <- "norm"
-    misp <- "misscov"
-  }
-  if(misp == "missunifcov"){
-    cov.mod <- "unif"
-    misp <- "misscov"
-  }
+  # if(misp == "missnormcov"){
+  #   cov.mod <- "norm"
+  #   misp <- "misscov"
+  # }
+  # if(misp == "missunifcov"){
+  #   cov.mod <- "unif"
+  #   misp <- "misscov"
+  # }
 
   setupTMB(mod)
-  true.parms <- setup_trueparms(mod, misp, family, link)
+  true.parms <- setup_trueparms(mod, misp, family, link, type)
 
   ## simulate data with these parameters
   message(ii, ": Simulating data...")
-  sim.dat <- simdat(n, ng, mod, cov.mod, true.parms, misp, ii)
+  sim.dat <- simdat(n, ng, mod, cov.mod, type, true.parms, misp, ii)
   if(is.null(sim.dat)){
     set.seed(ii)
     while(is.null(sim.dat)){
       new.seed = round(runif(1, 5000, 8000))
-      sim.dat <-  simdat(n, ng, mod, cov.mod, true.parms, misp, new.seed)
+      sim.dat <-  simdat(n, ng, mod, cov.mod, type, true.parms, misp, new.seed)
     }
   }
 
-  init.dat <- mkTMBdat(sim.dat, true.parms, mod, misp)
-  init.par <- mkTMBpar(true.parms, sim.dat, mod, misp, do.true)
-  init.random <- mkTMBrandom(mod, misp, do.true)
-  init.map <- mkTMBmap(init.par, mod, misp, true.parms$fam, do.true)
-  mod.out <- osa.out <- dharma.out <- list(h0 = NULL, h1 = NULL)
-  pvals <- data.frame(id = character(), type = character(), method = character(),
+  init.dat <- mkTMBdat(sim.dat, true.parms, mod, misp, type)
+  init.par <- mkTMBpar(true.parms, sim.dat, mod, misp, type, do.true)
+  init.random <- mkTMBrandom(mod, misp)
+  init.map <- mkTMBmap(init.par, mod, misp, type)
+  mod.out <- osa.out <- dharma.out <- list()
+  pvals <- data.frame(id = character(), type = character(), misp = character(),
+                      res.type = character(), method = character(),
                       model = character(), test = character(), 
                       version = character(), pvalue = numeric())
   mles <-  r <- out <- list()
 
-  for(h in 1:2){
+  for(h in 1:(length(misp)+1)){
+    message(ii, ": Optimizing  models...")
+    if(h == 1){
+      misp.name <- "correct"
+      id <- paste0(mod, '_', do.true, '_', type, '_correct_h0_', ii)
+    } else {
+      id <- paste0(mod, '_', do.true, '_', type, '_', misp[h-1], '_h', h-1, '_', ii)
+      misp.name <- misp[h-1]
+    }
 
-    message(ii, ": Optimizing two competing models...")
+    # Set the distribution based on the true or mis-specified likelihood
+    mod.fam <- "Gaussian"
+    if(!is.null(true.parms$fam)){
+      mod.fam <- true.parms$fam
+    }
+    if(h > 1){
+      if(misp[h-1] == "nb-pois"){
+        mod.fam <- "Poisson"
+      }
+      if(misp[h-1] == "gamma-lognorm" | misp[h-1] == "normal-lognorm"){
+        mod.fam <- "Lognormal"
+      }
+      if(misp[h-1] == "norm-gamma"){
+        mod.fam <- "Gamma"
+      }
+    }
 
-    id <- paste0(mod, '_', misp, '_', do.true, '_h', h-1, '_', ii)
-
-    init.obj <- list(data = init.dat[[h]], parameters = init.par[[h]], 
-                     map = init.map[[h]], random = init.random[[h]], DLL = mod)
-    
-    if(is.null(init.random[[h]])) Random <- FALSE
+    if(h == 1 | mod == "linmod"){
+      init.obj <- list(data = init.dat[[h]], parameters = init.par[[h]], 
+                      map = init.map[[h]], random = init.random[[h]], DLL = mod)
+      if(is.null(init.random[[h]])) Random <- FALSE
+    } else {
+      init.obj <- list(data = init.dat$h1[[h-1]], parameters = init.par$h1[[h-1]], 
+                      map = init.map$h1[[h-1]], random = init.random$h1[[h-1]], DLL = mod)
+      if(is.null(init.random$h1[[h-1]])) Random <- FALSE
+    }
     
     if(Random) init.obj$hessian <- TRUE
     
@@ -245,10 +288,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
         tmp1 <- true.parms$true.comp[[h]]
         tmp2 <- mod.out[[h]]$opt$par
         stopifnot(length(tmp2)>0)
-        ##if('fam' %in% names(tmp1)){
-        tmp1$fam <- NULL
-        tmp1$link <- NULL
-        ##}
+        
         tmp1 <- unlist(tmp1)
         ## super hacky way to get unique names when there are vectors
         names(tmp2) <- unlist(sapply(unique(names(tmp2)), function(x) {
@@ -261,7 +301,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
                                 true=as.numeric(tmp1),
                                 bias = tmp2-tmp1)
         mles[[h]] <- cbind(mles[[h]], id=id, replicate=ii,
-                           do.true=do.true,  model=mod, misp=misp,
+                           do.true=do.true,  model=mod, misp=misp.name,
                            n=n)
       } else {
         ## otherwise just NULL b/c nothing estimated
@@ -270,21 +310,19 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
 
       message(ii, ": Calculating residuals..")
       disc <- FALSE; ran <- c(-Inf,Inf); rot <- NULL
-      if(!is.null(true.parms$fam)){
-        if(true.parms$fam == 'Poisson'){
+      if(mod.fam == 'Poisson' | mod.fam == 'NB' | mod.fam == "Tweedie"){
           disc <- TRUE
           ran <- c(0,Inf)
-        }
-        if(true.parms$fam == 'Gamma') ran <- c(0,Inf)
-        if(true.parms$fam == 'Tweedie'){
-          disc <- TRUE
-          ran <- c(0,Inf)
-        }
-          
       }
+      if(mod.fam == 'Gamma' | mod.fam == 'Lognormal'){
+        ran <- c(0,Inf)
+      } 
+        
       if(mod == 'randomwalk' | mod == 'spatial' | mod == 'simpleGLMM') rot <- "estimated"
       
-      osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, methods=osa.methods, observation.name='y', Discrete = disc, Range = ran)
+      osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, methods=osa.methods, 
+                                    observation.name='y', Discrete = disc, 
+                                    Range = ran)
 
       expr <- expression(obj$simulate()$y)
       
@@ -293,10 +331,16 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
       } else {
         n_ <- n
       }
-     
+
+      if(h == 1 | mod == "linmod"){
+        init.obs <- sim.dat[[h]]
+      } else {
+        init.obs <- sim.dat$y1[[h-1]]
+      }
+      dharma.out[[h]] <- list()
       if('cond' %in% dharma.methods){
         dharma.out[[h]]$cond <- 
-          calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]],
+          calculate.dharma(mod.out[[h]]$obj, expr, obs = init.obs,
                            idx = 1:n_, fpr=mod.out[[h]]$report$fpr, 
                            int.resp = disc, rot = rot)
       } else {
@@ -307,7 +351,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
       
       if('cond_nrot' %in% dharma.methods){
         dharma.out[[h]]$cond_nrot <- 
-          calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]],
+          calculate.dharma(mod.out[[h]]$obj, expr, obs = init.obs,
                            idx = 1:n_, fpr=mod.out[[h]]$report$fpr, 
                            int.resp = disc, rot = NULL)
       } else {
@@ -325,7 +369,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
       
       if('uncond_nrot' %in% dharma.methods){
         dharma.out[[h]]$uncond_nrot <- 
-          calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], 
+          calculate.dharma(mod.out[[h]]$obj, expr, obs = init.obs, 
                            idx = 1:n_, fpr=mod.out[[h]]$report$fpr, 
                            int.resp = disc, rot = NULL)
       } else {
@@ -336,7 +380,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
 
       if('uncond' %in% dharma.methods){
         dharma.out[[h]]$uncond <- 
-          calculate.dharma(mod.out[[h]]$obj, expr, obs=sim.dat[[h]], 
+          calculate.dharma(mod.out[[h]]$obj, expr, obs = init.obs, 
                            idx = 1:n_, fpr=mod.out[[h]]$report$fpr, 
                            int.resp = disc, rot = rot)
       } else {
@@ -349,21 +393,33 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
       ## are RE - turning on when do.true == TRUE (AMH, 6/3/2022)
       if('mcmc' %in% osa.methods){
         t0 <- Sys.time()
-        if(!(misp == "dropRE" & h == 2)){
+        if(!(misp.name == "missre")){
           ## Build up TMB obj again
           if(do.true)  FE <- mod.out[[h]]$obj$par # true FE
           if(!do.true) FE <- mod.out[[h]]$opt$par # estimated FE
           ## make into list; https://stackoverflow.com/questions/46251725/convert-named-vector-to-list-in-r/46251794
           FE <- split(unname(FE),names(FE))
-          MLE <- modifyList(init.par[[h]], FE) #
-          ## Get FE and map them off
-          xx <- names(MLE)[-which(names(MLE) %in% init.random[[h]])]
-          map <- lapply(names(FE), function(x) factor(FE[[x]]*NA))
-          names(map) <- names(FE)
-          map <- c(map, init.map[[h]])
-          ## Rebuild with original FE mapped off and RE as FE
-          objmle <- MakeADFun(data=init.dat[[h]], parameters=MLE,
-                              map=map, DLL=mod.out[[h]]$obj$env$DLL)
+          if(h == 1){
+            MLE <- modifyList(init.par[[h]], FE) #
+            ## Get FE and map them off
+            xx <- names(MLE)[-which(names(MLE) %in% init.random[[h]])]
+            map <- lapply(names(FE), function(x) factor(FE[[x]]*NA))
+            names(map) <- names(FE)
+            map <- c(map, init.map[[h]])
+            ## Rebuild with original FE mapped off and RE as FE
+            objmle <- MakeADFun(data=init.dat[[h]], parameters=MLE,
+                                map=map, DLL=mod.out[[h]]$obj$env$DLL)
+          } else {
+            MLE <- modifyList(init.par$h1[[h-1]], FE) #
+            ## Get FE and map them off
+            xx <- names(MLE)[-which(names(MLE) %in% init.random$h1[[h-1]])]
+            map <- lapply(names(FE), function(x) factor(FE[[x]]*NA))
+            names(map) <- names(FE)
+            map <- c(map, init.map$h1[[h-1]])
+            objmle <- MakeADFun(data=init.dat$h1[[h-1]], parameters=MLE,
+                                map=map, DLL=mod.out[[h]]$obj$env$DLL)
+          }
+          
           fitmle <- tmbstan::tmbstan(objmle, chains=1, warmup=300, iter=301, seed=ii, refresh=-1)
           postmle <- as.numeric(as.matrix(fitmle)) ## single sample
           postmle <- postmle[-length(postmle)] # drop lp__ value
@@ -371,84 +427,19 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
           tmp <- objmle$report(postmle)
         }
         #if no random effect in model mispecification, return the quantile residual
-        if(misp == "dropRE" & h == 2){ 
+        if(misp.name == "missre"){ 
           tmp <- mod.out[[h]]$report
         }
-        if(is.null(true.parms$fam)){
-          sig <- if(is.null(tmp$sig)) tmp$sig_y else tmp$sig
-          Fx <- pnorm(q=init.dat[[h]]$y, mean= tmp$exp_val, sd=sig)
-          osa.out[[h]]$mcmc <-  qnorm(Fx)
+        # Calculate quantile residual
+        if(h == 1){
+          osa.out[[h]]$mcmc <- calc.quantile(mod.fam, tmp, init.dat[[h]]$y)
         } else {
-          if(true.parms$fam == 'Poisson'){
-            Fx <- ppois(init.dat[[h]]$y, tmp$exp_val)
-            px <- dpois(init.dat[[h]]$y, tmp$exp_val)
-            u <- runif(length(Fx))
-            osa.out[[h]]$mcmc <- qnorm(Fx - u * px)
-          }
-          if(true.parms$fam == 'Gamma'){
-            sig <- if(is.null(tmp$sig)) tmp$sig_y else tmp$sig
-            Fx <- pgamma(init.dat[[h]]$y, shape = 1/sig^2, scale = tmp$exp_val*sig^2)
-            osa.out[[h]]$mcmc <-  qnorm(Fx)
-          }
-          if(true.parms$fam == 'Gaussian'){
-            sig <- if(is.null(tmp$sig)) tmp$sig_y else tmp$sig
-            Fx <- pnorm(q=init.dat[[h]]$y, mean= tmp$exp_val, sd=sig)
-            osa.out[[h]]$mcmc <-  qnorm(Fx)
-          }
-          if(mod == 'simpleGLMM'){
-            if(init.dat[[h]]$family == 400){
-              
-              grp.idx <- init.dat[[h]]$group + 1
-              res <- NULL
-              p <- tmp$power
-              phi <- tmp$sig_y
-              if(misp != "dropRE"){
-                #calculate by group as ptweedie relies on pop min/max
-                for(j in 1:ng){
-                  idx <- which(grp.idx == j)
-                  y <- init.dat[[h]]$y[idx]
-                  mu <- tmp$exp_val[idx]
-                  Fx <- ptweedie(q = y, mu = mu, 
-                                 phi = phi, power = p)
-                  zero.idx <- which(y == 0)
-                  #as implemented in statmod::qres.tweedie
-                  Fx[zero.idx] <- runif(length(zero.idx), 0, Fx[zero.idx])
-                  res <- c(res, qnorm(Fx))
-                }
-              }
-              if(misp == "dropRE"){
-                for(j in 1:ng){
-                  idx <- which(grp.idx == j)
-                  y <- init.dat[[h]]$y[idx]
-                  mu <- tmp$exp_val[idx]
-                  Fx <- ptweedie(q = y, mu = mu, 
-                                 phi = phi, power = p)
-                  zero.idx <- which(y == 0)
-                  #as implemented in statmod::qres.tweedie
-                  Fx[zero.idx] <- runif(length(zero.idx), 0, Fx[zero.idx])
-                  res <- c(res, qnorm(Fx))
-                }
-              }
-              osa.out[[h]]$mcmc <- res
-            }
-            if(init.dat[[h]]$family == 500){
-              zero.idx <- which(init.dat[[h]]$y == 0)
-              pos.idx <- which(init.dat[[h]]$y > 0)
-              sig <- tmp$sig_y
-              Fx <- rep(0,length(init.dat[[h]]$y))
-              Fx[pos.idx] <- pgamma(init.dat[[h]]$y[pos.idx], shape = 1/sig^2, 
-                                    scale = tmp$exp_val[pos.idx]*sig^2)
-              Fx[zero.idx] <- runif(length(zero.idx), 0, 1)
-              osa.out[[h]]$mcmc <- qnorm(Fx)
-            }
-          }
-
+          osa.out[[h]]$mcmc <- calc.quantile(mod.fam, tmp, init.dat$h1[[h-1]]$y)
         }
         osa.out[[h]]$runtime.mcmc <- as.numeric(Sys.time()-t0, 'secs')
-        
-      }else {
+      
+      } else {
         osa.out[[h]]$mcmc <- osa.out[[h]]$runtime.mcmc <- NA
-        #
       }
     
       AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC) #!doesn't work if doTrue == TRUE
@@ -462,8 +453,9 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
           converge <- 0
         }
       }
-      r[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
-                           replicate=ii, y=sim.dat[[h]],
+      r[[h]] <- data.frame(id=id, model=mod, type = type, misp = misp.name, 
+                           version = paste0("h", h-1),
+                           replicate=ii, y=init.obs,
                            ypred=mod.out[[h]]$report$exp_val,
                            osa.cdf = osa.out[[h]]$cdf, 
                            osa.gen = osa.out[[h]]$gen,
@@ -476,8 +468,9 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
                            sim_cond_nrot= dharma.out[[h]]$cond_nrot$resids,
                            sim_uncond_nrot=dharma.out[[h]]$uncond_nrot$resids) 
      
-      out[[h]] <- data.frame(id=id, model=mod, misp = misp, version=names(mod.out)[h],
-                             replicate = ii, maxgrad=maxgrad, converge=converge,
+      out[[h]] <- data.frame(id=id, model=mod, type = type, misp = misp.name, 
+                             version = paste0("h", h-1), replicate = ii, 
+                             maxgrad=maxgrad, converge=converge,
                              AIC=AIC, AICc=AICc)
       out[[h]][names(osa.out[[h]])[grep("runtime", names(osa.out[[h]]))]] <- 
         sapply(grep("runtime", names(osa.out[[h]])), function(x) osa.out[[h]][[x]] )
@@ -485,26 +478,30 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
         sapply(names(dharma.out[[1]])[!grepl("re", names(dharma.out[[1]]))], function(x) dharma.out[[h]][[x]]$runtime)
         
     
-      pvals <- rbind(pvals, cbind(id,calc.pvals( type = 'osa', method = osa.methods, mod = mod,
-                                        res.obj = osa.out[[h]], version = names(mod.out)[h],
-                                        fam = true.parms$fam, do.true )))
-      pvals <- rbind(pvals, cbind(id,calc.pvals( type = 'sim', method = dharma.methods, mod = mod,
-                                        res.obj = dharma.out[[h]], version = names(mod.out)[h],
-                                        fam = true.parms$fam, do.true )))
+      pvals <- rbind(pvals, cbind(id = id, type = type, misp = misp.name,
+                                  calc.pvals( res.type = 'osa', method = osa.methods, mod = mod,
+                                              res.obj = osa.out[[h]], version = paste0("h", h-1),
+                                              fam = true.parms$fam, do.true )))
+      pvals <- rbind(pvals, cbind(id = id, type = type, misp = misp.name, 
+                                  calc.pvals( res.type = 'sim', method = dharma.methods, mod = mod,
+                                              res.obj = dharma.out[[h]], version = paste0("h", h-1),
+                                              fam = true.parms$fam, do.true )))
       if(mod == 'spatial'){
         if(!is.null(osa.methods)){
-          sac.pvals <- calc.sac( type = 'osa', 
+          sac.pvals <- calc.sac( res.type = 'osa', 
                                  dat = sim.dat, 
                                  res.obj = osa.out[[h]],
-                                 version = names(mod.out)[h])
-          pvals <- rbind(pvals, cbind(id, sac.pvals))
+                                 version = paste0("h", h-1))
+          pvals <- rbind(pvals, cbind(id = id, type = type, 
+                                      misp = misp.name,  sac.pvals))
         } 
         if(!is.null(dharma.methods)){
-          sac.pvals <- calc.sac( type = 'sim', 
+          sac.pvals <- calc.sac( res.type = 'sim', 
                                  dat = sim.dat, 
                                  res.obj = dharma.out[[h]],
-                                 version = names(mod.out)[h])
-          pvals <- rbind(pvals, cbind(id, sac.pvals))
+                                 version = paste0("h", h-1))
+          pvals <- rbind(pvals, cbind(id = id, type = type, 
+                                      misp = misp.name,  sac.pvals))
         } 
       }
           
@@ -514,9 +511,6 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
   resids <- rbind(r[[1]], r[[2]])
   stats <- rbind(out[[1]], out[[2]])
   pvals$replicate <- ii
-  pvals$misp <- misp.name
-  stats$misp <- misp.name
-  resids$misp <- misp.name
   ## Tack this on for plotting later
   resids$do.true <- do.true
   pvals$do.true <- do.true
@@ -590,235 +584,294 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp,
   return(invisible(list(pvals=pvals, resids=resids, mles=mles, stats=stats)))
 }
 
-mkTMBdat <- function(Dat, Pars, Mod, Misp){
+mkTMBdat <- function(Dat, Pars, Mod, Misp, Type){
   if(Mod == 'linmod'){
-    dat0 <- list(y = Dat$y0, X = Dat$x)
-    dat1 <- list(y = Dat$y1, X = Dat$x)
+    dat0 <- list(y = Dat$y0, X = as.matrix(Dat$x))
+    dat1 <- list(y = Dat$y1, X = as.matrix(Dat$x))
   }
   if(Mod == 'randomwalk'){
-    dat0 <- list(y = Dat$y0, mod = 0, sim_re = 0)
-    dat1 <- list(y = Dat$y1, mod = 0, sim_re = 0)
-    if(Misp == "normal"){
-      dat0$mod = 1
+    dat0 <- list(y = Dat$y0, mod = 0, sim_re = 0) #default: type = LMM
+    if(Type == "GLMM"){
+      dat0$mod <- 2
     }
+    dat1 <- list()
+    if(length(Misp) != length(Dat$y1)){
+      "Stop, length of mispecifications does not match list of misspecified data"
+    }
+    for(m in 1:length(Misp)){
+      dat1[[m]] <- dat0
+      dat1[[m]]$y <- Dat$y1[[m]]
+      if(Misp[m] == 'normal-lognormal' | Misp[m] == 'gamma-lognorm'){
+        dat1[[m]]$mod <- 1 # Lognormal
+      }
+    }
+    
   }
   if(Mod == 'simpleGLMM'){
-    ng <- length(Dat$random$u)
+    ng <- length(Dat$random$u0)
     ni <- length(Dat$y0)/ng
-    dat0 <- list(y=Dat$y0, X = Dat$x,
+    dat0 <- list(y=Dat$y0, X = as.matrix(Dat$x),
                  group = rep(0:(ng-1), each = ni),
                  obs = rep(0:(ni-1), ng),
                  family = fam_enum(Pars$fam),
                  link = link_enum(Pars$link),
                  sim_re = 0)
-    dat1 <- dat0
-    dat1$y = Dat$y1
-    if(Misp=="deltagamma"){
-      dat1$family = fam_enum("Delta_Gamma")
+    dat1 <- list()
+    if(length(Misp) != length(Dat$y1)){
+      "Stop, length of mispecifications does not match list of misspecified data"
+    }
+    for(m in 1:length(Misp)){
+      dat1[[m]] <- dat0
+      dat1[[m]]$y <- Dat$y1[[m]]
+      if(Misp[m] == "missunifcov" | Misp[m] == "missnormcov"){
+        dat1[[m]]$X <- as.matrix(Dat$x[,1])
+      }
+      if(Misp[m] == "nb-pois"){
+        dat1[[m]]$family <- fam_enum("Poisson")
+      }
     }
   }
   if(Mod == 'spatial'){
     loc <- Dat$loc
     mesh <- Dat$mesh
     dd <- as.matrix(dist(loc))
-    dat0 <- list(y = Dat$y0, X = Dat$x, dd = dd, nu = 1,
+    dat0 <- list(y = Dat$y0, X = as.matrix(Dat$x), dd = dd, nu = 1,
                  mesh_i = mesh$idx$loc-1, sim_re = 0,
                  family = fam_enum(Pars$fam),
                  link = link_enum(Pars$link), reStruct = 10)
-    dat0$spde <-  INLA::inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
-    dat1 <- dat0
-    dat1$y <- Dat$y1
-    
-    if(Misp == "aniso"){
-      mesh <- Dat$mesh.aniso
-      dat1$mesh_i <- mesh$idx$loc-1
-      dat1$spde <-  INLA::inla.spde2.matern(mesh)$param.inla[c('M0', 'M1', 'M2')]
+    spde <- fmesher::fm_fem(mesh, order = 2)
+    dat0$spde <-  list(M0 = spde$c0,
+                       M1 = spde$g1,
+                       M2 = spde$g2)
+    dat1 <- list()
+    if(length(Misp) != length(Dat$y1)){
+      "Stop, length of mispecifications does not match list of misspecified data"
+    }
+    for(m in 1:length(Misp)){
+      dat1[[m]] <- dat0
+      
+      dat1[[m]]$y <- Dat$y1[[m]]
+      if(Misp[m] == "missre" ){
+        dat1[[m]]$reStruct <- 20 #do not fit a spatial likelihood
+      }
+      if(Misp[m] == "norm-gamma"){
+        dat1[[m]]$family <- fam_enum("Gamma")
+      }
     }
   }
-  if(Misp=='misscov'){
-    dat1$X <- as.matrix(dat1$X[,1])
-  }
-  if(Misp=='dropRE'){
-    dat1$reStruct = 20 #do not fit spatial likelihood
-  }
+  
   out = list(h0 = dat0, h1 = dat1)
   return(out)
 }
 
-mkTMBpar <- function(Pars, Dat, Mod, Misp, doTrue){
-
+mkTMBpar <- function(Pars, Dat, Mod, Misp, Type, doTrue){
   if(Mod == 'linmod'){
-    if(doTrue){
-      par0 <-  list(beta = Pars$theta, ln_sig = log(Pars$sd.vec[1]))
-    } else {
-      par0 <- list(beta = c(0,0), ln_sig = 0)
-    }
-    par1 <- par0
-
-    if(Misp == 'misscov'){
-      par1$beta <- par1$beta[1]
-    }
+    out <- mkTMBpar_linmod(Pars, Dat, Mod, Misp, Type, doTrue)
   }
-
   if(Mod == 'randomwalk'){
-    if(doTrue){
-      par0 <-  list(u = Dat$random$u0, mu = Pars$theta, ln_sig = log(Pars$sd.vec[1]), ln_tau = log(Pars$sd.vec[2]))
-      if(Misp == 'mu0'){
-        par1 <-  list(u = Dat$random$u1, mu = 0, ln_sig = log(Pars$sd.vec[1]), ln_tau = log(Pars$sd.vec[2]))
-      } else {
-        par1 <- par0
-      }
-    } else {
-      par0 <- par1 <- list(u = rep(1, length(Dat$random$u0)), mu = 0, ln_sig = 0, ln_tau = 0)
-    }
+    out <- mkTMBpar_randomwalk(Pars, Dat, Mod, Misp, Type, doTrue)
   }
-
   if(Mod == 'simpleGLMM'){
-    if(doTrue){
-      par0 <- list(beta = Pars$theta, 
-                   ln_sig_y = log(Pars$sd.vec[1]),
-                   ln_sig_u = log(Pars$sd.vec[2]), ln_sig_v = numeric(0),
-                   u = Dat$random$u, v = rep(0,length(Dat$y0)/length(Dat$random$u)))
-      if(Pars$fam == 'Tweedie'){
-        par0$ln_sig_y <- c(par0$ln_sig_y, 
-                           log((Pars$sd.vec[3]-1)/(2-Pars$sd.vec[3])))
-      }
-    } else {
-      par0 <- list(beta = 0, ln_sig_y = 0, ln_sig_u = 0, ln_sig_v = numeric(0),
-                   u = rep(0, length(Dat$random$u)),
-                   v = rep(0, length(Dat$y0)/length(Dat$random$u)))
-      if(Pars$fam == 'Tweedie'){
-        par0$ln_sig_y <- c(0,0)
-      }
-    }
-    if(Pars$fam == "Poisson") par0$ln_sig_y = numeric(0)
-    par1 <- par0
-    if(Misp == 'overdispersion'){
-      if(doTrue){
-        par0$ln_sig_v <- log(Pars$sd.vec[3])
-        par0$v <- Dat$random$v
-      } else {
-        par0$ln_sig_v <- 0
-      }
-    }
-    if(Misp == 'misscov'){
-      par1$beta <- par1$beta[1]
-      if(!doTrue) par0$beta <- c(0,0)
-    }
-    if(Misp == 'dropRE'){
-      par1$u <- rep(0, length(par0$u))
-      par1$ln_sig_u <- numeric(0)
-    }
+    out <- mkTMBpar_simpleGLMM(Pars, Dat, Mod, Misp, Type, doTrue)
   }
-
   if(Mod == 'spatial'){
-    if(doTrue){
-      omega.true <- rep(0, Dat$mesh$n)
-      omega.true[Dat$mesh$idx$loc] <- as.vector(Dat$random$omega)
-      par0 <- list(beta = Pars$theta, theta = log(Pars$sd.vec[1]),
-                   ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/Pars$sp.parm*sd.vec[2])),
-                   ln_kappa = log(sqrt(8)/Pars$sp.parm),
-                   ln_sig_v = numeric(0),
-                   omega = omega.true,
-                   v = rep(0,length(Dat$y0)))
-    } else {
-      par0 <- list(beta = 0, theta = 0, ln_tau = 0, ln_kappa = 0,
-                   ln_sig_v = numeric(0),
-                   omega = rep(0, Dat$mesh$n),
-                   v = rep(0,length(Dat$y0)))
-      if(Misp == 'misscov'){
-        par0$beta <- c(0,0)
-      }
-    }
-    if(Pars$fam == "Poisson") par0$theta = 0
-    par1 <- par0
-    if(Misp == 'overdispersion'){
-      if(doTrue){
-        par0$ln_sig_v <- log(Pars$sd.vec[3])
-        par0$v <- Dat$random$v
-      } else {
-        par0$ln_sig_v <- 0
-      }
-    }
-    if(Misp == 'misscov'){
-      par1$beta <- par1$beta[1]
-    }
-    if(Misp == 'dropRE'){
-      par1$ln_tau = 0
-      par1$ln_kappa = 0
-      par1$omega = rep(0, length(par0$omega))
-    }
-    if(Misp == "aniso"){
-      par1$omega = rep(0, Dat$mesh.aniso$n)
-    }
+    out <- mkTMBpar_spatial(Pars, Dat, Mod, Misp, Type, doTrue)
   }
+  return(out)
+}
+
+mkTMBpar_linmod <- function(Pars, Dat, Mod, Misp, Type, doTrue){
+  if(doTrue){
+    par0 <-  list(beta = Pars$beta, ln_sig_y = log(Pars$sd.vec[1]))
+  } else {
+    par0 <- list(beta = c(0,0), ln_sig_y = 0)
+  }
+  par1 <- par0
+
+  if(Misp == 'misscov'){
+    par1$beta <- par1$beta[1]
+  }
+  
   out = list(h0 = par0, h1 = par1)
   return(out)
 }
 
-mkTMBrandom <- function(Mod, Misp, doTrue){
+mkTMBpar_randomwalk <- function(Pars, Dat, Mod, Misp, Type, doTrue){
+  if(doTrue){
+    par0 <-  list(mu = Pars$beta, ln_sig_y = log(Pars$sd.vec[1]), 
+                  ln_sig_u = log(Pars$sd.vec[2]), u = Dat$random$u0)
+  } else {
+    par0 <-  list(mu = 0, ln_sig_y = 0, ln_sig_u = 0, 
+                  u = rep(1, length(Dat$random$u0)))
+  }
+  par1 <- list()
+  for(m in 1:length(Misp)){
+    par1[[m]] <- par0
+    if(Misp[m] == "missre"){
+      par1[[m]]$ln_sig_u = numeric(0)
+      par1[[m]]$u = rep(0, length(Dat$random$u0))
+    }
+    if(Misp[m] == "mu0"){
+      par1[[m]]$mu = 0
+    }
+  }
+
+  out = list(h0 = par0, h1 = par1)
+  return(out)
+}
+
+mkTMBpar_simpleGLMM <- function(Pars, Dat, Mod, Misp, Type, doTrue){
+  if(doTrue){
+    par0 <- list(beta = Pars$beta, 
+                 ln_sig_y = log(Pars$sd.vec[1]),
+                 theta = 0,
+                 ln_sig_u = log(Pars$sd.vec[2]), 
+                 u = Dat$random$u0)
+    if(Pars$fam == 'Tweedie'){
+      par0$theta <- log((Pars$theta-1)/(2-Pars$theta))
+    }
+    if(Pars$fam == 'NB'){
+      par0$ln_sig_y = 0
+      par0$theta <- log(Pars$theta)
+    }
+  } else {
+    par0 <- list(beta = rep(0,length(Pars$beta)), ln_sig_y = 0, 
+                 theta = 0, ln_sig_u = 0,
+                 u = rep(0, length(Dat$random$u0)))
+    if(Pars$fam == 'Tweedie' | Pars$fam == 'NB'){
+      par0$theta <- 0
+    }
+  }
+
+  par1 <- list()
+  for(m in 1:length(Misp)){
+    par1[[m]] <- par0
+    if(Misp[m] == "missunifcov" | Misp[m] == "missnormcov"){
+      par1[[m]]$beta <- par1[[m]]$beta[1]
+    }
+    if(Misp[m] == "missre"){
+      par1[[m]]$ln_sig_u <- numeric(0)
+      par1[[m]]$u <- rep(0, length(Dat$random$u0))
+    }
+    if(Misp[m] == "nb-pois"){
+      par1[[m]]$theta <- 0
+    }
+    if(doTrue & Misp[m] == "mispre"){
+      par1[[m]]$u <- Dat$random$u1[[m]]
+    }
+  }
+  
+  out = list(h0 = par0, h1 = par1)
+  return(out)
+}
+
+mkTMBpar_spatial <- function(Pars, Dat, Mod, Misp, Type, doTrue){
+  if(doTrue){
+    omega.true <- rep(0, Dat$mesh$n)
+    omega.true[Dat$mesh$idx$loc] <- as.vector(Dat$random$omega0)
+    par0 <- list(beta = Pars$beta, theta = log(Pars$sd.vec[1]),
+                   ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/Pars$sp.parm*Pars$sd.vec[2])),
+                   ln_kappa = log(sqrt(8)/Pars$sp.parm),
+                   omega = omega.true)
+  } else {
+    par0 <- list(beta = 0, theta = 0, ln_tau = 0, ln_kappa = 0,
+                   omega = rep(0, Dat$mesh$n))
+     
+  }
+  if(Pars$fam == "Poisson") par0$theta = 0
+  
+  par1 <- list()
+  for(m in 1:length(Misp)){
+    par1[[m]] <- par0
+    if(Misp[m] == "missre"){
+      par1[[m]]$ln_tau = 0
+      par1[[m]]$ln_kappa = 0
+      par1[[m]]$omega = rep(0, Dat$mesh$n)
+    }
+  }
+
+  out = list(h0 = par0, h1 = par1)
+  return(out)
+}
+
+mkTMBrandom <- function(Mod, Misp){
   if(Mod == 'linmod'){
     Random.h0 = NULL
     Random.h1 = NULL
   }
-  if(Mod == 'randomwalk'){
+  if(Mod == 'randomwalk' | Mod == "simpleGLMM"){
     Random.h0 <- 'u'
-    Random.h1 <- 'u'
-  }
-  if(Mod == 'simpleGLMM'){
-    Random.h1 <- 'u'
-    if(Misp == 'overdispersion'){
-      Random.h0 <- c('u', 'v')
-    } else {
-      Random.h0 <- 'u'
+    Random.h1 <- list()
+    for(m in 1:length(Misp)){
+      Random.h1[[m]] <- 'u'
     }
   }
   if(Mod == 'spatial'){
-    Random.h1 <- 'omega'
-    if(Misp == 'overdispersion'){
-      Random.h0 <- c('omega', 'v')
-    } else {
-      Random.h0 <- 'omega'
+    Random.h0 <- 'omega'
+    Random.h1 <- list()
+    for(m in 1:length(Misp)){
+      Random.h1[[m]] <- 'omega'
     }
   }
-  if(Misp == 'dropRE'){
-    Random.h1 <- c()
+  if("missre" %in% Misp){
+    Random.h1[which(Misp == "missre")] <- list(NULL)
   }
   out <- list(h0 = Random.h0, h1 = Random.h1)
   return(out)
 }
 
-mkTMBmap <- function(Pars, Mod, Misp, Fam, doTrue){
-  if(Mod == 'linmod'){
-    map.h0 <- list()
-    map.h1 <- list()
-  }
+mkTMBmap <- function(Pars, Mod, Misp, Type){
+  map.h0 <- list()
+  map.h1 <- list()
   if(Mod == 'randomwalk'){
-    map.h0 <- list()
-    if(Misp == 'mu0'){
-      map.h1 <- list(mu = factor(NA))
-    } else {
-      map.h1 <- list()
+    for(m in 1:length(Misp)){
+      map.h1[[m]] <- list()
+      if(Misp[m] == "missre"){
+        map.h1[[m]]$u = rep(factor(NA), length(Pars$h0$u))
+      }
+      if(Misp[m] == "mu0"){
+        map.h1[[m]]$mu = factor(NA)
+      }
     }
   }
-  if(Mod == 'simpleGLMM' | Mod == 'spatial'){
-    map.h0 <- map.h1 <- list(v = rep(factor(NA), length(Pars$h1$v)))
-    if(Misp == 'overdispersion'){
-      map.h0 <- list(v = rep(factor(NA), length(Pars$h0$v)))
+  if(Mod == 'simpleGLMM'){
+    if(Type == "LMM"){
+      map.h0$theta = factor(NA)
     }
-    if(Fam == "Poisson" & Mod == 'spatial'){
-      map.h0$theta <- factor(NA)
-      map.h1$theta <- factor(NA)
+    if(Type == "GLMM"){
+      map.h0$ln_sig_y = factor(NA)
     }
-    if(Misp == 'dropRE' & Mod == 'spatial'){
-      map.h1$ln_kappa = factor(NA)
-      map.h1$ln_tau = factor(NA)
-      map.h1$omega <- rep(factor(NA), length(Pars$h1$omega))
+    for(m in 1:length(Misp)){
+      map.h1[[m]] <- list()
+      if(Type == "LMM"){
+        map.h1[[m]]$theta = factor(NA)
+      }
+      if(Type == "GLMM"){
+        map.h1[[m]]$ln_sig_y = factor(NA)
+        if(Misp[[m]] == "nb-pois"){
+          map.h1[[m]]$theta = factor(NA)
+        }
+      }
+      
+      if(Misp[m] == "missre"){
+        map.h1[[m]]$u = rep(factor(NA), length(Pars$h0$u))
+      }
     }
-    if(Misp == 'dropRE' & Mod == 'simpleGLMM'){
-      map.h1$u <- rep(factor(NA), length(Pars$h1$u))
+  } 
+  if(Mod == 'spatial'){
+    if(Type == "GLMM"){
+      map.h0 <- list(theta = factor(NA))
+    } 
+    for(m in 1:length(Misp)){
+      map.h1[[m]] <- map.h0
+      if(Misp[m] == "missre"){
+        map.h1[[m]]$ln_tau = factor(NA)
+        map.h1[[m]]$ln_kappa = factor(NA)
+        map.h1[[m]]$omega = rep(factor(NA), length(Pars$h0$omega))
+      }
     }
   }
+
   out <- list(h0 = map.h0, h1 = map.h1)
   return(out)
 }
@@ -831,6 +884,7 @@ fam_enum <- function(fam){
   if(fam == 'lognormal') out <- 300
   if(fam == 'Tweedie') out <- 400
   if(fam == 'Delta_Gamma') out <- 500
+  if(fam == 'NB') out <- 600
   return(out)
 }
 

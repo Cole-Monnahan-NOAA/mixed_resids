@@ -6,7 +6,8 @@ enum valid_family{
   Poisson_family = 200,
   lognormal_family = 300,
   Tweedie_family = 400,
-  Delta_Gamma_family = 500
+  Delta_Gamma_family = 500,
+  NB_family = 600
 };
 
 enum  valid_link{
@@ -38,6 +39,13 @@ Type inverse_linkfun(Type eta, int link){
   return ans; 
 }
 
+//see pnbinom_mu at: https://github.com/SurajGupta/r-source/blob/a28e609e72ed7c47f6ddfbb86c85279a0750f0b7/src/nmath/pnbinom.c
+template<class Type>
+Type pnbinom(Type x, Type mu, Type size) {
+  Type pr = size/(size + mu);
+  return 1. - pbeta(pr, size, x+1);
+}
+
 template<class Type>
 Type objective_function<Type>::operator()()
 {
@@ -50,33 +58,33 @@ Type objective_function<Type>::operator()()
   DATA_INTEGER( family );
   DATA_INTEGER( link );
   PARAMETER_VECTOR(beta); //intercept
-  PARAMETER_VECTOR(ln_sig_y); 
-  PARAMETER_VECTOR(ln_sig_u); //natural log of between subject sd 
-  PARAMETER_VECTOR(ln_sig_v); //natural log of overdispersion sd 
+  PARAMETER_VECTOR(ln_sig_y); //tweedie: this is phi parameter, var = mu^pow/phi
+  PARAMETER(theta) //tweedie: logit power; nb: log size; delta: logit prob zero
+  PARAMETER_VECTOR(ln_sig_u); //natural log of between subject sd  
   PARAMETER_VECTOR(u); //group-level random effects
-  PARAMETER_VECTOR(v); //observation-level random effects
 
   DATA_VECTOR_INDICATOR(keep,y);
 
-  Type sig_y;
+  Type sig_y = 0;
+  Type sig_u = 0;
   Type power = 0;
   Type pz = 0;
+  Type size = 0;
   if(ln_sig_y.size()>0) sig_y = exp(ln_sig_y(0));
-  if(ln_sig_y.size() == 2){
-    if( family == 400 ){
-      power = invlogit(ln_sig_y(1)) + Type(1); //tweedie power parameter
-    }
-    if( family == 500 ){
-      pz = invlogit(ln_sig_y(1)); //prob zero in delta model
-    }
-  } 
+
+  if( family == 400 ){ //Tweedie
+    power = invlogit(theta) + Type(1); //tweedie power parameter
+  }
+  if( family == 500 ){ //Delta
+    pz = invlogit(theta); //prob zero in delta model
+  }
+  if(family == 600){ //NB
+    size = exp(theta);
+  }
+  
   Type nll = 0;
   //only fit random effect if ln_sig_u isn't null
   bool u_flag = (ln_sig_u.size()>0);
-  //only fit overdispersion if ln_sig_v isn't null
-  bool v_flag = (ln_sig_v.size()>0);
-  Type sig_v= 0;
-  Type sig_u = 0;
 
   Type cdf;
 
@@ -92,27 +100,17 @@ Type objective_function<Type>::operator()()
       }
     }
   }
-  // Probability of observation-level random effects
-  if(v_flag){
-    sig_v = exp(ln_sig_v(0));
-    for(int j=0; j<v.size(); j++){
-      nll -= dnorm(v(j), Type(0), sig_v, true);
-      if(sim_re == 1){
-        SIMULATE{
-          v(j) = rnorm(Type(0), sig_v);
-        }
-      }
-    }
-  }
+  
   
   vector<Type> eta = X*beta;
   vector<Type> fpr(y.size());
   vector<Type> mu(y.size());
+  Type s1, s2;
   // Likelihood
   for(int i=0; i<y.size(); i++){
     fpr(i) = eta(obs(i));
     fpr(i) = inverse_linkfun(fpr(i), link);
-    mu(i) = eta(obs(i)) + u(group(i)) + v(obs(i));
+    mu(i) = eta(obs(i)) + u(group(i));
     mu(i) = inverse_linkfun(mu(i), link);
 
     switch(family){
@@ -146,9 +144,30 @@ Type objective_function<Type>::operator()()
         break;
       case Tweedie_family:
         nll -= keep(i) * dtweedie(y(i), mu(i), sig_y, power, true);
-        //cdf method not possible as no qtweedie in TMB
+        /* avilable on TMB's ptweedie branch
+        cdf = squeeze( ptweedie(y(i), mu(i), sig_y, power) );
+        nll -= keep.cdf_lower(i) * log( cdf );
+        nll -= keep.cdf_upper(i) * log( 1.0 - cdf );
+        */
         SIMULATE{
           y(i) = rtweedie(mu(i), sig_y, power);
+        }
+        break;
+      case NB_family: //variance = mu(1 + mu/size)
+        //use dnbinom_robust(y, log(mu), log(var-mu))
+        //log(size) = 2 x log(mu) - log(var-mu)
+        //log(var-mu) = 2 x log(mu) - log(size)
+        s1 = log(mu(i)); // log(mu_i)
+        s2  = 2. * s1 - theta; // log(var - mu) 
+        nll -= keep(i) * dnbinom_robust(y(i), s1, s2, true);
+        cdf = squeeze( pnbinom(y(i), mu(i), size) );
+        nll -= keep.cdf_lower(i) * log( cdf );
+        nll -= keep.cdf_upper(i) * log( 1.0 - cdf );
+        //cdf method not possible as no qnbinom in TMB
+        SIMULATE { // from glmmTMB: uses rnbinom2(mu, var)
+          s1 = mu(i);
+          s2 = mu(i) * (Type(1) + mu(i) / exp(theta));
+          y(i) = rnbinom2(s1, s2);
         }
         break;
       case Delta_Gamma_family:
@@ -186,12 +205,11 @@ Type objective_function<Type>::operator()()
   REPORT(fpr);
   REPORT(exp_val);
   REPORT(u);
-  REPORT(v);
   REPORT(sig_y);
   REPORT(sig_u);
-  REPORT(sig_v);
   REPORT(power);
   REPORT(pz);
+  REPORT(size);
 
   return(nll);
 }
