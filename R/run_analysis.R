@@ -47,7 +47,6 @@ run_model(reps, mod='linmod', misp='overdispersion', cov.mod = 'norm',
 ### Random walk from the paper =================================================
 ## possible mispecifications: 'missre', 'normal-lognorm', 'gamma-lognorm', 'mu0'
 dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
-dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc','pears')
 run_model(reps, n = 100, mod='randomwalk', 
           misp = c('missre', 'normal-lognorm', 'mu0'), 
