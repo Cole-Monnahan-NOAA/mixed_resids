@@ -1,10 +1,10 @@
-source('../../R/sim_data.R')
-source('../../R/model_fns.R')
+setwd("../..")
+source('R/startup.R')
 
 simulate_randomwalk <- function(seed, n, type, sd.vec, init_u){
   set.seed(seed)
   if(type == "LMM") mu <- 2
-  if(type == "GLMM") mu <- .1
+  if(type == "GLMM") mu <- .05
   sig_y <- sd.vec[1]
   sig_u <- sd.vec[2]
   huge <- 1e3
@@ -167,7 +167,6 @@ test.est.objpar <- list(
     test.est.par$h1[[2]][2:3]
   )
 )
-dyn.load(TMB::dynlib("../../src/randomwalk"))
 test_that("randomwalk, LMM, init.obj", {
 for(h in 1:4){
   if(h == 1){
@@ -192,12 +191,12 @@ for(h in 1:4){
 
 
 context("GLMM randomwalk tests")
-testsim <- simulate_randomwalk(123, 50, "GLMM", sd.vec = c(.5,.05), init_u = 1)
+testsim <- simulate_randomwalk(123, 100, "GLMM", sd.vec = c(.5,.05), init_u = .1)
 rw.par <- setup_trueparms(mod ='randomwalk', 
                           misp = c('missre', 'gamma-lognorm', 'mu0'), 
                           fam = "Gamma", link = "log",
                           type = "GLMM")
-modelsim <- simdat(n=50, mod='randomwalk', 
+modelsim <- simdat(n=100, mod='randomwalk', 
                  trueparms = setup_trueparms(mod ='randomwalk', 
                                              misp=c('missre', 'gamma-lognorm', 'mu0'), 
                                              fam = "Gamma", link = "log",
@@ -237,7 +236,7 @@ test_that('randomwalk, misp=mu0',{
 })
 min.y <- max.y <- rep(-999,1000)
 for(i in 1:1000){
-  testsim <- simulate_randomwalk(i,50,"GLMM", sd.vec = c(.5,.05), init_u = 1)
+  testsim <- simulate_randomwalk(i,100,"GLMM", sd.vec = c(.5,.05), init_u = .1)
   min.y[i] <- min(testsim$y)
   max.y[i] <- max(testsim$y)
 }
@@ -267,18 +266,18 @@ test_that('randomwalk, GLMM, mkDat, mod and simre',{
 
 test.true.par <- list(
   h0 = list(
-    mu = 0.1, ln_sig_y = log(0.5),
+    mu = 0.05, ln_sig_y = log(0.5),
     ln_sig_u = log(0.05),
     u = modelsim$random$u0
   ),
   h1 = list(
     list(
-      mu = 0.1, ln_sig_y = log(0.5),
+      mu = 0.05, ln_sig_y = log(0.5),
       ln_sig_u = numeric(0),
       u = rep(0, length(modelsim$random$u0))
     ),
     list(
-      mu = 0.1, ln_sig_y = log(0.5),
+      mu = 0.05, ln_sig_y = log(0.5),
       ln_sig_u = log(0.05),
       u = modelsim$random$u1[[2]]
     ),
@@ -359,25 +358,54 @@ test.est.objpar <- list(
 )
 
 test_that("randomwalk, GLMM, init.obj", {
-for(h in 1:4){
-  if(h == 1){
-    model.true.obj <- TMB::MakeADFun(data = modeldat$h0, parameters = model.true.par$h0, 
-                     map = model.true.map$h0, random = model.random$h0, DLL = "randomwalk")
-    model.est.obj <- TMB::MakeADFun(data = modeldat$h0, parameters = model.est.par$h0, 
-                     map = model.est.map$h0, random = model.random$h0, DLL = "randomwalk")
-    expect_equal(unlist(test.true.objpar$h0), model.true.obj$par)
-    expect_equal(unlist(test.est.objpar$h0), model.est.obj$par)
+  dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
+  osa.methods <- c('gen', 'cdf', 'mcmc','pears')
+  osa.true.out <- osa.est.out <- osa.true.ks <- osa.est.ks <- list()
+  test.mod <- run_iter(ii = 123, n = 100, ng = 0, mod = "randomwalk", cov.mod = NULL, 
+                       misp =  c('missre', 'gamma-lognorm', 'mu0'), 
+                       family = "Gamma", link = "log",
+                       type = 'GLMM', do.true = TRUE, savefiles = FALSE)
+  for(h in 1:4){
+    if(h == 1){
+      model.true.obj <- TMB::MakeADFun(data = modeldat$h0, parameters = model.true.par$h0, 
+                      map = model.true.map$h0, random = model.random$h0, DLL = "randomwalk")
+      model.est.obj <- TMB::MakeADFun(data = modeldat$h0, parameters = model.est.par$h0, 
+                      map = model.est.map$h0, random = model.random$h0, DLL = "randomwalk")
+      expect_equal(unlist(test.true.objpar$h0), model.true.obj$par)
+      expect_equal(unlist(test.est.objpar$h0), model.est.obj$par)
+    }
+    if(h>1){
+      model.true.obj <- TMB::MakeADFun(data = modeldat$h1[[h-1]], parameters = model.true.par$h1[[h-1]], 
+                      map = model.true.map$h1[[h-1]], random = model.random$h1[[h-1]], DLL = "randomwalk")
+      model.est.obj <- TMB::MakeADFun(data = modeldat$h1[[h-1]], parameters = model.est.par$h1[[h-1]], 
+                      map = model.est.map$h1[[h-1]], random = model.random$h1[[h-1]], DLL = "randomwalk")
+      expect_equal(unlist(test.true.objpar$h1[[h-1]]), model.true.obj$par)
+      expect_equal(unlist(test.est.objpar$h1[[h-1]]), model.est.obj$par)
+    }
+    model.est.opt <- nlminb(model.est.obj$par, model.est.obj$fn, model.est.obj$gr)
+    osa.true.out[[h]] <- list(
+      gen.resid = oneStepPredict(model.true.obj, observation.name="y",
+                    data.term.indicator='keep',
+                    range = c(0,Inf),
+                    method="oneStepGeneric", trace=FALSE,
+                    discrete = FALSE)$residual,
+      cdf.resid = oneStepPredict(model.true.obj, observation.name="y",
+                    data.term.indicator='keep' ,
+                    method="cdf", trace=FALSE,
+                    discrete = FALSE)$residual
+    )
+    osa.true.ks[[h]] <- list(
+      gen.pvalue = ks.test(osa.true.out[[h]]$gen.resid,'pnorm')$p.value,
+      cdf.pvalue = ks.test(osa.true.out[[h]]$cdf.resid,'pnorm')$p.value
+    )
+    expect_equal(dplyr::filter(test.mod$pvals, 
+                               test == "GOF.ks" & method == "gen" & 
+                                 version == paste0("h", h-1))$pvalue,
+                 osa.true.ks[[h]]$gen.pvalue)
+    expect_equal(dplyr::filter(test.mod$pvals, 
+                               test == "GOF.ks" & method == "cdf" & 
+                                 version == paste0("h", h-1))$pvalue,
+                 osa.true.ks[[h]]$cdf.pvalue)
+    rm(model.true.obj, model.est.obj)
   }
-  if(h>1){
-    model.true.obj <- TMB::MakeADFun(data = modeldat$h1[[h-1]], parameters = model.true.par$h1[[h-1]], 
-                     map = model.true.map$h1[[h-1]], random = model.random$h1[[h-1]], DLL = "randomwalk")
-    model.est.obj <- TMB::MakeADFun(data = modeldat$h1[[h-1]], parameters = model.est.par$h1[[h-1]], 
-                     map = model.est.map$h1[[h-1]], random = model.random$h1[[h-1]], DLL = "randomwalk")
-    expect_equal(unlist(test.true.objpar$h1[[h-1]]), model.true.obj$par)
-    expect_equal(unlist(test.est.objpar$h1[[h-1]]), model.est.obj$par)
-  }
-  rm(model.true.obj, model.est.obj)
-}
 })
-
-dyn.unload(TMB::dynlib("../../src/randomwalk"))

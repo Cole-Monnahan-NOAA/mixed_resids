@@ -331,7 +331,7 @@ modelsim <- simdat(n=100, mod='spatial', type = "GLMM",
 
 modeldat <- mkTMBdat(Dat = modelsim, 
                        Pars = setup_trueparms(mod ='spatial', 
-                                             misp=c('missre', 'pois-zip', 'mispre'), 
+                                             misp = c('missre', 'pois-zip', 'mispre'), 
                                              fam = "Poisson", link = "log",
                                              type = "GLMM"),  
                        Mod = "spatial", 
