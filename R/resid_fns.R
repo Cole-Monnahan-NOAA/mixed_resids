@@ -151,7 +151,7 @@ calc.quantile <- function(fam, report, y){
     Fx[zero.idx] <- runif(length(zero.idx), 0, Fx[zero.idx])
     out <- qnorm(Fx)
   }
-  if(family == "Delta_Gamma"){
+  if(fam == "Delta_Gamma"){
     zero.idx <- which(y == 0)
     pos.idx <- which(y > 0)
     sig <- tmp$sig_y
@@ -248,17 +248,16 @@ calculate.jp <- function(obj, sdr, opt, obs, data.name, fpr, N=1000, random = TR
 }
 
 
-calc.sac <- function(type, dat, res.obj, version){
+calc.sac <- function(res.type, dat, res.obj, version){
   
-  if(type == 'osa'){
+  if(res.type == 'osa'){
     res.names <- c('cdf', 'gen', 'fg', 'mcmc', 'osg',
                    'pears')
   }
-  if(type == 'sim'){
+  if(res.type == 'sim'){
     res.names <- c('cond', 'uncond', 'cond_nrot', 'uncond_nrot')
   }
-  
-  df <- data.frame(type = character(), method = character(), model = character(),
+  df <- data.frame(res.type = character(), method = character(), model = character(),
                    test = character(), version = character(), pvalue = numeric())
   
   dmat.obs <- as.matrix(dist(dat$loc, upper = TRUE))
@@ -268,10 +267,10 @@ calc.sac <- function(type, dat, res.obj, version){
   
   for(m in 1:length(res.obj)){
     nms <- names(res.obj)[m]
-    if(type == "osa"){
+    if(res.type == "osa"){
       x <- res.obj[[m]]
     }
-    if(type == "sim"){
+    if(res.type == "sim"){
       x <- res.obj[[m]]$out$scaledResiduals
     }
     if (nms %in% res.names) {
@@ -279,7 +278,7 @@ calc.sac <- function(type, dat, res.obj, version){
       if(is.numeric(x)){
         ## only test for positive correlationa
         y <- ape::Moran.I(x, wt, alternative = 'greater')$p.value
-        df <- rbind(df,data.frame(type= type, 
+        df <- rbind(df,data.frame(res.type= res.type, 
                          method = names(res.obj)[m], 
                          model='spatial', 
                          test='SAC', 

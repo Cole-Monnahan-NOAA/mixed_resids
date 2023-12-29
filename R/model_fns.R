@@ -46,9 +46,9 @@ setup_randomwalk <- function(mod, misp, fam, link, type){
     init.u <- 5
   }
   if(type == "GLMM"){
-    beta <- 0.1
+    beta <- 0.05
     sd.vec <- c(0.5, 0.05)
-    init.u <- 1
+    init.u <- 0.1
   }
   
   true.comp <- list()
@@ -75,12 +75,11 @@ setup_randomwalk <- function(mod, misp, fam, link, type){
 
 setup_simpleGLMM <- function(mod, misp, fam, link, type){
   theta <- NA
+  true.comp <- list()
   if(type == "LMM"){
     #currently only misp = misscovunif or misscovnorm is implemented
     beta <- c(4,-8)
     sd.vec <- c(0.5, 2)
-
-    true.comp <- list()
     true.comp[[1]] <- list(beta_1 = beta[1], beta_2 = beta[2],
                            ln_sig_y = log(sd.vec[1]),
                            ln_sig_u = log(sd.vec[2]))
@@ -180,7 +179,7 @@ setup_spatial<- function(mod, misp, fam, link, type){
   return(true.parms)
 }
 
-run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
+run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
                      family, link, do.true = FALSE, savefiles=TRUE){
   library(TMB)
   library(DHARMa)
@@ -265,7 +264,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
       }
     }
 
-    if(h == 1){
+    if(h == 1 | mod == "linmod"){
       init.obj <- list(data = init.dat[[h]], parameters = init.par[[h]], 
                       map = init.map[[h]], random = init.random[[h]], DLL = mod)
       if(is.null(init.random[[h]])) Random <- FALSE
@@ -333,7 +332,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
         n_ <- n
       }
 
-      if(h == 1){
+      if(h == 1 | mod == "linmod"){
         init.obs <- sim.dat[[h]]
       } else {
         init.obs <- sim.dat$y1[[h-1]]
@@ -431,7 +430,6 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
         if(misp.name == "missre"){ 
           tmp <- mod.out[[h]]$report
         }
-        
         # Calculate quantile residual
         if(h == 1){
           osa.out[[h]]$mcmc <- calc.quantile(mod.fam, tmp, init.dat[[h]]$y)
@@ -490,18 +488,20 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = 'norm', misp, type,
                                               fam = true.parms$fam, do.true )))
       if(mod == 'spatial'){
         if(!is.null(osa.methods)){
-          sac.pvals <- calc.sac( type = 'osa', 
+          sac.pvals <- calc.sac( res.type = 'osa', 
                                  dat = sim.dat, 
                                  res.obj = osa.out[[h]],
                                  version = paste0("h", h-1))
-          pvals <- rbind(pvals, cbind(id, sac.pvals))
+          pvals <- rbind(pvals, cbind(id = id, type = type, 
+                                      misp = misp.name,  sac.pvals))
         } 
         if(!is.null(dharma.methods)){
-          sac.pvals <- calc.sac( type = 'sim', 
+          sac.pvals <- calc.sac( res.type = 'sim', 
                                  dat = sim.dat, 
                                  res.obj = dharma.out[[h]],
                                  version = paste0("h", h-1))
-          pvals <- rbind(pvals, cbind(id, sac.pvals))
+          pvals <- rbind(pvals, cbind(id = id, type = type, 
+                                      misp = misp.name,  sac.pvals))
         } 
       }
           

@@ -85,14 +85,14 @@ simdat.linmod <- function(n, mod, cov.mod, type=NULL,
     v <- rnorm(n,0,sd.vec[2])  #sd.vec[2] = sd.vec[1]*log(4)
     y1 <- y0*exp(v)
 
-    dat.out <- list(y0 = list(y0), y1 = list(y1), x = X)
+    dat.out <- list(y0 = y0, y1 = y1, x = X)
     return(dat.out)
   }
 
 simdat.randomwalk <- function(n, mod, cov.mod, type, 
   trueparms, misp, seed, X){
   for(i in 1:length(misp)){
-    if(!(misp[i] %in% c('missre', 'normal-lognorm', 'mu0'))) {
+    if(!(misp[i] %in% c('missre', 'normal-lognorm', 'gamma-lognorm', 'mu0'))) {
       stop("Misspecification not available for random walk")
     }
   }

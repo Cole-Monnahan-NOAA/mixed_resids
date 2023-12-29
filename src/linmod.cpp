@@ -6,8 +6,8 @@ Type objective_function<Type>::operator()()
   DATA_MATRIX(X);
   DATA_VECTOR_INDICATOR(keep,y);
   PARAMETER_VECTOR(beta); //intercept
-  PARAMETER(ln_sig);
-  Type sig_y = exp(ln_sig);
+  PARAMETER(ln_sig_y);
+  Type sig_y = exp(ln_sig_y);
   Type nll = 0;
   Type cdf;
 

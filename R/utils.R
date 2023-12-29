@@ -61,7 +61,7 @@ add_aic <- function(opt,n){
 }
 
 
-run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm',
+run_model <- function(reps, n=100, ng=0, mod, cov.mod = NULL,
                       misp, type, family = "Gaussian", link = "identity",
                       do.true = FALSE, savefiles=TRUE){
   if(do.true){
@@ -113,19 +113,19 @@ run_model <- function(reps, n=100, ng=0, mod, cov.mod = 'norm',
   sfStop()
   message("Processing and saving final results...")
   ## Read results back in from file
-  fs <- list.files(paste0('results/', res.name, '_pvals/'), full.names=TRUE)
+  fs <- list.files(paste0(res.name, '_pvals/'), full.names=TRUE)
   pvals <- lapply(fs, readRDS) %>% bind_rows %>% filter(!is.na(pvalue))
-  saveRDS(pvals, file=paste0('results/', res.name, '_pvals.RDS'))
+  saveRDS(pvals, file=paste0(res.name, '_pvals.RDS'))
   ## Read in residuals
-  fs <- list.files(paste0('results/', res.name, '_resids/'), full.names=TRUE)
+  fs <- list.files(paste0(res.name, '_resids/'), full.names=TRUE)
   resids <- lapply(fs, readRDS) %>% bind_rows
-  saveRDS(resids, file=paste0('results/', res.name,'_resids.RDS'))
-  fs <- list.files(paste0('results/', res.name,'_mles/'), full.names=TRUE)
+  saveRDS(resids, file=paste0(res.name,'_resids.RDS'))
+  fs <- list.files(paste0(res.name,'_mles/'), full.names=TRUE)
   mles <- lapply(fs, readRDS) %>% bind_rows
-  saveRDS(mles, file=paste0('results/', res.name,'_mles.RDS'))
-  fs <- list.files(paste0('results/', res.name,'_stats/'), full.names=TRUE)
+  saveRDS(mles, file=paste0(res.name,'_mles.RDS'))
+  fs <- list.files(paste0(res.name,'_stats/'), full.names=TRUE)
   stats <- lapply(fs, readRDS) %>% bind_rows
-  saveRDS(stats, file=paste0('results/', res.name,'_stats.RDS'))
+  saveRDS(stats, file=paste0(res.name,'_stats.RDS'))
   return(invisible(results))
 }
 
