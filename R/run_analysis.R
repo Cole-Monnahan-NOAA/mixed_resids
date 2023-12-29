@@ -39,71 +39,50 @@ do.true <- TRUE
 ## Set osa.methods and dharma.methods to NULL to turn off
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'pears')
 dharma.methods <- c('uncond_nrot', 'cond_nrot')
-run_model(reps, mod='linmod', misp='overdispersion', do.true = do.true)
+run_model(reps, mod='linmod', misp='overdispersion', cov.mod = 'norm',
+          type = 'LMM', do.true = do.true)
 
 
 
 ### Random walk from the paper =================================================
-## possible mispecifications: mu0, outliers, normal
-osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc','pears')
+## possible mispecifications: 'missre', 'normal-lognorm', 'gamma-lognorm', 'mu0'
 dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
-run_model(reps, mod='randomwalk', misp='mu0', do.true = do.true)
+dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
+osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc','pears')
+run_model(reps, n = 100, mod='randomwalk', 
+          misp = c('missre', 'normal-lognorm', 'mu0'), 
+          type = 'LMM', do.true = do.true)
+osa.methods <- c('gen', 'cdf', 'mcmc','pears')
+run_model(reps, n = 100, mod='randomwalk', 
+          misp =  c('missre', 'gamma-lognorm', 'mu0'), 
+          family = "Gamma", link = "log",
+          type = 'GLMM', do.true = do.true)
 
 ### simpleGLMM with 5 groups===================================================
-## possible mispecifications: overdispersion,  missnormcov, missunifcov, deltagamma
-##! outliers not set up correctly when distribution not normal (lognormal better misp?)
-##! misp cannot be overdispersion when fam = Tweedie
-run_model(reps, ng = 5, mod='simpleGLMM', misp='missnormcov', do.true = do.true)
-run_model(reps, ng = 5, mod='simpleGLMM', misp='missunifcov', do.true = do.true)
-osa.methods <- c('mcmc', 'pears')
+## possible mispecifications: 'missre', 'nb-pois', 'mispre', 'missunifcov', 'misscovnorm'
 dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
-run_model(reps, ng = 5, mod='simpleGLMM', misp='dropRE',
-          family = "Tweedie", link = "log", do.true = do.true)
+osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc','pears')
+run_model(reps, n = 100, ng = 5, mod='simpleGLMM', cov.mod = 'unif',
+          misp = c('missre', 'missunifcov', 'mispre'), 
+          type = 'LMM', do.true = do.true)
+osa.methods <- c('gen', 'cdf', 'mcmc','pears')
+run_model(reps, n = 100, ng = 5, mod='simpleGLMM',
+          misp = c('missre', 'nb-pois', 'mispre'),
+          type = 'GLMM',  family = "NB", link = "log",
+          do.true = do.true)
 
-### Simple spatial SPDE model ==================================================
-## possible mispecifications: overdispersion, misscov, mispomega,
-## dropRE, aniso - outliers not set up correctly when
-## distribution not normal
+### spatial ==================================================================                                                                                    ### Simple spatial SPDE model ==================================================
+## possible mispecifications: 'missre', 'pois-zip', 'mispre', 'normal-gamma'
+dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 'pears')
-run_model(reps, n=100, mod='spatial', misp='mispomega', do.true = do.true)
-#h1 mispomega models occasionally fail b/c the exp(omega) leads to convergence issues.
-#Repeat failed model runs with new seed for h0 and h1:
-
-pvals <- lapply(list.files('results', pattern='_pvals.RDS',
-                           full.names=TRUE), readRDS) %>% bind_rows
-pvals.true <- dplyr::filter(pvals, model == "spatial" & misp == "mispomega" &
-                         do.true == TRUE & version == "h1")
-pvals.est <- dplyr::filter(pvals, model == "spatial" & misp == "mispomega" &
-                             do.true == FALSE & version == "h1")
-true.reps <- unique(pvals.true$replicate)
-##bad reps
-idx <- which(!(true.reps %in% unique(pvals.est$replicate) ))
-reps <- true.reps[idx]
-#re-run with reps 35:47 and repeat; remove rep 34 from true
-#delete from spatial_mispomega_true...
-metric.nms <- c("stats", "resids", "pvals", "mles")
-for(i in seq_along(metric.nms)){
-  unlink(paste0("results/spatial_true_mispomega_",
-                metric.nms[i],
-                "/",
-                metric.nms[i],
-                "_",
-                idx,
-                ".RDS"))
-}
-## Generate new seeds
-reps <- (max(true.reps)+1):(max(true.reps)+length(idx)) 
-rm(pvals, idx, i, metric.nms)
-## Rerun new reps for do.true = TRUE and do.true = FALSE
-run_model(reps, n=100, mod='spatial', misp='mispomega', do.true = TRUE)
-run_model(reps, n=100, mod='spatial', misp='mispomega', do.true = FALSE)
-
-reps <- 1:1000
-run_model(reps, n=100, mod='spatial', misp='misscov', cov.mod = 'unif', do.true = do.true)
-
-osa.methods <- c('gen', 'cdf', 'mcmc', 'pears') #only 'cdf' and 'gen' suitable for discrete distributions
-run_model(reps, n=100, mod='spatial', misp='dropRE',
-          family = "Poisson", link = "log", do.true = do.true)
+run_model(reps, n = 100, mod ='spatial',
+          misp = c('missre', 'normal-gamma', 'mispre'), 
+          type = 'LMM', do.true = do.true)
+osa.methods <- c('gen', 'cdf', 'mcmc','pears')
+run_model(reps, n = 100, mod ='spatial',
+          misp = c('missre', 'pois-zip', 'mispre'),
+          family = "Poisson", link = "log",
+          type = 'GLMM', do.true = do.true)
 
 ## stop clusters
 sfStop()
