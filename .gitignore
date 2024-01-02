@@ -4,6 +4,8 @@ models/*.o
 models/*.dll
 *.log
 .Rproj.user
+
+#LMM results
 results/linmod_true_LMM_pvals/
 results/linmod_true_LMM_resids/
 results/linmod_true_LMM_stats/
@@ -36,4 +38,38 @@ results/spatial_LMM_pvals/
 results/spatial_LMM_resids/
 results/spatial_LMM_stats/
 results/spatial_LMM_mles/
+
+#GLMM results
+results/linmod_true_GLMM_pvals/
+results/linmod_true_GLMM_resids/
+results/linmod_true_GLMM_stats/
+results/linmod_true_GLMM_mles/
+results/linmod_GLMM_pvals/
+results/linmod_GLMM_resids/
+results/linmod_GLMM_stats/
+results/linmod_GLMM_mles/
+results/randomwalk_true_GLMM_pvals/
+results/randomwalk_true_GLMM_resids/
+results/randomwalk_true_GLMM_stats/
+results/randomwalk_true_GLMM_mles/
+results/randomwalk_GLMM_pvals/
+results/randomwalk_GLMM_resids/
+results/randomwalk_GLMM_stats/
+results/randomwalk_GLMM_mles/
+results/simpleGLMM_true_GLMM_pvals/
+results/simpleGLMM_true_GLMM_resids/
+results/simpleGLMM_true_GLMM_stats/
+results/simpleGLMM_true_GLMM_mles/
+results/simpleGLMM_GLMM_pvals/
+results/simpleGLMM_GLMM_resids/
+results/simpleGLMM_GLMM_stats/
+results/simpleGLMM_GLMM_mles/
+results/spatial_true_GLMM_pvals/
+results/spatial_true_GLMM_resids/
+results/spatial_true_GLMM_stats/
+results/spatial_true_GLMM_mles/
+results/spatial_GLMM_pvals/
+results/spatial_GLMM_resids/
+results/spatial_GLMM_stats/
+results/spatial_GLMM_mles/
 
