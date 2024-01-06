@@ -90,9 +90,9 @@ setup_simpleGLMM <- function(mod, misp, fam, link, type){
     sd.vec <- rep(NA, 2)
 
     if(fam == "NB"){
-      beta <- log(.5)
-      size <- .6
-      sd.vec[2] <- .8 #sig_u
+      beta <- log(2)
+      size <- 1
+      sd.vec[2] <- 1 #sig_u
       theta <- size
 
       true.comp[[1]] <- list(beta = beta,
@@ -445,14 +445,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
       AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC) #!doesn't work if doTrue == TRUE
       AICc <- ifelse(do.true, NA, mod.out[[h]]$aic$AICc) #!doesn't work if doTrue == TRUE
       maxgrad <- ifelse(do.true,NA, max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) ) #!doesn't work if doTrue == TRUE
-      converge <- NA
-      if(!do.true){
-        if(mod.out[[h]]$opt$convergence == 1 | mod.out[[h]]$sdr$pdHess == FALSE ){
-          converge <- 1
-        } else {
-          converge <- 0
-        }
-      }
+      
       r[[h]] <- data.frame(id=id, model=mod, type = type, misp = misp.name, 
                            version = paste0("h", h-1),
                            replicate=ii, y=init.obs,
@@ -469,9 +462,13 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
                            sim_uncond_nrot=dharma.out[[h]]$uncond_nrot$resids) 
      
       out[[h]] <- data.frame(id=id, model=mod, type = type, misp = misp.name, 
-                             version = paste0("h", h-1), replicate = ii, 
-                             maxgrad=maxgrad, converge=converge,
-                             AIC=AIC, AICc=AICc)
+                             version = paste0("h", h-1), 
+                             replicate = ii, 
+                             converge.maxgrad = maxgrad, 
+                             converge.status = mod.out[[h]]$opt$convergence,
+                             converge.hessian = mod.out[[h]]$sdr$pdHess,
+                             AIC = AIC, 
+                             AICc = AICc)
       out[[h]][names(osa.out[[h]])[grep("runtime", names(osa.out[[h]]))]] <- 
         sapply(grep("runtime", names(osa.out[[h]])), function(x) osa.out[[h]][[x]] )
       out[[h]][paste0("runtime.", names(dharma.out[[1]])[!grepl("re", names(dharma.out[[1]]))])] <- 
