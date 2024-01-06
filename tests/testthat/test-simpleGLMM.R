@@ -1,5 +1,5 @@
-source('../../R/sim_data.R')
 source('../../R/model_fns.R')
+source('../../R/resid_fns.R')
 
 simulate_simpleGLMM <- function(seed, n=100, ng=5, 
   cov.mod=NULL, type){
@@ -12,9 +12,9 @@ simulate_simpleGLMM <- function(seed, n=100, ng=5,
     sig.u <- 2
   }
   if(type == "GLMM"){
-    beta <- log(.5)
-    size <- .6
-    sig.u <- .8 #sig_u
+    beta <- log(2)
+    size <- 1
+    sig.u <- 1 #sig_u
     theta <- size
   }
 
@@ -38,9 +38,11 @@ simulate_simpleGLMM <- function(seed, n=100, ng=5,
     for(j in 1:ng){
       y0[,j] <- rnorm(n, mu + u[j], sig.y)
     }
+    set.seed(seed)
+    u.misp <- rgamma(ng, 1, 1)
     set.seed(seed*2)
     for(j in 1:ng){
-      y1[,j] <- rnorm(n, mu + exp(u[j]), sig.y)
+      y1[,j] <- rnorm(n, mu + u.misp[j], sig.y)
     }
   }
   
@@ -50,9 +52,11 @@ simulate_simpleGLMM <- function(seed, n=100, ng=5,
     for(j in 1:ng){
       y0[,j] <- rnbinom(n, size, mu = exp(mu + u[j]))
     }
+    set.seed(seed)
+    u.misp <- rgamma(ng, 1, 1)
     set.seed(seed*2)
     for(j in 1:ng){
-      y1[,j] <- rnbinom(n, size, mu = exp(mu + exp(u[j])))
+      y1[,j] <- rnbinom(n, size, mu = exp(mu + u.misp))
     }
   }
   out <- list(y0 = as.vector(y0), y1 = as.vector(y1), u=u, x = X)
@@ -352,8 +356,8 @@ for(i in 1:1000){
   max.y1[i] <- max(testsim$y1)
 }
 test_that('simpleGLMM, GLMM, min/max y',{
-  expect_equal(TRUE, max(max.y0) < 100 )
-  #expect_equal(TRUE, max(max.y1) < 100 )
+  expect_equal(TRUE, max(max.y0) < 500 )
+  expect_equal(TRUE, max(max.y1) < 20000 )
 } )
 
 test_that('simpleGLMM, GLMM, mkDat, y',{

@@ -158,18 +158,20 @@ simdat.simpleGLMM <- function(n, ng, mod, cov.mod, type,
   u1 <- list()
   y1 <- list()
 
-  set.seed(seed*2)
   for(m in 1:length(misp)){
     if(misp[m] == "mispre"){
+      set.seed(seed)
+      u1[[m]] <- rgamma(ng, 1, 1)
       ymisp <- eta <- matrix(0, n, ng)
+      set.seed(seed*2)
       for(j in 1:ng){
         for(i in 1:n){
-          eta[i,j] <- mu[i] + exp(u0[j]) 
+          eta[i,j] <- mu[i] + u1[[m]][j] 
           ymisp[i,j] <- sim_y(as.matrix(eta[i,j]), 0, parm=inits, 
                                 fam=fam, link=link)
         }
       }
-      u1[[m]] <- exp(u0)
+     
       y1[[m]] <- as.vector(ymisp)
     } else {
       u1[[m]] <- u0
