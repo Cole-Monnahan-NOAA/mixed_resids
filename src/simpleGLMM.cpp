@@ -43,7 +43,7 @@ Type inverse_linkfun(Type eta, int link){
 template<class Type>
 Type pnbinom(Type x, Type mu, Type size) {
   Type pr = size/(size + mu);
-  return 1. - pbeta(pr, size, x+1);
+  return pbeta(pr, size, x+1);
 }
 
 template<class Type>
