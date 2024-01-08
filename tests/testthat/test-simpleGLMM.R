@@ -1,5 +1,5 @@
-source('../../R/model_fns.R')
-source('../../R/resid_fns.R')
+setwd("../..")
+source('R/startup.R')
 
 simulate_simpleGLMM <- function(seed, n=100, ng=5, 
   cov.mod=NULL, type){
@@ -18,7 +18,7 @@ simulate_simpleGLMM <- function(seed, n=100, ng=5,
     theta <- size
   }
 
-  #Set up cpvariate
+  #Set up covariate
   if(!is.null(cov.mod)){
     set.seed(seed)
     if(cov.mod == 'norm') X <- cbind(rep(1,n), rnorm(n))
@@ -56,10 +56,11 @@ simulate_simpleGLMM <- function(seed, n=100, ng=5,
     u.misp <- rgamma(ng, 1, 1)
     set.seed(seed*2)
     for(j in 1:ng){
-      y1[,j] <- rnbinom(n, size, mu = exp(mu + u.misp))
+      y1[,j] <- rnbinom(n, size, mu = exp(mu + u.misp[j]))
     }
   }
-  out <- list(y0 = as.vector(y0), y1 = as.vector(y1), u=u, x = X)
+  out <- list(y0 = as.vector(y0), y1 = as.vector(y1), 
+              u = u, u.misp = u.misp, x = X)
   return(out)
 }
 
@@ -250,7 +251,7 @@ test.est.objpar <- list(
     test.est.par$h1[[3]][c(1,2,4)]
   )
 )
-dyn.load(TMB::dynlib("../../src/simpleGLMM"))
+dyn.load(TMB::dynlib("src/simpleGLMM"))
 test_that("simpleGLMM, LMM, init.obj", {
 for(h in 1:4){
   if(h == 1){
@@ -357,7 +358,7 @@ for(i in 1:1000){
 }
 test_that('simpleGLMM, GLMM, min/max y',{
   expect_equal(TRUE, max(max.y0) < 500 )
-  expect_equal(TRUE, max(max.y1) < 20000 )
+  expect_equal(TRUE, max(max.y1) < 30000 )
 } )
 
 test_that('simpleGLMM, GLMM, mkDat, y',{
@@ -384,32 +385,32 @@ test_that('simpleGLMM, GLMM, mkDat, fam, link and simre',{
 
 test.true.par <- list(
   h0 = list(
-    beta = log(.5), 
+    beta = log(2), 
     ln_sig_y = 0,
-    theta = log(0.6),
-    ln_sig_u = log(0.8),
+    theta = log(1),
+    ln_sig_u = log(1),
     u = modelsim$random$u0
   ),
   h1 = list(
     list(
-    beta = log(.5), 
+    beta = log(2), 
     ln_sig_y = 0,
-    theta = log(0.6),
+    theta = log(1),
     ln_sig_u = numeric(0),
     u = rep(0, length(modelsim$random$u0))
     ),
     list(
-      beta = log(.5), 
+      beta = log(2), 
       ln_sig_y = 0,
       theta = 0,
-      ln_sig_u = log(0.8),
+      ln_sig_u = log(1),
       u = modelsim$random$u1[[2]]
     ),
     list(
-      beta = log(0.5), 
+      beta = log(2), 
       ln_sig_y = 0,
-      theta = log(0.6),
-      ln_sig_u = log(0.8),
+      theta = log(1),
+      ln_sig_u = log(1),
       u = modelsim$random$u1[[3]]
     )
   )
@@ -490,7 +491,7 @@ test.est.objpar <- list(
     test.est.par$h1[[3]][c(1,3,4)]
   )
 )
-test_that("simpleGLMM, LMM, init.obj", {
+test_that("simpleGLMM, GLMM, init.obj", {
 for(h in 1:4){
   if(h == 1){
     model.true.obj <- TMB::MakeADFun(data = modeldat$h0, parameters = model.true.par$h0, 
@@ -515,4 +516,4 @@ for(h in 1:4){
   rm(model.true.obj, model.est.obj)
 }
 })
-dyn.unload(TMB::dynlib("../../src/simpleGLMM"))
+dyn.unload(TMB::dynlib("src/simpleGLMM"))
