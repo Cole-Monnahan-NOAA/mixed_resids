@@ -444,7 +444,13 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
     
       AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC) #!doesn't work if doTrue == TRUE
       AICc <- ifelse(do.true, NA, mod.out[[h]]$aic$AICc) #!doesn't work if doTrue == TRUE
-      maxgrad <- ifelse(do.true,NA, max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) ) #!doesn't work if doTrue == TRUE
+      maxgrad <- ifelse(do.true, NA, 
+                        max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) 
+                        ) #!doesn't work if doTrue == TRUE
+      convergestatus <- ifelse(do.true, NA, 
+                               mod.out[[h]]$opt$convergence)
+      convergehessian <- ifelse(do.true, NA, 
+                                mod.out[[h]]$sdr$pdHess)
       
       r[[h]] <- data.frame(id=id, model=mod, type = type, misp = misp.name, 
                            version = paste0("h", h-1),
@@ -465,8 +471,8 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
                              version = paste0("h", h-1), 
                              replicate = ii, 
                              converge.maxgrad = maxgrad, 
-                             converge.status = mod.out[[h]]$opt$convergence,
-                             converge.hessian = mod.out[[h]]$sdr$pdHess,
+                             converge.status = convergestatus,
+                             converge.hessian = convergehessian,
                              AIC = AIC, 
                              AICc = AICc)
       out[[h]][names(osa.out[[h]])[grep("runtime", names(osa.out[[h]]))]] <- 
