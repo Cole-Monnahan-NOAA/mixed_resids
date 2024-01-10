@@ -41,14 +41,14 @@ setup_linmod <- function(mod, misp, fam, link){
 
 setup_randomwalk <- function(mod, misp, fam, link, type){
   if(type == "LMM"){
-    beta <- 2
+    beta <- 6
+    drift <- 2
     sd.vec <- c(1,1)
-    init.u <- 5
   }
   if(type == "GLMM"){
-    beta <- 0.05
+    beta <- 0.1
+    drift <- 0.05
     sd.vec <- c(0.5, 0.05)
-    init.u <- 0.1
   }
   
   true.comp <- list()
@@ -67,7 +67,7 @@ setup_randomwalk <- function(mod, misp, fam, link, type){
     }
   }
 
-  true.parms <- list(beta=beta, sd.vec=sd.vec, init.u = init.u,
+  true.parms <- list(beta=beta, sd.vec=sd.vec, drift = drift,
     fam=fam, link=link, true.comp=true.comp)
 
   return(true.parms)
@@ -701,10 +701,10 @@ mkTMBpar_linmod <- function(Pars, Dat, Mod, Misp, Type, doTrue){
 
 mkTMBpar_randomwalk <- function(Pars, Dat, Mod, Misp, Type, doTrue){
   if(doTrue){
-    par0 <-  list(mu = Pars$beta, ln_sig_y = log(Pars$sd.vec[1]), 
+    par0 <-  list(beta = Pars$beta, mu = Pars$drift, ln_sig_y = log(Pars$sd.vec[1]), 
                   ln_sig_u = log(Pars$sd.vec[2]), u = Dat$random$u0)
   } else {
-    par0 <-  list(mu = 0, ln_sig_y = 0, ln_sig_u = 0, 
+    par0 <-  list(beta = 0, mu = 0, ln_sig_y = 0, ln_sig_u = 0, 
                   u = rep(1, length(Dat$random$u0)))
   }
   par1 <- list()
@@ -716,6 +716,9 @@ mkTMBpar_randomwalk <- function(Pars, Dat, Mod, Misp, Type, doTrue){
     }
     if(Misp[m] == "mu0"){
       par1[[m]]$mu = 0
+      if(doTrue){
+        par1[[m]]$u = Dat$random$u1[[m]]
+      }
     }
   }
 

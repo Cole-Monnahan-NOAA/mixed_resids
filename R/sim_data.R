@@ -97,19 +97,21 @@ simdat.randomwalk <- function(n, mod, cov.mod, type,
     }
   }
   list2env(trueparms, envir = environment(simdat.randomwalk))
-  mu <- X %*% beta
+  #mu <- X %*% drift
   ## Simulate random measurements
   set.seed(seed)
-  u0 <- cumsum( c(init.u, rnorm(n-1, mu, sd.vec[2]) ))
+  u0 <- cumsum( rnorm(n, 0, sd.vec[2]) ) 
+  t <- 1:n
+  eta <- beta + as.vector(t * drift + u0)
+ 
   set.seed(seed)
-  y0 <- sim_y(Eta = u0, omega = rep(0, n), parm = sd.vec[1], 
+  y0 <- sim_y(Eta = eta, omega = rep(0, n), parm = sd.vec[1], 
     fam = fam, link = link)
   u1 <- list()
   y1 <- list()
-    
   for(i in 1:length(misp)){
-    u1[[i]] <- u0
     y1[[i]] <- y0
+    u1[[i]] <- u0
   }
  
     

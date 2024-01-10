@@ -2,7 +2,6 @@ setwd("../..")
 source('R/startup.R')
 
 simulate_randomwalk <- function(seed, n, type, sd.vec, init_u){
-  set.seed(seed)
   if(type == "LMM") mu <- 2
   if(type == "GLMM") mu <- .05
   sig_y <- sd.vec[1]
@@ -10,28 +9,28 @@ simulate_randomwalk <- function(seed, n, type, sd.vec, init_u){
   huge <- 1e3
   ## simulate random track
   set.seed(seed)
-  u <- rnorm(n-1,mean=0,sd=sig_u)
-  Ypred <- rep(NA, n)
-  Ypred[1] <- init_u
-  for(t in 2:n) Ypred[t] <- Ypred[t-1]+u[t-1]+mu
-  ## simulate random measurements
+  z <- cumsum( rnorm(n, 0, sig_u) ) 
+  eta <- init_u + 1:n * mu + z
+ 
+  
   set.seed(seed)
   if(type == "LMM"){
-    Y <- rnorm(n, Ypred, sd=sig_y)
+    Y <- rnorm(n, eta, sd=sig_y)
   } 
   if(type == "GLMM"){
-    Y <- rgamma(n, 1/sig_y^2, scale = exp(Ypred)*sig_y^2)
+    Y <- rgamma(n, 1/sig_y^2, scale = exp(eta)*sig_y^2)
   }
-  out <- list(y=Y,u=Ypred)
+
+  out <- list(y = Y, u = z, eta = eta)
 }
 
 context("LMM randomwalk tests")
-testsim <- simulate_randomwalk(123,50,"LMM", sd.vec = c(1,1), init_u = 5)
+testsim <- simulate_randomwalk(123, 100, "LMM", sd.vec = c(1,1), init_u = 6)
 rw.par <- setup_trueparms(mod ='randomwalk', 
                           misp=c('missre', 'normal-lognorm', 'mu0'), 
                           fam = "Gaussian", link = "identity",
                           type = "LMM")
-modelsim <- simdat(n=50, mod='randomwalk', 
+modelsim <- simdat(n=100, mod='randomwalk', 
                  trueparms = rw.par, 
                  misp=c('missre', 'normal-lognorm', 'mu0'), seed=123)
 
@@ -66,8 +65,8 @@ test_that('randomwalk, LMM, simdat',{
 })
 min.y <- rep(-999, 1000)
 for(i in 1:1000){
-  testsim <- simulate_randomwalk(i,50,"LMM", sd.vec = c(1,1), init_u = 5)
-  min.y[i] <- min(testsim$y)
+  testsimmin <- simulate_randomwalk(i,100,"LMM", sd.vec = c(1,1), init_u = 6)
+  min.y[i] <- min(testsimmin$y)
 }
 test_that('randomwalk, LMM, min y',{
   expect_equal(TRUE, min(min.y) > 0 )
@@ -93,22 +92,26 @@ test_that('randomwalk, LMM, mkDat, mod and simre',{
 
 test.true.par <- list(
   h0 = list(
+    beta = 6,
     mu = 2, ln_sig_y = 0,
     ln_sig_u = 0,
     u = modelsim$random$u0
   ),
   h1 = list(
     list(
+      beta = 6, 
       mu = 2, ln_sig_y = 0,
       ln_sig_u = numeric(0),
       u = rep(0, length(modelsim$random$u0))
     ),
     list(
+      beta = 6, 
       mu = 2, ln_sig_y = 0,
       ln_sig_u = 0,
       u = modelsim$random$u1[[2]]
     ),
     list(
+      beta = 6, 
       mu = 0, ln_sig_y = 0,
       ln_sig_u = 0,
       u = modelsim$random$u1[[3]]
@@ -119,6 +122,11 @@ test.est.par <- test.true.par
 test.est.par$h0$mu <- 
   test.est.par$h1[[1]]$mu <- 
     test.est.par$h1[[2]]$mu <- 0
+
+test.est.par$h0$beta <- 
+  test.est.par$h1[[1]]$beta <- 
+  test.est.par$h1[[2]]$beta <-  
+  test.est.par$h1[[3]]$beta <-0
 
 test.est.par$h0$u <- 
   test.est.par$h1[[2]]$u <- 
@@ -152,30 +160,38 @@ test_that("randomwalk, LMM, mkrandom", {
 
 
 test.true.objpar <- list(
-  h0 = test.true.par$h0[1:3],
+  h0 = test.true.par$h0[1:4],
   h1 = list(
-    test.true.par$h1[[1]][1:2],
-    test.true.par$h1[[2]][1:3],
-    test.true.par$h1[[3]][2:3]
+    test.true.par$h1[[1]][1:3],
+    test.true.par$h1[[2]][1:4],
+    test.true.par$h1[[3]][c(1,3:4)]
   )
 ) 
 test.est.objpar <- list(
-  h0 = test.est.par$h0[1:3],
+  h0 = test.est.par$h0[1:4],
   h1 = list(
-    test.est.par$h1[[1]][1:2],
-    test.est.par$h1[[2]][1:3],
-    test.est.par$h1[[2]][2:3]
+    test.est.par$h1[[1]][1:3],
+    test.est.par$h1[[2]][1:4],
+    test.est.par$h1[[2]][c(1,3:4)]
   )
 )
+dyn.load(dynlib("src/randomwalk"))
 test_that("randomwalk, LMM, init.obj", {
+
 for(h in 1:4){
   if(h == 1){
     model.true.obj <- TMB::MakeADFun(data = modeldat$h0, parameters = model.true.par$h0, 
                      map = model.true.map$h0, random = model.random$h0, DLL = "randomwalk")
     model.est.obj <- TMB::MakeADFun(data = modeldat$h0, parameters = model.est.par$h0, 
                      map = model.est.map$h0, random = model.random$h0, DLL = "randomwalk")
+    report.true <- model.true.obj$report()
+    report.est <- model.est.obj$report()
+    expect_equal(testsim$u, report.true$u)
+    expect_equal(testsim$eta, report.true$eta)
     expect_equal(unlist(test.true.objpar$h0), model.true.obj$par)
     expect_equal(unlist(test.est.objpar$h0), model.est.obj$par)
+    expect_equal(rep(1,100), report.est$u)
+    expect_equal(rep(1,100), report.est$eta)
   }
   if(h>1){
     model.true.obj <- TMB::MakeADFun(data = modeldat$h1[[h-1]], parameters = model.true.par$h1[[h-1]], 
@@ -266,23 +282,31 @@ test_that('randomwalk, GLMM, mkDat, mod and simre',{
 
 test.true.par <- list(
   h0 = list(
-    mu = 0.05, ln_sig_y = log(0.5),
+    beta = 0.1,
+    mu = 0.05, 
+    ln_sig_y = log(0.5),
     ln_sig_u = log(0.05),
     u = modelsim$random$u0
   ),
   h1 = list(
     list(
-      mu = 0.05, ln_sig_y = log(0.5),
+      beta = 0.1,
+      mu = 0.05, 
+      ln_sig_y = log(0.5),
       ln_sig_u = numeric(0),
       u = rep(0, length(modelsim$random$u0))
     ),
     list(
-      mu = 0.05, ln_sig_y = log(0.5),
+      beta = 0.1,
+      mu = 0.05, 
+      ln_sig_y = log(0.5),
       ln_sig_u = log(0.05),
       u = modelsim$random$u1[[2]]
     ),
     list(
-      mu = 0, ln_sig_y = log(0.5),
+      beta = 0.1,
+      mu = 0, 
+      ln_sig_y = log(0.5),
       ln_sig_u = log(0.05),
       u = modelsim$random$u1[[3]]
     )
@@ -291,23 +315,31 @@ test.true.par <- list(
 
 test.est.par <- list(
   h0 = list(
-    mu = 0, ln_sig_y = 0,
+    beta = 0,
+    mu = 0, 
+    ln_sig_y = 0,
     ln_sig_u = 0,
     u = rep(1, length(modelsim$random$u0))
   ),
   h1 = list(
     list(
-      mu = 0, ln_sig_y = 0,
+      beta = 0,
+      mu = 0, 
+      ln_sig_y = 0,
       ln_sig_u = numeric(0),
       u = rep(0, length(modelsim$random$u0))
     ),
     list(
-      mu = 0, ln_sig_y = 0,
+      beta = 0,
+      mu = 0, 
+      ln_sig_y = 0,
       ln_sig_u = 0,
       u = rep(1, length(modelsim$random$u0))
     ),
     list(
-      mu = 0, ln_sig_y = 0,
+      beta = 0,
+      mu = 0, 
+      ln_sig_y = 0,
       ln_sig_u = 0,
       u = rep(1, length(modelsim$random$u0))
     )
@@ -325,7 +357,7 @@ test.map <- list(
 
 test_that("randomwalk, GLMM, mkpar", {
   expect_equal(test.true.par, model.true.par)
-  expect_equal(test.est.par$h0, model.est.par$h0)
+  expect_equal(test.est.par, model.est.par)
 })
 
 test_that("randomwalk, GLMM, mkmap", {
@@ -341,19 +373,19 @@ test_that("randomwalk, GLMM, mkrandom", {
 
 
 test.true.objpar <- list(
-  h0 = test.true.par$h0[1:3],
+  h0 = test.true.par$h0[1:4],
   h1 = list(
-    test.true.par$h1[[1]][1:2],
-    test.true.par$h1[[2]][1:3],
-    test.true.par$h1[[3]][2:3]
+    test.true.par$h1[[1]][1:3],
+    test.true.par$h1[[2]][1:4],
+    test.true.par$h1[[3]][c(1,3:4)]
   )
 ) 
 test.est.objpar <- list(
-  h0 = test.est.par$h0[1:3],
+  h0 = test.est.par$h0[1:4],
   h1 = list(
-    test.est.par$h1[[1]][1:2],
-    test.est.par$h1[[2]][1:3],
-    test.est.par$h1[[2]][2:3]
+    test.est.par$h1[[1]][1:3],
+    test.est.par$h1[[2]][1:4],
+    test.est.par$h1[[2]][c(1,3:4)]
   )
 )
 
