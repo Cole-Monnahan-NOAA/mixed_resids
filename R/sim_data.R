@@ -92,7 +92,8 @@ simdat.linmod <- function(n, mod, cov.mod, type=NULL,
 simdat.randomwalk <- function(n, mod, cov.mod, type, 
   trueparms, misp, seed, X){
   for(i in 1:length(misp)){
-    if(!(misp[i] %in% c('missre', 'normal-lognorm', 'gamma-lognorm', 'mu0'))) {
+    if(!(misp[i] %in% c('missre', 'normal-lognorm', 'gamma-lognorm',
+                        'mu0', 'mispre'))) {
       stop("Misspecification not available for random walk")
     }
   }
@@ -101,17 +102,33 @@ simdat.randomwalk <- function(n, mod, cov.mod, type,
   ## Simulate random measurements
   set.seed(seed)
   u0 <- cumsum( rnorm(n, 0, sd.vec[2]) ) 
+  if(type == "LMM"){
+    set.seed(seed)
+    u.misp <- cumsum( exp(rnorm(n, 0, sd.vec[2])) ) 
+  }
+  if(type == "GLMM"){
+    set.seed(seed)
+    u.misp <- cumsum( rgamma(n, 0.01, 1.5) ) 
+  }
   t <- 1:n
-  eta <- beta + as.vector(t * drift + u0)
+  eta0 <- beta + as.vector(t * drift + u0)
+  eta1 <- beta + as.vector(t * drift + u.misp)
  
   set.seed(seed)
-  y0 <- sim_y(Eta = eta, omega = rep(0, n), parm = sd.vec[1], 
+  y0 <- sim_y(Eta = eta0, omega = rep(0, n), parm = sd.vec[1], 
     fam = fam, link = link)
+  set.seed(seed)
+  y.misp <- sim_y(Eta = eta1, omega = rep(0, n), parm = sd.vec[1], 
+                  fam = fam, link = link)
   u1 <- list()
   y1 <- list()
   for(i in 1:length(misp)){
     y1[[i]] <- y0
     u1[[i]] <- u0
+    if(misp[i] == "mispre"){
+      y1[[i]] <- y.misp
+      u1[[i]] <- u.misp
+    }
   }
  
     

@@ -119,27 +119,27 @@ calc.quantile <- function(fam, report, y){
   out <- NA
   if(fam == 'Gaussian'){
     Fx <- pnorm(q = y, mean = report$exp_val, sd = report$sig_y)
-    out <-  qnorm(Fx)
+    out <-  qnorm(squeeze(Fx))
   }
   if(fam == 'Lognormal'){
     Fx <- pnorm(q = log(y), mean = report$exp_val, sd = report$sig_y)
-    out <-  qnorm(Fx)
+    out <-  qnorm(squeeze(Fx))
   }
   if(fam == 'Gamma'){
     Fx <- pgamma(q = y, shape = 1/report$sig_y^2, scale = report$exp_val*report$sig_y^2)
-    out <-  qnorm(Fx)
+    out <-  qnorm(squeeze(Fx))
   }
   if(fam == 'Poisson'){
     Fx <- ppois(y, report$exp_val)
     px <- dpois(y, report$exp_val)
     u <- runif(length(Fx))
-    out <- qnorm(Fx - u * px)
+    out <- qnorm(squeeze(Fx) - u * px)
   }
   if(fam == 'NB'){
     Fx <- pnbinom(y, size = report$size, mu = report$exp_val)
     px <- dnbinom(y, size = report$size, mu = report$exp_val)
     u <- runif(length(Fx))
-    out <- qnorm(Fx - u * px)
+    out <- qnorm(squeeze(Fx) - u * px)
   }  
   if(fam == "Tweedie"){
     grp.idx <- group + 1
@@ -149,7 +149,7 @@ calc.quantile <- function(fam, report, y){
     zero.idx <- which(y == 0)
     #as implemented in statmod::qres.tweedie
     Fx[zero.idx] <- runif(length(zero.idx), 0, Fx[zero.idx])
-    out <- qnorm(Fx)
+    out <- qnorm(squeeze(Fx))
   }
   if(fam == "Delta_Gamma"){
     zero.idx <- which(y == 0)
@@ -159,7 +159,7 @@ calc.quantile <- function(fam, report, y){
     Fx[pos.idx] <- pgamma(y[pos.idx], shape = 1/report$sig_y^2, 
                           scale = report$exp_val[pos.idx]*report$sig_y^2)
     Fx[zero.idx] <- runif(length(zero.idx), 0, 1)
-    out <- qnorm(Fx)
+    out <- qnorm(squeeze(Fx))
   }
   return(out)
 }
@@ -295,6 +295,49 @@ calc.sac <- function(res.type, dat, res.obj, version){
    return(df)
   
 }
+
+calc.auto <- function(res.type, res.obj, version){
+  
+  if(res.type == 'osa'){
+    res.names <- c('cdf', 'gen', 'fg', 'mcmc', 'osg',
+                   'pears')
+  }
+  if(res.type == 'sim'){
+    res.names <- c('cond', 'uncond', 'cond_nrot', 'uncond_nrot')
+  }
+  df <- data.frame(res.type = character(), method = character(), model = character(),
+                   test = character(), version = character(), pvalue = numeric())
+  
+  
+  for(m in 1:length(res.obj)){
+    nms <- names(res.obj)[m]
+    if(res.type == "osa"){
+      x <- res.obj[[m]]
+    }
+    if(res.type == "sim"){
+      x <- res.obj[[m]]$out$scaledResiduals
+    }
+    if (nms %in% res.names) {
+      if(is.numeric(x)){
+        p <- lmtest::dwtest(x[is.finite(x)] ~ 1)$p.value
+        df <- rbind(df,data.frame(res.type= res.type, 
+                                  method = names(res.obj)[m], 
+                                  model='randomwalk', 
+                                  test='Auto', 
+                                  version = version,
+                                  pvalue = p))
+      } 
+    }
+  }
+  if(nrow(df) == 0){
+    df <- data.frame(type = type, method = NA, model = NA,
+                     test = 'Auto', version = version, pvalue = NA)
+  }
+  
+  return(df)
+  
+}
+
 
 
 calc.pvals <- function(res.type, method, mod, res.obj, version, fam, doTrue){

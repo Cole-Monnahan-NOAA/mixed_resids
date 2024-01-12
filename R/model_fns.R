@@ -47,20 +47,23 @@ setup_randomwalk <- function(mod, misp, fam, link, type){
   }
   if(type == "GLMM"){
     beta <- 0.1
-    drift <- 0.05
+    drift <- 0.01
     sd.vec <- c(0.5, 0.05)
   }
   
   true.comp <- list()
-  true.comp[[1]] <- list(mu = beta, ln_sig_y = log(sd.vec[1]),
-          ln_sig_u = log(sd.vec[2]))
+  true.comp[[1]] <- list(mu = drift, 
+                         ln_sig_y = log(sd.vec[1]),
+                         ln_sig_u = log(sd.vec[2]))
   for(i in 1:length(misp)){
+    true.comp[[i+1]] <- true.comp[1]
     if(misp[i] == 'mu0'){
       true.comp[[i+1]] <- list(ln_sig_y = log(sd.vec[1]),
                                ln_sig_u = log(sd.vec[2]))
     } 
     if(misp[i] == 'missre'){
-      true.comp[[i+1]] <- list(mu = beta, ln_sig_y = log(sd.vec[1]))
+      true.comp[[i+1]] <- list(beta = beta, mu = drift, 
+                               ln_sig_y = log(sd.vec[1]))
     }
     if(misp[i] == 'gamma-lognorm' | misp[i] == 'normal-lognorm'){
       true.comp[[i+1]] <- true.comp[[1]]
@@ -229,7 +232,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
   init.dat <- mkTMBdat(sim.dat, true.parms, mod, misp, type)
   init.par <- mkTMBpar(true.parms, sim.dat, mod, misp, type, do.true)
   init.random <- mkTMBrandom(mod, misp)
-  init.map <- mkTMBmap(init.par, mod, misp, type)
+  init.map <- mkTMBmap(init.par, mod, misp, type, do.true)
   mod.out <- osa.out <- dharma.out <- list()
   pvals <- data.frame(id = character(), type = character(), misp = character(),
                       res.type = character(), method = character(),
@@ -388,7 +391,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
         dharma.out[[h]]$uncond$resids <- NA
         dharma.out[[h]]$uncond$runtime <- NA
       }
-      
+       
       ## only makes sense to run when MLE is estimated and there
       ## are RE - turning on when do.true == TRUE (AMH, 6/3/2022)
       if('mcmc' %in% osa.methods){
@@ -441,7 +444,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
       } else {
         osa.out[[h]]$mcmc <- osa.out[[h]]$runtime.mcmc <- NA
       }
-    
+ 
       AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC) #!doesn't work if doTrue == TRUE
       AICc <- ifelse(do.true, NA, mod.out[[h]]$aic$AICc) #!doesn't work if doTrue == TRUE
       maxgrad <- ifelse(do.true, NA, 
@@ -507,7 +510,23 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
                                       misp = misp.name,  sac.pvals))
         } 
       }
-          
+      
+      if(mod == 'randomwalk'){
+        if(!is.null(osa.methods)){
+          auto.pvals <- calc.auto( res.type = 'osa',  
+                                   res.obj = osa.out[[h]],
+                                   version = paste0("h", h-1))
+          pvals <- rbind(pvals, cbind(id = id, type = type, 
+                                      misp = misp.name,  auto.pvals))
+        } 
+        if(!is.null(dharma.methods)){
+          auto.pvals <- calc.auto( res.type = 'sim', 
+                                   res.obj = dharma.out[[h]],
+                                   version = paste0("h", h-1))
+          pvals <- rbind(pvals, cbind(id = id, type = type, 
+                                      misp = misp.name,  auto.pvals))
+        } 
+      }
          
     }
   }
@@ -716,9 +735,6 @@ mkTMBpar_randomwalk <- function(Pars, Dat, Mod, Misp, Type, doTrue){
     }
     if(Misp[m] == "mu0"){
       par1[[m]]$mu = 0
-      if(doTrue){
-        par1[[m]]$u = Dat$random$u1[[m]]
-      }
     }
   }
 
@@ -762,9 +778,9 @@ mkTMBpar_simpleGLMM <- function(Pars, Dat, Mod, Misp, Type, doTrue){
     if(Misp[m] == "nb-pois"){
       par1[[m]]$theta <- 0
     }
-    if(doTrue & Misp[m] == "mispre"){
-      par1[[m]]$u <- Dat$random$u1[[m]]
-    }
+    # if(doTrue & Misp[m] == "mispre"){
+    #   par1[[m]]$u <- Dat$random$u1[[m]]
+    # }
   }
   
   out = list(h0 = par0, h1 = par1)
@@ -826,12 +842,20 @@ mkTMBrandom <- function(Mod, Misp){
   return(out)
 }
 
-mkTMBmap <- function(Pars, Mod, Misp, Type){
+mkTMBmap <- function(Pars, Mod, Misp, Type, doTrue){
   map.h0 <- list()
   map.h1 <- list()
   if(Mod == 'randomwalk'){
+    if(!doTrue){
+      #not identifiable when estimating
+      map.h0$beta <- factor(NA) 
+    }
     for(m in 1:length(Misp)){
       map.h1[[m]] <- list()
+      if(!doTrue & Misp[m] != "missre"){
+        #not identifiable when estimating
+        map.h1[[m]]$beta <- factor(NA) 
+      }
       if(Misp[m] == "missre"){
         map.h1[[m]]$u = rep(factor(NA), length(Pars$h0$u))
       }
