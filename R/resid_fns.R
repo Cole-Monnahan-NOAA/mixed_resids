@@ -338,6 +338,49 @@ calc.auto <- function(res.type, res.obj, version){
   
 }
 
+calc.cat <- function(res.type, group, res.obj, version){
+  
+  if(res.type == 'osa'){
+    res.names <- c('cdf', 'gen', 'fg', 'mcmc', 'osg',
+                   'pears')
+  }
+  if(res.type == 'sim'){
+    res.names <- c('cond', 'uncond', 'cond_nrot', 'uncond_nrot')
+  }
+  df <- data.frame(res.type = character(), method = character(), model = character(),
+                   test = character(), version = character(), pvalue = numeric())
+  
+  for(m in 1:length(res.obj)){
+    nms <- names(res.obj)[m]
+    if(res.type == "osa"){
+      x <- res.obj[[m]]
+    }
+    if(res.type == "sim"){
+      x <- res.obj[[m]]$out$scaledResiduals
+    }
+    if (nms %in% res.names) {
+      if(is.numeric(x)){
+        ## only test for positive correlation
+        idx <- which(is.finite(x))
+        y <- leveneTest(x[idx] ~ factor(group[idx]))$`Pr(>F)`[1]
+        df <- rbind(df,data.frame(res.type = res.type, 
+                                  method = names(res.obj)[m], 
+                                  model = 'simpleGLMM', 
+                                  test = 'Cat', 
+                                  version = version,
+                                  pvalue = y))
+      } 
+    }
+  }
+  if(nrow(df) == 0){
+    df <- data.frame(type = type, method = NA, model = NA,
+                     test = 'Cat', version = version, pvalue = NA)
+  }
+  
+  return(df)
+  
+}
+
 
 
 calc.pvals <- function(res.type, method, mod, res.obj, version, fam, doTrue){

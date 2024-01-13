@@ -13,6 +13,7 @@ library(R.utils)
 library(Matrix)
 library(goftest)
 library(tweedie)
+library(car)
 
 ## Some global settings
 ggwidth <- 7

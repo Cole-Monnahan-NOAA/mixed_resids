@@ -192,6 +192,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
   library(R.utils)
   library(goftest)
   library(tweedie)
+  library(car)
   
   if(do.true){
     mod.name <- paste0(mod, "_true")
@@ -492,6 +493,31 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
                                   calc.pvals( res.type = 'sim', method = dharma.methods, mod = mod,
                                               res.obj = dharma.out[[h]], version = paste0("h", h-1),
                                               fam = true.parms$fam, do.true )))
+      if(mod == 'simpleGLMM'){
+        if(h == 1){
+          grp <- init.dat[[h]]$group
+        }
+        if(h > 1){
+          grp <- init.dat$h1[[h-1]]$group
+        }
+        if(!is.null(osa.methods)){
+          cat.pvals <- calc.cat( res.type = 'osa', 
+                                 group = grp, 
+                                 res.obj = osa.out[[h]],
+                                 version = paste0("h", h-1))
+          pvals <- rbind(pvals, cbind(id = id, type = type, 
+                                      misp = misp.name,  cat.pvals))
+        } 
+        if(!is.null(dharma.methods)){
+          cat.pvals <- calc.cat( res.type = 'sim', 
+                                 group = grp,  
+                                 res.obj = dharma.out[[h]],
+                                 version = paste0("h", h-1))
+          pvals <- rbind(pvals, cbind(id = id, type = type, 
+                                      misp = misp.name,  cat.pvals))
+        } 
+      }
+      
       if(mod == 'spatial'){
         if(!is.null(osa.methods)){
           sac.pvals <- calc.sac( res.type = 'osa', 
