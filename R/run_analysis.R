@@ -46,29 +46,43 @@ run_model(reps, mod='linmod', misp='overdispersion', cov.mod = 'norm',
 
 ### Random walk from the paper =================================================
 ## possible mispecifications: 'missre', 'normal-lognorm', 'gamma-lognorm', 'mu0'
-dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
-osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc','pears')
-run_model(reps, n = 100, mod='randomwalk', 
-          misp = c('missre', 'normal-lognorm', 'mu0'), 
-          type = 'LMM', do.true = do.true)
-osa.methods <- c('gen', 'cdf', 'mcmc','pears')
-run_model(reps, n = 100, mod='randomwalk', 
-          misp =  c('missre', 'gamma-lognorm', 'mu0'), 
-          family = "Gamma", link = "log",
-          type = 'GLMM', do.true = do.true)
+reps <- 1:441
+a <- Sys.time()
+for(dt in 1:2){
+  if(dt == 1){do.true <- TRUE}
+  if(dt == 2){do.true <- FALSE}
+  dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
+  osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc','pears')
+  run_model(reps, n = 100, mod='randomwalk', 
+            misp = c('missre', 'mu0', 'mispre'), 
+            type = 'LMM', do.true = do.true)
+  osa.methods <- c('gen', 'cdf', 'mcmc','pears')
+  run_model(reps, n = 100, mod='randomwalk', 
+            misp =  c('missre', 'mu0', 'mispre'), 
+            family = "Gamma", link = "log",
+            type = 'GLMM', do.true = do.true)
+}
+b <- Sys.time()
 
 ### simpleGLMM with 5 groups===================================================
 ## possible mispecifications: 'missre', 'nb-pois', 'mispre', 'missunifcov', 'misscovnorm'
-dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
-osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc','pears')
-run_model(reps, n = 100, ng = 5, mod='simpleGLMM', cov.mod = 'unif',
-          misp = c('missre', 'missunifcov', 'mispre'), 
-          type = 'LMM', do.true = do.true)
-osa.methods <- c('gen', 'cdf', 'mcmc','pears')
-run_model(reps, n = 100, ng = 5, mod='simpleGLMM',
-          misp = c('missre', 'nb-pois', 'mispre'),
-          type = 'GLMM',  family = "NB", link = "log",
-          do.true = do.true)
+reps <- 1:441
+a <- Sys.time()
+for(dt in 1:2){
+  if(dt == 1){do.true <- TRUE}
+  if(dt == 2){do.true <- FALSE}
+  dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
+  osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc','pears')
+  run_model(reps, n = 20, ng = 5, mod='simpleGLMM', cov.mod = 'unif',
+            misp = c('missre', 'missunifcov', 'mispre'), 
+            type = 'LMM', do.true = do.true)
+  osa.methods <- c('gen', 'cdf', 'mcmc','pears')
+  run_model(reps, n = 20, ng = 5, mod='simpleGLMM',
+            misp = c('missre', 'nb-pois', 'mispre'),
+            type = 'GLMM',  family = "NB", link = "log",
+            do.true = do.true)
+}
+b <- Sys.time()
 
 ### spatial ==================================================================                                                                                    ### Simple spatial SPDE model ==================================================
 ## possible mispecifications: 'missre', 'pois-zip', 'mispre', 'normal-gamma'
