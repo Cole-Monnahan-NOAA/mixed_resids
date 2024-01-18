@@ -18,11 +18,11 @@
 #' * missnormcov: missing normal covariate
 #' * missre: missing random effect
 #' * mu0: missing drift term, specific to linmod
-#' * mispre: mispecified random effect, exp(re)
+#' * mispre: mispecified random effect, e.g. exp(re)
 #' * nb-pois: misspecified distribution (nb data fit to poisson)
 #' * overdispersion: misspecified distribution (lognormal data fit to normal)
-#' * gamma-lognorm: misspecified distribution (gamma data fit to lognormal)
-#' * normal-lognorm: misspecified distribution (gamma data fit to lognormal)
+#' * lognorm-gamma: misspecified distribution (lognormal data fit to gamma)
+#' * hsk: heteroskadacity introduced to simulated data
 #' * mispzip: zero-inflated data fit to non-zero inflated data
 #' @param seed
 #'
@@ -36,7 +36,7 @@ simdat <- function(n, ng=0, mod, cov.mod = NULL, type = NULL,
   for(i in 1:length(misp)){
   if(!(misp[i] %in% c('missunifcov', 'missnormcov', 'missre', 
                    'mu0', 'mispre', 'nb-pois', 'overdispersion', 
-                   'gamma-lognorm', 'normal-lognorm', 'pois-zip',
+                   'gamma-normal', 'hsk', 'pois-zip', 
                    'normal-gamma'))){
     stop('incorrect mis-specification name')
   } }
@@ -57,7 +57,7 @@ simdat <- function(n, ng=0, mod, cov.mod = NULL, type = NULL,
   }
   if(mod == 'randomwalk'){
     dat.out <- simdat.randomwalk(n, mod, cov.mod, type,
-                   trueparms, misp, seed, X)
+                   trueparms, misp, seed)
   }
   if(mod == 'simpleGLMM'){
     dat.out <- simdat.simpleGLMM(n, ng, mod, cov.mod, type,
@@ -90,46 +90,64 @@ simdat.linmod <- function(n, mod, cov.mod, type=NULL,
   }
 
 simdat.randomwalk <- function(n, mod, cov.mod, type, 
-  trueparms, misp, seed, X){
+  trueparms, misp, seed){
   for(i in 1:length(misp)){
-    if(!(misp[i] %in% c('missre', 'normal-lognorm', 'gamma-lognorm',
+    if(!(misp[i] %in% c('missre', 'hsk', 'gamma-normal', 
                         'mu0', 'mispre'))) {
       stop("Misspecification not available for random walk")
     }
   }
   list2env(trueparms, envir = environment(simdat.randomwalk))
-  #mu <- X %*% drift
   ## Simulate random measurements
   set.seed(seed)
-  u0 <- cumsum( rnorm(n, 0, sd.vec[2]) ) 
-  if(type == "LMM"){
-    set.seed(seed)
-    u.misp <- cumsum( exp(rnorm(n, 0, sd.vec[2])) ) 
-  }
-  if(type == "GLMM"){
-    set.seed(seed)
-    u.misp <- cumsum( rgamma(n, 0.01, 1.5) ) 
-  }
-  t <- 1:n
-  eta0 <- beta + as.vector(t * drift + u0)
-  eta1 <- beta + as.vector(t * drift + u.misp)
- 
+  eta0 <- cumsum( rnorm(n, 0, sd.vec[2]) ) 
+  u0 <- 1:n * drift + eta0
   set.seed(seed)
-  y0 <- sim_y(Eta = eta0, omega = rep(0, n), parm = sd.vec[1], 
-    fam = fam, link = link)
-  set.seed(seed)
-  y.misp <- sim_y(Eta = eta1, omega = rep(0, n), parm = sd.vec[1], 
-                  fam = fam, link = link)
+  y0 <- sim_y(Eta = u0, omega = rep(0, n), parm = sd.vec[1], 
+              fam = fam, link = link)
+  
   u1 <- list()
   y1 <- list()
   for(i in 1:length(misp)){
     y1[[i]] <- y0
     u1[[i]] <- u0
+    
     if(misp[i] == "mispre"){
+      #simulate non-normal random effect
+      if(type == "LMM"){
+        set.seed(seed)
+        u.misp <- cumsum( exp(rnorm(n, drift, sd.vec[2])) )
+      }
+      if(type == "GLMM"){
+        set.seed(seed)
+        u.misp <- cumsum( rgamma(n, 0.5, 20) )
+      }
+      set.seed(seed)
+      y.misp <- sim_y(Eta = u.misp, omega = rep(0, n), parm = sd.vec[1], 
+                      fam = fam, link = link)
+      
       y1[[i]] <- y.misp
       u1[[i]] <- u.misp
     }
+    
+    if(misp[i] == "hsk"){
+      #simulate data with heterosckadicity
+      set.seed(123)
+      y.misp <- sim_y(Eta = u0, omega = rep(0, n), parm = sqrt((1:n/2)^1.3), 
+                  fam = fam, link = link)
+      y1[[i]] <- y.misp
+    }
+    
+    if(misp[i] == "mu0"){
+      u1[[i]] <- eta0
+    }
   }
+  
+  
+  
+  
+
+  
  
     
   random <- list(u0 = u0, u1 = u1)
@@ -370,7 +388,7 @@ sim_y <- function(Eta, omega, parm, fam, link){
   }
   if(fam == 'Gaussian'){
     ## assuming parm[1] is SD of sampling process
-    Y <- rnorm(N, mu, parm[1])
+    Y <- rnorm(N, mu, parm)
   }
   if(fam == 'NB'){
     #parm = size
