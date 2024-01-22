@@ -213,6 +213,9 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
       if(misp[h-1] == "norm-gamma"){
         mod.fam <- "Gamma"
       }
+      if(misp[h-1] == "gamma-normal"){
+        mod.fam <- "Gaussian"
+      }
     }
 
     if(h == 1 | mod == "linmod"){
@@ -233,6 +236,15 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
         control = list(run.model = !do.true, do.sdreport = TRUE)
         )
     )
+    
+    maxgrad <- ifelse(do.true, NA, 
+                      max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) 
+    ) #!doesn't work if doTrue == TRUE
+    convergestatus <- ifelse(do.true, 0, 
+                             mod.out[[h]]$opt$convergence)
+    convergehessian <- ifelse(do.true, NA, 
+                              mod.out[[h]]$sdr$pdHess)
+    
     if(class(mod.out[[h]])!='try-error'){
       if(!do.true & h == 1){
         ## if estimating, return MLE values
@@ -270,10 +282,15 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
       } 
         
       if(mod == 'randomwalk' | mod == 'spatial' | mod == 'simpleGLMM') rot <- "estimated"
-      
-      osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, methods=osa.methods, 
-                                    observation.name='y', Discrete = disc, 
-                                    Range = ran)
+      if(convergestatus == 0){
+        osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, methods=osa.methods, 
+                                      observation.name='y', Discrete = disc, 
+                                      Range = ran)
+      } else {
+        osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, methods=NULL, 
+                                      observation.name='y', Discrete = disc, 
+                                      Range = ran)
+      }
 
       expr <- expression(obj$simulate()$y)
       
@@ -289,7 +306,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
         init.obs <- sim.dat$y1[[h-1]]
       }
       dharma.out[[h]] <- list()
-      if('cond' %in% dharma.methods){
+      if('cond' %in% dharma.methods & convergestatus == 0){
         dharma.out[[h]]$cond <- 
           calculate.dharma(mod.out[[h]]$obj, expr, obs = init.obs,
                            idx = 1:n_, fpr=mod.out[[h]]$report$fpr, 
@@ -300,7 +317,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
         dharma.out[[h]]$cond$runtime <- NA
       }
       
-      if('cond_nrot' %in% dharma.methods){
+      if('cond_nrot' %in% dharma.methods & convergestatus == 0){
         dharma.out[[h]]$cond_nrot <- 
           calculate.dharma(mod.out[[h]]$obj, expr, obs = init.obs,
                            idx = 1:n_, fpr=mod.out[[h]]$report$fpr, 
@@ -311,14 +328,14 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
         dharma.out[[h]]$cond_nrot$runtime <- NA
       }
       
-      if('uncond_nrot' %in% dharma.methods | 
-         'uncond' %in% dharma.methods){
+      if(('uncond_nrot' %in% dharma.methods | 
+         'uncond' %in% dharma.methods) & convergestatus == 0){
         mod.out[[h]]$obj$env$data$sim_re <- 1 #turn on RE simulation
         #retape, do not reset parameters to initial values
         mod.out[[h]]$obj$retape(set.defaults = FALSE) 
       }
       
-      if('uncond_nrot' %in% dharma.methods){
+      if('uncond_nrot' %in% dharma.methods & convergestatus == 0){
         dharma.out[[h]]$uncond_nrot <- 
           calculate.dharma(mod.out[[h]]$obj, expr, obs = init.obs, 
                            idx = 1:n_, fpr=mod.out[[h]]$report$fpr, 
@@ -329,7 +346,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
         dharma.out[[h]]$uncond_nrot$runtime <- NA
       }
 
-      if('uncond' %in% dharma.methods){
+      if('uncond' %in% dharma.methods & convergestatus == 0){
         dharma.out[[h]]$uncond <- 
           calculate.dharma(mod.out[[h]]$obj, expr, obs = init.obs, 
                            idx = 1:n_, fpr=mod.out[[h]]$report$fpr, 
@@ -342,7 +359,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
        
       ## only makes sense to run when MLE is estimated and there
       ## are RE - turning on when do.true == TRUE (AMH, 6/3/2022)
-      if('mcmc' %in% osa.methods){
+      if('mcmc' %in% osa.methods & convergestatus == 0){
         t0 <- Sys.time()
         if(!(misp.name == "missre")){
           ## Build up TMB obj again
@@ -395,13 +412,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
  
       AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC) #!doesn't work if doTrue == TRUE
       AICc <- ifelse(do.true, NA, mod.out[[h]]$aic$AICc) #!doesn't work if doTrue == TRUE
-      maxgrad <- ifelse(do.true, NA, 
-                        max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) 
-                        ) #!doesn't work if doTrue == TRUE
-      convergestatus <- ifelse(do.true, NA, 
-                               mod.out[[h]]$opt$convergence)
-      convergehessian <- ifelse(do.true, NA, 
-                                mod.out[[h]]$sdr$pdHess)
+     
       
       r[[h]] <- data.frame(id=id, model=mod, type = type, misp = misp.name, 
                            version = paste0("h", h-1),
@@ -431,16 +442,22 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
       out[[h]][paste0("runtime.", names(dharma.out[[1]])[!grepl("re", names(dharma.out[[1]]))])] <- 
         sapply(names(dharma.out[[1]])[!grepl("re", names(dharma.out[[1]]))], function(x) dharma.out[[h]][[x]]$runtime)
         
-    
-      pvals <- rbind(pvals, cbind(id = id, type = type, misp = misp.name,
-                                  calc.pvals( res.type = 'osa', method = osa.methods, mod = mod,
-                                              res.obj = osa.out[[h]], version = paste0("h", h-1),
-                                              fam = true.parms$fam, do.true )))
-      pvals <- rbind(pvals, cbind(id = id, type = type, misp = misp.name, 
-                                  calc.pvals( res.type = 'sim', method = dharma.methods, mod = mod,
-                                              res.obj = dharma.out[[h]], version = paste0("h", h-1),
-                                              fam = true.parms$fam, do.true )))
-      if(mod == 'simpleGLMM'){
+      if(convergestatus == 0){
+        pvals <- rbind(pvals, cbind(id = id, type = type, misp = misp.name,
+                                    calc.pvals( res.type = 'osa', 
+                                                method = osa.methods, mod = mod,
+                                                res.obj = osa.out[[h]], 
+                                                version = paste0("h", h-1),
+                                                fam = true.parms$fam, do.true )))
+        
+        pvals <- rbind(pvals, cbind(id = id, type = type, misp = misp.name, 
+                                    calc.pvals( res.type = 'sim', 
+                                                method = dharma.methods, mod = mod,
+                                                res.obj = dharma.out[[h]], 
+                                                version = paste0("h", h-1),
+                                                fam = true.parms$fam, do.true )))
+      }
+      if(mod == 'simpleGLMM' & convergestatus == 0){
         if(h == 1){
           grp <- init.dat[[h]]$group
         }
@@ -465,7 +482,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
         } 
       }
       
-      if(mod == 'spatial'){
+      if(mod == 'spatial' & convergestatus == 0){
         if(!is.null(osa.methods)){
           sac.pvals <- calc.sac( res.type = 'osa', 
                                  dat = sim.dat, 
@@ -484,7 +501,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
         } 
       }
       
-      if(mod == 'randomwalk'){
+      if(mod == 'randomwalk' & convergestatus == 0){
         if(!is.null(osa.methods)){
           auto.pvals <- calc.auto( res.type = 'osa',  
                                    res.obj = osa.out[[h]],
