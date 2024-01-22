@@ -100,9 +100,8 @@ simdat.randomwalk <- function(n, mod, cov.mod, type,
   list2env(trueparms, envir = environment(simdat.randomwalk))
   ## Simulate random measurements
   set.seed(seed)
-  eta0 <- cumsum( rnorm(n, 0, sd.vec[2]) ) 
-  u0 <- 1:n * drift + eta0
-  set.seed(seed)
+  u0 <- c(0, cumsum( rnorm(n-1, drift, sd.vec[2]) ) ) 
+  set.seed(seed*10)
   y0 <- sim_y(Eta = u0, omega = rep(0, n), parm = sd.vec[1], 
               fam = fam, link = link)
   
@@ -139,7 +138,8 @@ simdat.randomwalk <- function(n, mod, cov.mod, type,
     }
     
     if(misp[i] == "mu0"){
-      u1[[i]] <- eta0
+      set.seed(seed)
+      u1[[i]] <- c(0, cumsum( rnorm(n-1, 0, sd.vec[2]) ) ) 
     }
   }
   

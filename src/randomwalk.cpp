@@ -20,10 +20,8 @@ Type objective_function<Type>::operator()()
   DATA_VECTOR(y);                  // Observations
   DATA_INTEGER(mod); //0: normal; 1: lognormal; 2: gamma
   DATA_INTEGER(sim_re);
-  DATA_INTEGER(doTrue); //0: FALSE; 1: TRUE
   DATA_VECTOR_INDICATOR(keep, y);  // For one-step predictions
 
-  //DATA_SCALAR(huge);
   PARAMETER(mu);
   PARAMETER(ln_sig_y);
   PARAMETER_VECTOR(ln_sig_u); 
@@ -34,14 +32,12 @@ Type objective_function<Type>::operator()()
   bool u_flag = (ln_sig_u.size()>0);
   Type sig_y = exp(ln_sig_y);	// observation sd
   vector<Type> sig_u(ln_sig_u.size());
+  vector<Type> ypred(u.size());
+  ypred.setZero();
   Type nll = 0;
-  vector<Type> eta(u.size());
-  eta.setZero();
   
   if(u_flag){
     sig_u = exp(ln_sig_u);
-    vector<Type> ypred(u.size());
-    ypred.setZero();
     
     //Initial condition
     nll -= dnorm(u(0), Type(0), Type(1000), true);
@@ -57,11 +53,6 @@ Type objective_function<Type>::operator()()
       nll -= dnorm(u(i), ypred(i), sig_u(0), true);
       if(sim_re == 1){
         SIMULATE{
-          if(doTrue == 1){
-            //if initial parameters are true, u includes the drift term
-            u(i) = rnorm(u(i-1), sig_u(0));
-          }
-          if(doTrue == 0)
             u(i) = rnorm(ypred(i), sig_u(0));
         }
       }
@@ -122,6 +113,7 @@ Type objective_function<Type>::operator()()
   REPORT(sig_u);
   REPORT(sig_y);
   REPORT(nll);
+  REPORT(ypred);
   
   return nll;
 }
