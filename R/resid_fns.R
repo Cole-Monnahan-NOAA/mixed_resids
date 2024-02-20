@@ -288,7 +288,7 @@ calc.sac <- function(res.type, dat, res.obj, version){
     }
   }
   if(nrow(df) == 0){
-    df <- data.frame(type = type, method = NA, model = NA,
+    df <- data.frame(res.type = res.type, method = NA, model = NA,
                      test = 'SAC', version = version, pvalue = NA)
   }
 
@@ -463,7 +463,7 @@ calc.pvals <- function(res.type, method, mod, res.obj, version, fam, doTrue){
     }
   } 
   if(is.null(method) | nrow(df) == 0){
-    df <- data.frame(type = type, method = NA, model = NA,
+    df <- data.frame(res.type = res.type, method = NA, model = NA,
                      test = NA, version = version, pvalue = NA)
   }
   return(df)
