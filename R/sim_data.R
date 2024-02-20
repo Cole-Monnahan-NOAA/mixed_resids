@@ -37,7 +37,7 @@ simdat <- function(n, ng=0, mod, cov.mod = NULL, type = NULL,
   if(!(misp[i] %in% c('missunifcov', 'missnormcov', 'missre', 
                    'mu0', 'mispre', 'nb-pois', 'overdispersion', 
                    'gamma-normal', 'hsk', 'pois-zip', 
-                   'normal-gamma'))){
+                   'normal-gamma', 'ln-error'))){
     stop('incorrect mis-specification name')
   } }
   if(!(mod %in% c('linmod', 'randomwalk', 'simpleGLMM', 'spatial'))) stop('incorrect model name')
@@ -223,7 +223,7 @@ simdat.simpleGLMM <- function(n, ng, mod, cov.mod, type,
 simdat.spatial <- function(n, mod, type, trueparms, 
                            misp, seed, X){
   for(i in 1:length(misp)){
-    if(!(misp[i] %in% c('missre', 'pois-zip', 'mispre', 
+    if(!(misp[i] %in% c('missre', 'pois-zip', 'mispre', 'ln-error',
       'normal-gamma'))) {
       stop(paste0("Misspecification", misp[i]," not available for spatial"))
     }
@@ -251,7 +251,7 @@ simdat.spatial <- function(n, mod, type, trueparms,
   mesh <- try(
     R.utils::withTimeout( 
       fmesher::fm_mesh_2d(loc, max.edge = c(sp.parm/3,sp.parm), 
-                          offset = c(sp.parm/10,sp.parm*2), min.angle = 26),
+                          offset = c(sp.parm/20,sp.parm), min.angle = 26),
       timeout = 30, onTimeout = 'silent' ))
     
   if("aniso" %in% misp){
@@ -294,6 +294,11 @@ simdat.spatial <- function(n, mod, type, trueparms,
     if(misp[[m]] == "pois-zip"){
       set.seed(seed)
       y1[[m]] <- rbinom(n, 1, 0.7) * y1[[m]]
+    }
+    if(misp[[m]] == "ln-error"){
+      #simulate data with lognormal error
+      set.seed(123)
+      y1[[m]] <- y0 * exp(rnorm(n))
     }
   
   }
