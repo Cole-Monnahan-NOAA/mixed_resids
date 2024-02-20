@@ -30,6 +30,7 @@ setup_linmod <- function(mod, misp, fam, link){
 }
 
 setup_randomwalk <- function(mod, misp, fam, link, type){
+  true.comp <- list()
   if(type == "LMM"){
     drift <- 2
     sd.vec <- c(1,1)
@@ -39,9 +40,19 @@ setup_randomwalk <- function(mod, misp, fam, link, type){
     sd.vec <- c(0.5, 0.05)
   }
   
-  true.comp <- list(mu = drift, 
+  true.comp[[1]] <- list(mu = drift, 
                     ln_sig_y = log(sd.vec[1]),
                     ln_sig_u = log(sd.vec[2]))
+  
+  for(m in 1:length(misp)){
+    true.comp[[m+1]] <- true.comp[[1]]
+    if(misp[m] == "missre"){
+      true.comp[[m+1]]$ln_sig_u <- NULL
+    }
+    if(misp[m] == "mu0"){
+      true.comp[[m+1]]$mu <- NULL
+    }
+  }
 
   true.parms <- list(sd.vec=sd.vec, drift = drift,
     fam=fam, link=link, true.comp=true.comp)
@@ -51,11 +62,11 @@ setup_randomwalk <- function(mod, misp, fam, link, type){
 
 setup_simpleGLMM <- function(mod, misp, fam, link, type){
   theta <- NA
+  true.comp <- list()
   if(type == "LMM"){
-    #currently only misp = misscovunif or misscovnorm is implemented
     beta <- c(4,-8)
     sd.vec <- c(0.5, 2)
-    true.comp <- list(beta_1 = beta[1], beta_2 = beta[2],
+    true.comp[[1]] <- list(beta_1 = beta[1], beta_2 = beta[2],
                       ln_sig_y = log(sd.vec[1]),
                       ln_sig_u = log(sd.vec[2]))
    
@@ -70,7 +81,7 @@ setup_simpleGLMM <- function(mod, misp, fam, link, type){
       sd.vec[2] <- 1 #sig_u
       theta <- size
 
-      true.comp <- list(beta = beta,
+      true.comp[[1]] <- list(beta = beta,
                         theta = log(size),
                         ln_sig_u = log(sd.vec[2]))
     }
@@ -79,7 +90,7 @@ setup_simpleGLMM <- function(mod, misp, fam, link, type){
       beta <- 0.5
       sd.vec[2] <- sqrt(0.5) #sig_u
 
-      true.comp <- list(beta = beta[1],
+      true.comp[[1]] <- list(beta = beta[1],
                         ln_sig_u = log(sd.vec[2]))
     }
 
@@ -89,10 +100,23 @@ setup_simpleGLMM <- function(mod, misp, fam, link, type){
       sd.vec <- c(1.7,1) #phi, sig_u
       theta <- pow
 
-      true.comp <- list(beta = beta,
+      true.comp[[1]] <- list(beta = beta,
                         ln_sig_y = log(sd.vec[1]),
                         theta = log((pow-1)/(2-pow)),
                         ln_sig_u = log(sd.vec[2]))
+    }
+  }
+  
+  for(m in 1:length(misp)){
+    true.comp[[m+1]] <- true.comp[[1]]
+    if(misp[m] == "missre"){
+      true.comp[[m+1]]$ln_sig_u <- NULL
+    }
+    if(misp[m] == "missunifcov"){
+      true.comp[[m+1]]$beta_2 <- NULL
+    }
+    if(misp[m] == "nb-pois"){
+      true.comp[[m+1]]$theta <- NULL
     }
   }
 
@@ -105,13 +129,15 @@ setup_simpleGLMM <- function(mod, misp, fam, link, type){
 
 setup_spatial<- function(mod, misp, fam, link, type){
   sp.parm <- 50
+  true.comp <- list()
   if(type == "LMM"){
     beta <- 4
     sd.vec <- c(1, 1)
 
-    true.comp <- list(beta = beta, theta = log(sd.vec[1]),
+    true.comp[[1]] <- list(beta = beta, theta = log(sd.vec[1]),
            ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd))
            ln_kappa = log(sqrt(8)/sp.parm))
+    
   }
 
   if(type == "GLMM"){
@@ -119,9 +145,17 @@ setup_spatial<- function(mod, misp, fam, link, type){
       beta <- 0.5
       sd.vec <- c(NA, sqrt(0.25))  
     }
-    true.comp <- list(beta = beta, 
+    true.comp[[1]] <- list(beta = beta, 
            ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd))
            ln_kappa = log(sqrt(8)/sp.parm))
+  }
+  
+  for(m in 1:length(misp)){
+    true.comp[[m+1]] <- true.comp[[1]]
+    if(misp[m] == "missre"){
+      true.comp[[m+1]]$ln_tau <- NULL
+      true.comp[[m+1]]$ln_kappa <- NULL
+    }
   }
   
   true.parms <- list(beta=beta, sd.vec=sd.vec, sp.parm=sp.parm,
@@ -261,7 +295,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
     if(class(mod.out[[h]])!='try-error'){
       if(!do.true){
         ## if estimating, return MLE values
-        tmp1 <- true.parms$true.comp
+        tmp1 <- true.parms$true.comp[[h]]
         tmp2 <- mod.out[[h]]$opt$par
         
         if(h == 1){
