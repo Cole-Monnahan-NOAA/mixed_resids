@@ -106,7 +106,7 @@ setup_simpleGLMM <- function(mod, misp, fam, link, type){
 setup_spatial<- function(mod, misp, fam, link, type){
   sp.parm <- 50
   if(type == "LMM"){
-    beta <- 20
+    beta <- 4
     sd.vec <- c(1, 1)
 
     true.comp <- list(beta = beta, theta = log(sd.vec[1]),
@@ -179,7 +179,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
 
   init.dat <- mkTMBdat(sim.dat, true.parms, mod, misp, type, do.true)
   init.par <- mkTMBpar(true.parms, sim.dat, mod, misp, type, do.true)
-  init.random <- mkTMBrandom(mod, misp)
+  init.random <- mkTMBrandom(mod, misp, type, do.true)
   init.map <- mkTMBmap(init.par, mod, misp, type, do.true)
   mod.out <- osa.out <- dharma.out <- list()
   pvals <- data.frame(id = character(), type = character(), misp = character(),
@@ -189,7 +189,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
   mles <-  r <- out <- list()
 
   for(h in 1:(length(misp)+1)){
-    message(ii, ": Optimizing  models...")
+    message(ii, ": Optimizing  models...", h)
     if(h == 1){
       misp.name <- "correct"
       id <- paste0(mod, '_', do.true, '_', type, '_correct_h0_', ii)
@@ -237,6 +237,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
         )
     )
     
+    
     maxgrad <- ifelse(do.true, NA, 
                       max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) 
     ) #!doesn't work if doTrue == TRUE
@@ -245,11 +246,34 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
     convergehessian <- ifelse(do.true, NA, 
                               mod.out[[h]]$sdr$pdHess)
     
+    
+    #in spatial model, remove beta from random list
+    if(h == 1){
+      if(mod == "spatial" & "beta"  %in% init.random[[h]] & h == 1){
+        mod.out[[h]]$obj$env$random <- mod.out[[1]]$obj$env$random[-1]
+      }
+    } else {
+      if(mod == "spatial" & "beta"  %in% init.random$h1[[h-1]] & h == 1){
+        mod.out[[h]]$obj$env$random <- mod.out[[1]]$obj$env$random[-1]
+      }
+    }
+    
     if(class(mod.out[[h]])!='try-error'){
-      if(!do.true & h == 1){
+      if(!do.true){
         ## if estimating, return MLE values
         tmp1 <- true.parms$true.comp
         tmp2 <- mod.out[[h]]$opt$par
+        
+        if(h == 1){
+          if(mod == "spatial" & "beta"  %in% init.random[[h]]){
+            tmp2 <- c(beta = mod.out[[h]]$obj$env$parList()$beta, tmp2)
+          }
+        } else {
+          if(mod == "spatial" & "beta"  %in% init.random$h1[[h-1]]){
+            tmp2 <- c(beta = mod.out[[h]]$obj$env$parList()$beta, tmp2)
+          }
+        }
+        
         stopifnot(length(tmp2)>0)
         
         tmp1 <- unlist(tmp1)
@@ -363,28 +387,39 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
         t0 <- Sys.time()
         if(!(misp.name == "missre")){
           ## Build up TMB obj again
-          if(do.true)  FE <- mod.out[[h]]$obj$par # true FE
-          if(!do.true) FE <- mod.out[[h]]$opt$par # estimated FE
+          FE <- mod.out[[h]]$obj$env$parList() # estimated FE
           ## make into list; https://stackoverflow.com/questions/46251725/convert-named-vector-to-list-in-r/46251794
-          FE <- split(unname(FE),names(FE))
+         # FE <- split(unname(FE),names(FE))
           if(h == 1){
-            MLE <- modifyList(init.par[[h]], FE) #
+            #MLE <- modifyList(init.par[[h]], FE) #
             ## Get FE and map them off
-            xx <- names(MLE)[-which(names(MLE) %in% init.random[[h]])]
-            map <- lapply(names(FE), function(x) factor(FE[[x]]*NA))
-            names(map) <- names(FE)
+            xx <- names(FE)[-which(names(FE) %in% init.random[[h]])]
+            if(mod == "spatial" & "beta" %in% init.random[[h]]){
+              ## beta is RE for REML but should be fixed for resid calc
+              FE.names <- c("beta", xx)
+            } else {
+              FE.names <- xx
+            }
+            map <- lapply(FE.names, function(x) factor(FE[[x]]*NA))
+            names(map) <- FE.names
             map <- c(map, init.map[[h]])
             ## Rebuild with original FE mapped off and RE as FE
-            objmle <- MakeADFun(data=init.dat[[h]], parameters=MLE,
+            objmle <- MakeADFun(data=init.dat[[h]], parameters=FE,
                                 map=map, DLL=mod.out[[h]]$obj$env$DLL)
           } else {
-            MLE <- modifyList(init.par$h1[[h-1]], FE) #
+            #MLE <- modifyList(init.par[[h]], FE) #
             ## Get FE and map them off
-            xx <- names(MLE)[-which(names(MLE) %in% init.random$h1[[h-1]])]
-            map <- lapply(names(FE), function(x) factor(FE[[x]]*NA))
-            names(map) <- names(FE)
+            xx <- names(FE)[-which(names(FE) %in% init.random$h1[[h-1]])]
+            if(mod == "spatial" & "beta" %in% init.random$h1[[h-1]]){
+              ## beta is RE for REML but should be fixed for resid calc
+              FE.names <- c("beta", xx)
+            } else {
+              FE.names <- xx
+            }
+            map <- lapply(FE.names, function(x) factor(FE[[x]]*NA))
+            names(map) <- FE.names
             map <- c(map, init.map$h1[[h-1]])
-            objmle <- MakeADFun(data=init.dat$h1[[h-1]], parameters=MLE,
+            objmle <- MakeADFun(data=init.dat$h1[[h-1]], parameters=FE,
                                 map=map, DLL=mod.out[[h]]$obj$env$DLL)
           }
           
@@ -520,8 +555,12 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
          
     }
   }
-  resids <- rbind(r[[1]], r[[2]])
-  stats <- rbind(out[[1]], out[[2]])
+  resids <- r[[1]]
+  stats <- out[[1]]
+  for(h in 2:(length(misp)+1)){
+    resids <- rbind(resids, r[[h]])
+    stats <- rbind(stats, out[[h]])
+  }
   pvals$replicate <- ii
   ## Tack this on for plotting later
   resids$do.true <- do.true
@@ -812,7 +851,7 @@ mkTMBpar_spatial <- function(Pars, Dat, Mod, Misp, Type, doTrue){
   return(out)
 }
 
-mkTMBrandom <- function(Mod, Misp){
+mkTMBrandom <- function(Mod, Misp, Type, doTrue){
   if(Mod == 'linmod'){
     Random.h0 = NULL
     Random.h1 = NULL
@@ -825,10 +864,15 @@ mkTMBrandom <- function(Mod, Misp){
     }
   }
   if(Mod == 'spatial'){
-    Random.h0 <- 'omega'
+    if(Type == 'LMM' & !doTrue){
+      rand <- c('beta', 'omega')
+    } else {
+      rand <- 'omega'
+    }
+    Random.h0 <- rand
     Random.h1 <- list()
     for(m in 1:length(Misp)){
-      Random.h1[[m]] <- 'omega'
+      Random.h1[[m]] <- rand
     }
   }
   if("missre" %in% Misp){
