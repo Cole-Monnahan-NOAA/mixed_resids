@@ -54,15 +54,17 @@ for(dt in 1:2){
   dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
   osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc','pears')
   run_model(reps, n = 100, mod='randomwalk', 
-            misp = c('missre', 'mu0', 'mispre'), 
+            misp =  c('missre', 'hsk', 'mu0', 'mispre'), 
             type = 'LMM', do.true = do.true)
   osa.methods <- c('gen', 'cdf', 'mcmc','pears')
   run_model(reps, n = 100, mod='randomwalk', 
-            misp =  c('missre', 'mu0', 'mispre'), 
+            misp =  c('missre', 'gamma-normal', 'mu0', 'mispre'), 
             family = "Gamma", link = "log",
             type = 'GLMM', do.true = do.true)
 }
 b <- Sys.time()
+c <- difftime(b, a, units = "mins")
+save(c, file = "results/randomwalk_local_reps-441.RData")
 
 ### simpleGLMM with 5 groups===================================================
 ## possible mispecifications: 'missre', 'nb-pois', 'mispre', 'missunifcov', 'misscovnorm'
@@ -83,13 +85,14 @@ for(dt in 1:2){
             do.true = do.true)
 }
 b <- Sys.time()
+save(c, file = "results/simpleGLMM_local_reps-441.RData")
 
 ### spatial ==================================================================                                                                                    ### Simple spatial SPDE model ==================================================
 ## possible mispecifications: 'missre', 'pois-zip', 'mispre', 'normal-gamma'
 dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 'pears')
 run_model(reps, n = 100, mod ='spatial',
-          misp = c('missre', 'normal-gamma', 'mispre'), 
+          misp = c('missre', 'ln-error', 'mispre'), 
           type = 'LMM', do.true = do.true)
 osa.methods <- c('gen', 'cdf', 'mcmc','pears')
 run_model(reps, n = 100, mod ='spatial',
