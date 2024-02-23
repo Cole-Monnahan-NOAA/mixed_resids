@@ -21,7 +21,7 @@ setup_trueparms <- function(mod, misp, fam, link, type){
 
 setup_linmod <- function(mod, misp, fam, link){
   beta <- c(4,-5)
-  sd.vec <- 1
+  sd.vec <- c(1,1)
   true.comp <- list(beta_1 = beta[1], beta_2 = beta[2],
       ln_sig = log(sd.vec))
   true.parms <- list(beta=beta, sd.vec=sd.vec, 
