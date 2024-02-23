@@ -356,19 +356,27 @@ calc.cat <- function(res.type, group, res.obj, version){
       x <- res.obj[[m]]
     }
     if(res.type == "sim"){
-      x <- res.obj[[m]]$out$scaledResiduals
+      x <- residuals(res.obj[[m]]$out, quantileFunction = qnorm,
+                     outlierValues = c(-7,7))
     }
     if (nms %in% res.names) {
       if(is.numeric(x)){
         ## only test for positive correlation
         idx <- which(is.finite(x))
-        y <- leveneTest(x[idx] ~ factor(group[idx]))$`Pr(>F)`[1]
+        lv.test <- leveneTest(x[idx] ~ factor(group[idx]))$`Pr(>F)`[1]
+        aov.test <- summary(aov(x[idx] ~ factor(group[idx])))[[1]]$`Pr(>F)`[1]
         df <- rbind(df,data.frame(res.type = res.type, 
                                   method = names(res.obj)[m], 
                                   model = 'simpleGLMM', 
-                                  test = 'Cat', 
+                                  test = 'EqVar', 
                                   version = version,
-                                  pvalue = y))
+                                  pvalue = lv.test),
+                    data.frame(res.type = res.type, 
+                               method = names(res.obj)[m], 
+                               model = 'simpleGLMM', 
+                               test = 'AOV', 
+                               version = version,
+                               pvalue = aov.test))
       } 
     }
   }
