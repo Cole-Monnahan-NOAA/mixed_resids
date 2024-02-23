@@ -163,7 +163,6 @@ Type objective_function<Type>::operator()()
         cdf = squeeze( pnbinom(y(i), mu(i), size) );
         nll -= keep.cdf_lower(i) * log( cdf );
         nll -= keep.cdf_upper(i) * log( 1.0 - cdf );
-        //cdf method not possible as no qnbinom in TMB
         SIMULATE { // from glmmTMB: uses rnbinom2(mu, var)
           s1 = mu(i);
           s2 = mu(i) * (Type(1) + mu(i) / exp(theta));
