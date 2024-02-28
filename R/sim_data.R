@@ -265,7 +265,7 @@ simdat.spatial <- function(n, mod, type, trueparms,
     mesh.aniso <- try(
       R.utils::withTimeout( 
         fmesher::fm_mesh_2d(loc.aniso, max.edge = c(sp.parm/3,sp.parm), 
-                            offset = c(sp.parm/10,sp.parm*2), min.angle = 26),
+                            offset = c(sp.parm/10,sp.parm), min.angle = 26),
         timeout = 30, onTimeout = 'silent' ))
   }
   

@@ -128,7 +128,7 @@ setup_simpleGLMM <- function(mod, misp, fam, link, type){
 
 
 setup_spatial<- function(mod, misp, fam, link, type){
-  sp.parm <- 50
+  sp.parm <- 30
   true.comp <- list()
   if(type == "LMM"){
     beta <- 4
