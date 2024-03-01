@@ -142,7 +142,7 @@ setup_spatial<- function(mod, misp, fam, link, type){
 
   if(type == "GLMM"){
     if(fam == "Poisson"){
-      beta <- 0.5
+      beta <- 2
       sd.vec <- c(NA, sqrt(0.25))  
     }
     true.comp[[1]] <- list(beta = beta, 
