@@ -36,8 +36,8 @@ setup_randomwalk <- function(mod, misp, fam, link, type){
     sd.vec <- c(1,1)
   }
   if(type == "GLMM"){
-    drift <- 0.01
-    sd.vec <- c(0.5, 0.05)
+    drift <- 0.02
+    sd.vec <- c(0.5, 0.15)
   }
   
   true.comp[[1]] <- list(mu = drift, 

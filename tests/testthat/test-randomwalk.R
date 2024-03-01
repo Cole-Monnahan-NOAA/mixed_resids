@@ -3,18 +3,18 @@ source('R/startup.R')
 
 simulate_randomwalk <- function(seed, n, type, sd.vec, misp = NULL){
   if(type == "LMM") mu <- 2
-  if(type == "GLMM") mu <- .01
+  if(type == "GLMM") mu <- .02
   sig_y <- sd.vec[1]
   sig_u <- sd.vec[2]
   ## simulate random track
   set.seed(seed)
   u0 <- c(0, cumsum( rnorm(n-1, mu, sig_u) ))
   if(type == "LMM"){
-    set.seed(seed)
+    set.seed(seed*10)
     y0 <- rnorm(n, u0, sd=sig_y)
   }
   if(type == "GLMM"){
-    set.seed(seed)
+    set.seed(seed*10)
     y0 <- rgamma(n, 1/sig_y^2, scale = exp(u0)*sig_y^2)
   }
   
@@ -265,7 +265,7 @@ for(h in 1:4){
 
 
 context("GLMM randomwalk tests")
-testsim <- simulate_randomwalk(123, 100, "GLMM", sd.vec = c(.5,.05),
+testsim <- simulate_randomwalk(123, 100, "GLMM", sd.vec = c(.5,.2),
                                misp = c('missre', 'gamma-normal', 'mu0', 'mispre'))
 rw.par <- setup_trueparms(mod ='randomwalk', 
                           misp = c('missre', 'gamma-normal', 'mu0', 'mispre'), 
@@ -316,7 +316,7 @@ test_that('randomwalk, misp=mu0',{
 })
 max.y <- matrix(-999,1000,4)
 for(i in 1:1000){
-  testsim <- simulate_randomwalk(i,100,"GLMM", sd.vec = c(.5,.05),
+  testsim <- simulate_randomwalk(i,100,"GLMM", sd.vec = c(.5,.15),
                                  misp = c('missre', 'gamma-normal', 'mu0', 'mispre'))
 
   max.y[i,1] <- max(testsim$y1[[1]])
