@@ -32,7 +32,7 @@ setup_linmod <- function(mod, misp, fam, link){
 setup_randomwalk <- function(mod, misp, fam, link, type){
   true.comp <- list()
   if(type == "LMM"){
-    drift <- 2
+    drift <- .75
     sd.vec <- c(1,1)
   }
   if(type == "GLMM"){
