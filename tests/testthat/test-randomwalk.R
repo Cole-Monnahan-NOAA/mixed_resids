@@ -44,7 +44,7 @@ simulate_randomwalk <- function(seed, n, type, sd.vec, misp = NULL){
     
     if(misp[m] == 'hsk'){
       set.seed(seed)
-      y1[[m]] <- rnorm(n, u0, sd=sqrt((1:n/2)^1.3))
+      y1[[m]] <- rnorm(n, u0, sd=sqrt((1:n)^2))
     }
     
     if(misp[m] == 'mu0'){
@@ -113,7 +113,7 @@ for(i in 1:1000){
 }
 test_that('randomwalk, LMM, max y',{
   expect_equal(TRUE, max(max.y[,1]) < 500 )
-  expect_equal(TRUE, max(max.y[,2]) < 500 )
+  expect_equal(TRUE, max(max.y[,2]) < 600 )
   expect_equal(TRUE, max(max.y[,3]) < 500 )
   expect_equal(TRUE, max(max.y[,4]) < 2000 )
 } )
