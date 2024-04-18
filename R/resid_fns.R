@@ -406,18 +406,18 @@ calc.pvals <- function(res.type, method, mod, res.obj, version, fam, doTrue){
             ad <- goftest::ad.test(res.real,'pnorm', estimated = FALSE)$p.value #assume mean=0,sd=1?
           } else {
             ad <- goftest::ad.test(res.real,'pnorm', estimated = TRUE)$p.value
+            lf <- nortest::lillie.test(res.finite)$p.value
+            df <- rbind(df, data.frame(res.type='osa', method=method[m], 
+                                       model=mod, test='GOF.lf', 
+                                       version = version, pvalue = lf))
           }
           ks <- suppressWarnings(ks.test(res.obj[[method[m]]],'pnorm')$p.value)
-          lf <- nortest::lillie.test(res.finite)$p.value
           df <- rbind(df, data.frame(res.type='osa', method=method[m], 
                                      model=mod, test='GOF.ad', 
                                      version = version, pvalue = ad))
           df <- rbind(df, data.frame(res.type='osa', method=method[m], 
                                      model=mod, test='GOF.ks', 
                                      version = version, pvalue = ks))
-          df <- rbind(df, data.frame(res.type='osa', method=method[m], 
-                                     model=mod, test='GOF.lf', 
-                                     version = version, pvalue = lf))
         }
       }
       if(!is.null(fam)){
@@ -441,6 +441,10 @@ calc.pvals <- function(res.type, method, mod, res.obj, version, fam, doTrue){
   
       for(m in 1:length(method)){
         if( all( !is.na(res.obj[[method[m]]]) ) ) {
+          #outlier, disp, GOF.ad, GOF.ks !outlier test not available yet for osa
+          #remove NA values from residual vector
+          res.real <- res.obj[[method[m]]]$out$scaledResiduals[!is.na(res.obj[[method[m]]]$out$scaledResiduals)]
+          res.finite <- res.obj[[method[m]]]$resids[is.finite(res.obj[[method[m]]]$resids)]
   
           #Outlier Tests
           if(!is.null(fam)){
@@ -469,12 +473,16 @@ calc.pvals <- function(res.type, method, mod, res.obj, version, fam, doTrue){
           #GOF tests
           if(doTrue){
             #use squeeze [0,1] -> (0,1) for ad.test
-            ad <- goftest::ad.test(squeeze(res.obj[[method[m]]]$out$scaledResiduals),'punif')$p.value 
+            ad <- goftest::ad.test(res.real,'punif')$p.value 
           } else {
-            ad <- goftest::ad.test(squeeze(res.obj[[method[m]]]$out$scaledResiduals),'punif', estimated = TRUE)$p.value
+            ad <- goftest::ad.test(res.real,'punif', estimated = TRUE)$p.value  
+            lf <- nortest::lillie.test(res.finite)$p.value
+            df <- rbind(df, data.frame(res.type='sim', method=method[m], 
+                                       model=mod, test='GOF.lf', 
+                                       version = version, pvalue = lf))
           }
           ks <- suppressWarnings(ks.test(res.obj[[method[m]]]$out$scaledResiduals,'punif')$p.value)
-          lf <- nortest::lillie.test(res.obj[[method[m]]]$resids)$p.value
+        
   
           df <- rbind(df, data.frame(res.type='sim', method=method[m], 
                                      model=mod, test='GOF.ad', 
@@ -482,9 +490,6 @@ calc.pvals <- function(res.type, method, mod, res.obj, version, fam, doTrue){
           df <- rbind(df, data.frame(res.type='sim', method=method[m], 
                                      model=mod, test='GOF.ks', 
                                      version = version, pvalue = ks))
-          df <- rbind(df, data.frame(res.type='sim', method=method[m], 
-                                     model=mod, test='GOF.lf', 
-                                     version = version, pvalue = lf))
         }
       }
     }
