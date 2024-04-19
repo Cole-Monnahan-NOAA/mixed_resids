@@ -45,6 +45,9 @@ calculate.osa <- function(obj, methods, observation.name,
                      discrete = Discrete,
                      subset = Subset)$residual,
       error=function(e) 'error')
+    if(all(is.na(cdf))){
+      cdf <- NA
+    }
     runtime.cdf <- as.numeric(Sys.time()-t0, 'secs')
     if(is.character(cdf)){# | any(!is.finite(cdf))){
       warning("OSA cdf failed")
@@ -360,7 +363,7 @@ calc.cat <- function(res.type, group, res.obj, version){
                      outlierValues = c(-7,7))
     }
     if (nms %in% res.names) {
-      if(is.numeric(x)){
+      if(is.numeric(x) & sum(!is.na(x)) > .5*length(x)){
         ## only test for positive correlation
         idx <- which(is.finite(x))
         lv.test <- leveneTest(x[idx] ~ factor(group[idx]))$`Pr(>F)`[1]
@@ -400,24 +403,27 @@ calc.pvals <- function(res.type, method, mod, res.obj, version, fam, doTrue){
         if(is.numeric(res.obj[[method[m]]])){
           #outlier, disp, GOF.ad, GOF.ks !outlier test not available yet for osa
           #remove NA values from residual vector
+          n.res <- length(res.obj[[method[m]]])
           res.real <- res.obj[[method[m]]][!is.na(res.obj[[method[m]]])]
           res.finite <- res.obj[[method[m]]][is.finite(res.obj[[method[m]]])]
-          if(doTrue){
-            ad <- goftest::ad.test(res.real,'pnorm', estimated = FALSE)$p.value #assume mean=0,sd=1?
-          } else {
-            ad <- goftest::ad.test(res.real,'pnorm', estimated = TRUE)$p.value
-            lf <- nortest::lillie.test(res.finite)$p.value
+          if(length(res.real) > 0.5*n.res | length(res.finite) > 0.5*n.res){
+            if(doTrue){
+              ad <- goftest::ad.test(res.real,'pnorm', estimated = FALSE)$p.value #assume mean=0,sd=1?
+            } else {
+              ad <- goftest::ad.test(res.real,'pnorm', estimated = TRUE)$p.value
+              lf <- nortest::lillie.test(res.finite)$p.value
+              df <- rbind(df, data.frame(res.type='osa', method=method[m], 
+                                         model=mod, test='GOF.lf', 
+                                         version = version, pvalue = lf))
+            }
+            ks <- suppressWarnings(ks.test(res.obj[[method[m]]],'pnorm')$p.value)
             df <- rbind(df, data.frame(res.type='osa', method=method[m], 
-                                       model=mod, test='GOF.lf', 
-                                       version = version, pvalue = lf))
+                                       model=mod, test='GOF.ad', 
+                                       version = version, pvalue = ad))
+            df <- rbind(df, data.frame(res.type='osa', method=method[m], 
+                                       model=mod, test='GOF.ks', 
+                                       version = version, pvalue = ks))
           }
-          ks <- suppressWarnings(ks.test(res.obj[[method[m]]],'pnorm')$p.value)
-          df <- rbind(df, data.frame(res.type='osa', method=method[m], 
-                                     model=mod, test='GOF.ad', 
-                                     version = version, pvalue = ad))
-          df <- rbind(df, data.frame(res.type='osa', method=method[m], 
-                                     model=mod, test='GOF.ks', 
-                                     version = version, pvalue = ks))
         }
       }
       if(!is.null(fam)){
@@ -443,53 +449,55 @@ calc.pvals <- function(res.type, method, mod, res.obj, version, fam, doTrue){
         if( all( !is.na(res.obj[[method[m]]]) ) ) {
           #outlier, disp, GOF.ad, GOF.ks !outlier test not available yet for osa
           #remove NA values from residual vector
+          n.res <- length(res.obj[[method[m]]]$out$scaledResiduals)
           res.real <- res.obj[[method[m]]]$out$scaledResiduals[!is.na(res.obj[[method[m]]]$out$scaledResiduals)]
           res.finite <- res.obj[[method[m]]]$resids[is.finite(res.obj[[method[m]]]$resids)]
-  
-          #Outlier Tests
-          if(!is.null(fam)){
-            if(fam == 'Poisson'){
-              disp <- testDispersion(res.obj[[method[m]]]$out, alternative = alt, plot=FALSE)$p.value
-  
-              #outlier test type = 'bootstrap' when discrete
-              outlier <- testOutliers(res.obj[[method[m]]]$out, alternative = alt,
-                                      margin = marg, type='bootstrap', plot=FALSE)$p.value
-  
-              df <- rbind(df, data.frame(res.type='sim', method=method[m], model=mod, test='disp',version = version, pvalue = disp))
-              df <- rbind(df, data.frame(res.type='sim', method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
+          if(length(res.real) > 0.5*n.res | length(res.finite) > 0.5*n.res){
+            #Outlier Tests
+            if(!is.null(fam)){
+              if(fam == 'Poisson'){
+                disp <- testDispersion(res.obj[[method[m]]]$out, alternative = alt, plot=FALSE)$p.value
+    
+                #outlier test type = 'bootstrap' when discrete
+                outlier <- testOutliers(res.obj[[method[m]]]$out, alternative = alt,
+                                        margin = marg, type='bootstrap', plot=FALSE)$p.value
+    
+                df <- rbind(df, data.frame(res.type='sim', method=method[m], model=mod, test='disp',version = version, pvalue = disp))
+                df <- rbind(df, data.frame(res.type='sim', method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
+              } else {
+                #outlier test type = 'binomial' only appropriate for continuous distributions
+                outlier <- testOutliers(res.obj[[method[m]]]$out, alternative = alt,
+                                        margin = marg, type='binomial', plot=FALSE)$p.value
+                df <- rbind(df, data.frame(res.type='sim', method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
+              }
             } else {
               #outlier test type = 'binomial' only appropriate for continuous distributions
               outlier <- testOutliers(res.obj[[method[m]]]$out, alternative = alt,
                                       margin = marg, type='binomial', plot=FALSE)$p.value
-              df <- rbind(df, data.frame(res.type='sim', method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
+              df <- rbind(df,  data.frame(res.type='sim',method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
             }
-          } else {
-            #outlier test type = 'binomial' only appropriate for continuous distributions
-            outlier <- testOutliers(res.obj[[method[m]]]$out, alternative = alt,
-                                    margin = marg, type='binomial', plot=FALSE)$p.value
-            df <- rbind(df,  data.frame(res.type='sim',method=method[m], model=mod, test='outlier',version = version, pvalue = outlier))
-          }
+            
+            #GOF tests
+            if(doTrue){
+              #use squeeze [0,1] -> (0,1) for ad.test
+              ad <- goftest::ad.test(res.real,'punif')$p.value 
+            } else {
+              ad <- goftest::ad.test(res.real,'punif', estimated = TRUE)$p.value  
+              lf <- nortest::lillie.test(res.finite)$p.value
+              df <- rbind(df, data.frame(res.type='sim', method=method[m], 
+                                         model=mod, test='GOF.lf', 
+                                         version = version, pvalue = lf))
+            }
+            ks <- suppressWarnings(ks.test(res.obj[[method[m]]]$out$scaledResiduals,'punif')$p.value)
           
-          #GOF tests
-          if(doTrue){
-            #use squeeze [0,1] -> (0,1) for ad.test
-            ad <- goftest::ad.test(res.real,'punif')$p.value 
-          } else {
-            ad <- goftest::ad.test(res.real,'punif', estimated = TRUE)$p.value  
-            lf <- nortest::lillie.test(res.finite)$p.value
+    
             df <- rbind(df, data.frame(res.type='sim', method=method[m], 
-                                       model=mod, test='GOF.lf', 
-                                       version = version, pvalue = lf))
+                                       model=mod, test='GOF.ad', 
+                                       version = version, pvalue = ad))
+            df <- rbind(df, data.frame(res.type='sim', method=method[m], 
+                                       model=mod, test='GOF.ks', 
+                                       version = version, pvalue = ks))
           }
-          ks <- suppressWarnings(ks.test(res.obj[[method[m]]]$out$scaledResiduals,'punif')$p.value)
-        
-  
-          df <- rbind(df, data.frame(res.type='sim', method=method[m], 
-                                     model=mod, test='GOF.ad', 
-                                     version = version, pvalue = ad))
-          df <- rbind(df, data.frame(res.type='sim', method=method[m], 
-                                     model=mod, test='GOF.ks', 
-                                     version = version, pvalue = ks))
         }
       }
     }
