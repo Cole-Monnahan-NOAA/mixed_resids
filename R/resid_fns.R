@@ -84,6 +84,7 @@ calculate.osa <- function(obj, methods, observation.name,
       pears <- (obj$env$data$y - report$exp_val)/sig
     }
   }
+  if(sum(pears) == 0){pears <- NA}
   return(list(gen=gen, fg=fg, osg=osg, cdf=cdf, 
               pears = pears, pears.df = pears.df,
               runtime.gen=runtime.gen, runtime.fg=runtime.fg,
