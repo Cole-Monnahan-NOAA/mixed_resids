@@ -75,10 +75,8 @@ calculate.osa <- function(obj, methods, observation.name,
   pears.df <- length(obj$env$data$y) - length(obj$par)
   if('pears' %in% methods){
     report <- obj$report()
-    if(Discrete == TRUE){
-      if(obj$env$data$family == 200){#Poisson model
-        pears <- (obj$env$data$y - report$exp_val)/sqrt(report$exp_val)
-      }
+    if(obj$env$data$family == 200){#Poisson model
+      pears <- (obj$env$data$y - report$exp_val)/sqrt(report$exp_val)
     } else {
       sig <- if(is.null(report$sig)) report$sig_y else report$sig
       pears <- (obj$env$data$y - report$exp_val)/sig
