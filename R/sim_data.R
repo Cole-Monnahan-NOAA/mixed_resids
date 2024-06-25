@@ -40,7 +40,7 @@ simdat <- function(n, ng=0, mod, cov.mod = NULL, type = NULL,
                    'normal-gamma', 'ln-error'))){
     stop('incorrect mis-specification name')
   } }
-  if(!(mod %in% c('linmod', 'randomwalk', 'simpleGLMM', 'spatial'))) stop('incorrect model name')
+  if(!(mod %in% c('linmod', 'pois_glm', 'randomwalk', 'simpleGLMM', 'spatial'))) stop('incorrect model name')
   
   #Simulate Covariate
   if(!is.null(cov.mod)){
@@ -54,6 +54,10 @@ simdat <- function(n, ng=0, mod, cov.mod = NULL, type = NULL,
   if(mod == 'linmod'){
     dat.out <- simdat.linmod(n, mod, cov.mod, type,
                    trueparms, misp, seed, X)
+  }
+  if(mod == 'pois_glm'){
+    dat.out <- simdat.glm(n, mod, cov.mod, type,
+                             trueparms, misp, seed)
   }
   if(mod == 'randomwalk'){
     dat.out <- simdat.randomwalk(n, mod, cov.mod, type,
@@ -87,7 +91,19 @@ simdat.linmod <- function(n, mod, cov.mod, type=NULL,
 
     dat.out <- list(y0 = y0, y1 = y1, x = X)
     return(dat.out)
-  }
+}
+
+simdat.glm <- function(n, mod, cov.mod, type = NULL,
+                       trueparms, misp, seed){
+  if(misp != 'pois-zip') stop("Misspecification not available for linmod")
+  list2env(trueparms, envir = environment(simdat.glm))
+  set.seed(seed)
+  y0 <- rpois(n, exp(beta))
+  set.seed(seed)
+  y1 <- rbinom(n, 1, 0.7)*y0
+  dat.out <- list(y0 = y0, y1 = y1)
+  return(dat.out)
+}
 
 simdat.randomwalk <- function(n, mod, cov.mod, type, 
   trueparms, misp, seed){

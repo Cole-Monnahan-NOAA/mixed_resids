@@ -42,6 +42,14 @@ dharma.methods <- c('uncond_nrot', 'cond_nrot')
 run_model(reps, mod='linmod', misp='overdispersion', cov.mod = 'norm',
           type = 'LMM', do.true = do.true)
 
+### GLM
+### =======================================================================
+### Simple generalized linear model as a sanity check. Some resid methods not 
+### applicable b/c no random effects
+osa.methods <- c('gen', 'cdf', 'pears')
+dharma.methods <- c('uncond_nrot', 'cond_nrot')
+run_model(reps, mod='glm', misp='pois-zip', type = 'GLMM', do.true = do.true,
+          family = "Poisson", link = "log")
 
 
 ### Random walk from the paper =================================================

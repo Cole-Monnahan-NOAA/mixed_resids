@@ -4,6 +4,10 @@ setup_trueparms <- function(mod, misp, fam, link, type){
   if(mod == 'linmod'){
     true.pars <- setup_linmod(mod, misp, fam, link)
   }
+  
+  if(mod == 'pois_glm'){
+    true.pars <- setup_glm(mod, misp, fam, link)
+  }
 
   if(mod == 'randomwalk'){
     true.pars <- setup_randomwalk(mod, misp, fam, link, type)
@@ -26,6 +30,14 @@ setup_linmod <- function(mod, misp, fam, link){
       ln_sig = log(sd.vec))
   true.parms <- list(beta=beta, sd.vec=sd.vec, 
     fam=fam, link=link, true.comp=true.comp)
+  return(true.parms)
+}
+
+setup_glm <- function(mod, misp, fam, link){
+  beta <- log(0.5)
+  true.comp <- list(beta_1 = beta)
+  true.parms <- list(beta=beta, fam=fam, 
+                     link=link, true.comp=true.comp)
   return(true.parms)
 }
 
@@ -182,7 +194,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
   }
   res.name <- paste0('results/', mod.name, '_', type)
 
-  if(mod == 'linmod'){
+  if(mod == 'linmod' | mod == 'pois_glm'){
     Random <- FALSE
   } else {
     Random <- TRUE
@@ -252,7 +264,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
       }
     }
 
-    if(h == 1 | mod == "linmod"){
+    if(h == 1 | mod == "linmod" | mod == "pois_glm"){
       init.obj <- list(data = init.dat[[h]], parameters = init.par[[h]], 
                       map = init.map[[h]], random = init.random[[h]], DLL = mod)
       if(is.null(init.random[[h]])) Random <- FALSE
@@ -674,6 +686,12 @@ mkTMBdat <- function(Dat, Pars, Mod, Misp, Type, doTrue){
     dat0 <- list(y = Dat$y0, X = as.matrix(Dat$x))
     dat1 <- list(y = Dat$y1, X = as.matrix(Dat$x))
   }
+  
+  if(Mod == 'pois_glm'){
+    dat0 <- list(y = Dat$y0)
+    dat1 <- list(y = Dat$y1)
+  }
+  
   if(Mod == 'randomwalk'){
     dat0 <- list(y = Dat$y0, mod = 0, sim_re = 0, doTrue = 0) #default: type = LMM
     if(Type == "GLMM"){
@@ -756,6 +774,9 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, Type, doTrue){
   if(Mod == 'linmod'){
     out <- mkTMBpar_linmod(Pars, Dat, Mod, Misp, Type, doTrue)
   }
+  if(Mod == 'pois_glm'){
+    out <- mkTMBpar_glm(Pars, Dat, Mod, Misp, Type, doTrue)
+  }
   if(Mod == 'randomwalk'){
     out <- mkTMBpar_randomwalk(Pars, Dat, Mod, Misp, Type, doTrue)
   }
@@ -779,6 +800,18 @@ mkTMBpar_linmod <- function(Pars, Dat, Mod, Misp, Type, doTrue){
   if(Misp == 'misscov'){
     par1$beta <- par1$beta[1]
   }
+  
+  out = list(h0 = par0, h1 = par1)
+  return(out)
+}
+
+mkTMBpar_glm <- function(Pars, Dat, Mod, Misp, Type, doTrue){
+  if(doTrue){
+    par0 <-  list(beta = Pars$beta)
+  } else {
+    par0 <- list(beta = 0)
+  }
+  par1 <- par0
   
   out = list(h0 = par0, h1 = par1)
   return(out)
@@ -887,6 +920,10 @@ mkTMBpar_spatial <- function(Pars, Dat, Mod, Misp, Type, doTrue){
 
 mkTMBrandom <- function(Mod, Misp, Type, doTrue){
   if(Mod == 'linmod'){
+    Random.h0 = NULL
+    Random.h1 = NULL
+  }
+  if(Mod == 'pois_glm'){
     Random.h0 = NULL
     Random.h1 = NULL
   }
