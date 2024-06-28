@@ -158,30 +158,37 @@ GMRFmarginal <- function(Q, i, ...) {
 extract_runtime <- function(stats){
   select(stats, model, misp, replicate, version, starts_with('runtime'))
 }
-process_results <- function(mles, runtimes, pvals, model, misp, vary = NULL){
-  if(!is.null(mles))
-    mles <- bind_rows(mles) %>% filter(h==0) #filter(version=='h0')
+process_results <- function(mles, runtimes, pvals, type, 
+                            model, misp, vary = NULL){
+  if(!is.null(mles)){
+    mles <- bind_rows(mles) %>% filter(h==0)} #filter(version=='h0')
   runtimes <- bind_rows(runtimes) %>% filter(version=='h0') %>%
-    pivot_longer(starts_with('runtime'), names_to='type',
+    pivot_longer(starts_with('runtime'), names_to='method',
                  values_to='runtime') %>%
-    mutate(type=gsub('runtime.|runtime_', '', type)) %>%
-    group_by(nobs, model, version, type) %>%
+    mutate(type=gsub('runtime.|runtime_', '', method)) %>%
+    group_by(nobs, model, version, method) %>%
     summarize(med=median(runtime, na.rm=TRUE),
               lwr=quantile(runtime, .25, na.rm=TRUE),
               upr=quantile(runtime, .75, na.rm=TRUE),
               pct.na=sum(is.na(runtime)),
               n=length(runtime), .groups='drop')
-  if(!is.null(pvals))
-    pvals <- bind_rows(pvals) %>%
-      filter(#version=='h0' &
-               grepl('GOF', test)) %>%
-      mutate(type=gsub('GOF.','',test))
-  results <- list(mles=mles, pvals=pvals, runtimes=runtimes, model=model, misp = misp)
+  if(!is.null(pvals)){
+    if(length(pvals)!=0){
+      pvals <- bind_rows(pvals) %>%
+        filter(#version=='h0' &
+          grepl('GOF', test)) %>%
+        mutate(type=gsub('GOF.','',test))
+    }
+  }
+  results <- list(mles=mles, pvals=pvals, runtimes=runtimes, 
+                  model=model, misp = misp)
 
   if(model == 'simpleGLMM'){
-    filename <- paste0('results/',model,'_', misp,'_', vary, '_sample_sizes.RDS')
+    filename <- paste0('results/',model,'_', misp,'_', type, '_',
+                       vary, '_sample_sizes.RDS')
   } else {
-    filename <- paste0('results/',model,'_', misp, '_sample_sizes.RDS')
+    filename <- paste0('results/',model,'_', misp, '_', type,
+                       '_sample_sizes.RDS')
   }
   saveRDS(results, file = filename)
   return(results$runtimes)

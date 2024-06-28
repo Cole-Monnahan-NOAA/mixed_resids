@@ -5,7 +5,7 @@ source("R/startup.R")
 
 cpus <- parallel::detectCores()-1
 
-Nreps <- 100
+Nreps <- 2#100
 do.true <- FALSE
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc')
 dharma.methods <- c('uncond', 'cond',
@@ -18,17 +18,40 @@ for(nobs in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
   tmp <- sfLapply(1:Nreps, function(ii)
-    run_iter(ii, n=nobs, mod='randomwalk', cov.mod='norm',
-             misp='mu0', family = "Gaussian", link = "identity",
+    run_iter(ii, n=nobs, mod='randomwalk', type = "LMM",
+             misp='hsk', family = "Gaussian", link = "identity",
              do.true=do.true, savefiles=FALSE))
   pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nobs))
   mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nobs))
   runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'stats', nobs))
   k <- k+1
-  results.randomwalk <- process_results(mles, runtimes, pvals,
-                                        model='randomwalk', misp = "mu0")
+  results.randomwalk.lmm <- process_results(mles, runtimes, pvals, type = "LMM",
+                                        model='randomwalk', misp = "hsk")
   sfStop()
 }
+osa.methods <- c('gen', 'cdf', 'mcmc')
+runtimes <- mles <- pvals <- list(); k <- 1
+(nobsvec <- 2^c(5:11))
+for(nobs in nobsvec){
+  sfInit( parallel=cpus>1, cpus=cpus )
+  sfExportAll()
+  tmp <- sfLapply(1:Nreps, function(ii)
+    run_iter(ii, n=nobs, mod='randomwalk', type = "GLMM",
+             misp='mispre', family = "Gamma", link = "log",
+             do.true=do.true, savefiles=FALSE))
+  if(!is.null(tmp$pvals[[k]])){
+    pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nobs))
+  } else {
+    pvals[[k]] <- NULL
+  }
+  mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nobs))
+  runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'stats', nobs))
+  k <- k+1
+  results.randomwalk.glmm <- process_results(mles, runtimes, pvals, type = "GLMM",
+                                            model='randomwalk', misp = "mispre")
+  sfStop()
+}
+
 ## plot_sample_sizes(results.randomwalk)
 
 ###simpleGLMM
@@ -36,65 +59,84 @@ for(nobs in nobsvec){
 ## group. Just increasing ngroups and leaving nobs the same (10), but
 ## from the residual standpoint I think it's ngroups*nobs that
 ## matters
+osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc')
 runtimes <- mles <- pvals <- list(); k <- 1
-# fixing group size or fixing obs produce the same results, just need to run one
-# (ngroupsvec <- 2^c(5:11))
-# nobs <- 8
-# for(nxng in ngroupsvec){
-#   sfInit( parallel=cpus>1, cpus=cpus )
-#   sfExportAll()
-#   tmp <- sfLapply(1:Nreps, function(ii)
-#     run_iter(ii, n=nobs, ng=nxng/nobs, mod='simpleGLMM', cov.mod='norm',
-#              misp='missunifcov', family = "Gaussian", link = "identity",
-#              do.true=do.true, savefiles=FALSE))
-#   pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nxng))
-#   mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nxng))
-#   runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'stats', nxng))
-#   k <- k+1
-#   results.simpleGLMM <- process_results(mles, runtimes, pvals,
-#                                         model='simpleGLMM', misp='missunifcov',
-#                                         vary = "grps")
-#   sfStop()
-# }
-
-(nobsvec <- 2^c(5:11))
+(nobsvec <- c(32,64))#2^c(5:11))
 ngroups <- 4
 for(nxng in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
   tmp <- sfLapply(1:Nreps, function(ii)
-    run_iter(ii, n=nxng/ngroups, ng=ngroups, mod='simpleGLMM', cov.mod='norm',
+    run_iter(ii, n=nxng/ngroups, ng=ngroups, mod='simpleGLMM', cov.mod='unif',
              misp='missunifcov', family = "Gaussian", link = "identity",
-             do.true=do.true, savefiles=FALSE))
+             type = "LMM", do.true=do.true, savefiles=FALSE))
   pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nxng))
   mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nxng))
   runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'stats', nxng))
   k <- k+1
-  results.simpleGLMM <- process_results(mles, runtimes, pvals,
+  results.simpleGLMM.lmm <- process_results(mles, runtimes, pvals, type = "LMM",
                                         model='simpleGLMM', misp='missunifcov',
                                         vary = "obs")
   sfStop()
 }
+
+osa.methods <- c('gen', 'cdf', 'mcmc')
+runtimes <- mles <- pvals <- list(); k <- 1
+for(nxng in nobsvec){
+  sfInit( parallel=cpus>1, cpus=cpus )
+  sfExportAll()
+  tmp <- sfLapply(1:Nreps, function(ii)
+    run_iter(ii, n=nxng/ngroups, ng=ngroups, mod='simpleGLMM', cov.mod=NULL,
+             misp='mispre', family = "NB", link = "log",
+             type = "GLMM", do.true=do.true, savefiles=FALSE))
+  pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nxng))
+  mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nxng))
+  runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'stats', nxng))
+  k <- k+1
+  results.simpleGLMM.glmm <- process_results(mles, runtimes, pvals, type  = "GLMM",
+                                            model='simpleGLMM', misp='mispre',
+                                            vary = "obs")
+  sfStop()
+}
+
 ##plot_sample_sizes(results.simpleGLMM)
 
 ### Spatial
+osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc')
 runtimes <- mles <- pvals <- list(); k <- 1
 (nobsvec <- 2^c(5:11))
 for(nobs in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
   tmp <- sfLapply(1:Nreps, function(ii)
-    run_iter(ii, n=nobs, ng = 0, mod='spatial', cov.mod='norm',
-             misp='mispomega', family = "Gaussian", link = "identity",
-             do.true=do.true, savefiles=FALSE))
+    run_iter(ii, n=nobs, ng = 0, mod='spatial', cov.mod=NULL,
+             misp='mispre', family = "Gaussian", link = "identity",
+             type = "LMM", do.true=do.true, savefiles=FALSE))
   pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nobs))
   mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nobs))
   runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'stats', nobs))
   k <- k+1
-  results.spatial <- process_results(mles, runtimes, pvals,
-                                     model='spatial',  misp='mispomega')
+  results.spatial.lmm <- process_results(mles, runtimes, pvals, type = "LMM",
+                                     model='spatial',  misp='mispre')
   sfStop()
 }
+
+for(nobs in nobsvec){
+  sfInit( parallel=cpus>1, cpus=cpus )
+  sfExportAll()
+  tmp <- sfLapply(1:Nreps, function(ii)
+    run_iter(ii, n=nobs, ng = 0, mod='spatial', cov.mod=NULL,
+             misp='pois-zip', family = "Poisson", link = "log",
+             type = "GLMM", do.true=do.true, savefiles=FALSE))
+  pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nobs))
+  mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nobs))
+  runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'stats', nobs))
+  k <- k+1
+  results.spatial.glmm <- process_results(mles, runtimes, pvals, type = "GLMM",
+                                         model='spatial',  misp='pois-zip')
+  sfStop()
+}
+
 plot_sample_sizes(results.spatial)
 
 ## bunch of machinery here to look at more than runtimes which is
