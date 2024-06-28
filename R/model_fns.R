@@ -28,6 +28,7 @@ setup_linmod <- function(mod, misp, fam, link){
   sd.vec <- c(1,1)
   true.comp <- list(beta_1 = beta[1], beta_2 = beta[2],
       ln_sig = log(sd.vec))
+  true.comp[[2]] = true.comp[[1]]
   true.parms <- list(beta=beta, sd.vec=sd.vec, 
     fam=fam, link=link, true.comp=true.comp)
   return(true.parms)
@@ -36,6 +37,7 @@ setup_linmod <- function(mod, misp, fam, link){
 setup_glm <- function(mod, misp, fam, link){
   beta <- log(0.5)
   true.comp <- list(beta_1 = beta)
+  true.comp[[2]] = true.comp[[1]]
   true.parms <- list(beta=beta, fam=fam, 
                      link=link, true.comp=true.comp)
   return(true.parms)
@@ -353,11 +355,11 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
         
       if(mod == 'randomwalk' | mod == 'spatial' | mod == 'simpleGLMM') rot <- "estimated"
       if(convergestatus == 0){
-        osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, methods=osa.methods, 
+        osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, mod.fam, methods=osa.methods, 
                                       observation.name='y', Discrete = disc, 
                                       Range = ran)
       } else {
-        osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, methods=NULL, 
+        osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, mod.fam, methods=NULL, 
                                       observation.name='y', Discrete = disc, 
                                       Range = ran)
       }
@@ -373,7 +375,11 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
       if(h == 1 | mod == "linmod"){
         init.obs <- sim.dat[[h]]
       } else {
-        init.obs <- sim.dat$y1[[h-1]]
+        if(h != 1 & mod == "pois_glm"){
+          init.obs <- sim.dat$y1
+        } else {
+          init.obs <- sim.dat$y1[[h-1]]
+        }
       }
       dharma.out[[h]] <- list()
       if('cond' %in% dharma.methods & convergestatus == 0){
@@ -479,6 +485,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
         if(misp.name == "missre"){ 
           tmp <- mod.out[[h]]$report
         }
+        
         # Calculate quantile residual
         if(h == 1){
           osa.out[[h]]$mcmc <- calc.quantile(mod.fam, tmp, init.dat[[h]]$y)
@@ -607,10 +614,12 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
     resids <- rbind(resids, r[[h]])
     stats <- rbind(stats, out[[h]])
   }
-  pvals$replicate <- ii
+  if(nrow(pvals)>0){
+    pvals$replicate <- ii
+    pvals$do.true <- do.true
+  }
   ## Tack this on for plotting later
   resids$do.true <- do.true
-  pvals$do.true <- do.true
   stats$do.true <- do.true
   mles <- do.call(rbind, mles)
   if(savefiles){

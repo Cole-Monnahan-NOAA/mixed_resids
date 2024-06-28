@@ -1,4 +1,4 @@
-calculate.osa <- function(obj, methods, observation.name,
+calculate.osa <- function(obj, mod.fam, methods, observation.name,
                           data.term.indicator='keep',
                           Range = c(-Inf,Inf), Discrete = NULL,
                           Subset = NULL){
@@ -75,7 +75,7 @@ calculate.osa <- function(obj, methods, observation.name,
   pears.df <- length(obj$env$data$y) - length(obj$par)
   if('pears' %in% methods){
     report <- obj$report()
-    if(obj$env$data$family == 200){#Poisson model
+    if(mod.fam == "Poisson"){#Poisson model
       pears <- (obj$env$data$y - report$exp_val)/sqrt(report$exp_val)
     } else {
       sig <- if(is.null(report$sig)) report$sig_y else report$sig
@@ -410,10 +410,12 @@ calc.pvals <- function(res.type, method, mod, res.obj, version, fam, doTrue){
               ad <- goftest::ad.test(res.real,'pnorm', estimated = FALSE)$p.value #assume mean=0,sd=1?
             } else {
               ad <- goftest::ad.test(res.real,'pnorm', estimated = TRUE)$p.value
-              lf <- nortest::lillie.test(res.finite)$p.value
-              df <- rbind(df, data.frame(res.type='osa', method=method[m], 
+              lf <- try(nortest::lillie.test(res.finite)$p.value)
+              if(class(lf) != "try-error"){
+                df <- rbind(df, data.frame(res.type='osa', method=method[m], 
                                          model=mod, test='GOF.lf', 
                                          version = version, pvalue = lf))
+              }
             }
             ks <- suppressWarnings(ks.test(res.obj[[method[m]]],'pnorm')$p.value)
             df <- rbind(df, data.frame(res.type='osa', method=method[m], 
@@ -482,10 +484,12 @@ calc.pvals <- function(res.type, method, mod, res.obj, version, fam, doTrue){
               ad <- goftest::ad.test(res.real,'punif')$p.value 
             } else {
               ad <- goftest::ad.test(res.real,'punif', estimated = TRUE)$p.value  
-              lf <- nortest::lillie.test(res.finite)$p.value
-              df <- rbind(df, data.frame(res.type='sim', method=method[m], 
-                                         model=mod, test='GOF.lf', 
-                                         version = version, pvalue = lf))
+              lf <- try(nortest::lillie.test(res.finite)$p.value)
+              if(class(lf) != "try-error"){
+                df <- rbind(df, data.frame(res.type='sim', method=method[m], 
+                                           model=mod, test='GOF.lf', 
+                                           version = version, pvalue = lf))
+              }
             }
             ks <- suppressWarnings(ks.test(res.obj[[method[m]]]$out$scaledResiduals,'punif')$p.value)
           
