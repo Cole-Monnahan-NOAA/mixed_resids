@@ -211,11 +211,22 @@ plot_sample_sizes <- function(results){
 }
 get.value <- function(x, val, nobs){
   if(is.null(x)) return(NULL)
-  if(val!='runtimes')
-    data.frame(nobs=nobs, x[[val]])
-  else
-    data.frame(nobs=nobs, extract_runtime(x[['stats']]))
+  new.df <- x[[val]]
+  if(nrow(new.df) > 0){
+    if(val!='runtimes') {
+      return(data.frame(nobs=nobs, new.df))
+    } else {
+      return(data.frame(nobs=nobs, extract_runtime(x[['stats']])))
+    }
+  }
 }
+# get.value <- function(x, val, nobs){
+#   if(is.null(x)) return(NULL)
+#   if(val!='runtimes')
+#     data.frame(nobs=nobs, x[[val]])
+#   else
+#     data.frame(nobs=nobs, extract_runtime(x[['stats']]))
+# }
 
 get.bad.reps <- function(df, Mod, Misp, doTrue){
   reps <- dplyr::filter(df, model == Mod & misp == Misp &

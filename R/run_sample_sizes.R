@@ -5,7 +5,7 @@ source("R/startup.R")
 
 cpus <- parallel::detectCores()-1
 
-Nreps <- 2#100
+Nreps <- 100
 do.true <- FALSE
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc')
 dharma.methods <- c('uncond', 'cond',
