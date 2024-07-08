@@ -286,27 +286,28 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
     )
     
     
-    maxgrad <- ifelse(do.true, NA, 
-                      max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) 
-    ) #!doesn't work if doTrue == TRUE
-    convergestatus <- ifelse(do.true, 0, 
-                             mod.out[[h]]$opt$convergence)
-    convergehessian <- ifelse(do.true, NA, 
-                              mod.out[[h]]$sdr$pdHess)
-    
-    
-    #in spatial model, remove beta from random list
-    if(h == 1){
-      if(mod == "spatial" & "beta"  %in% init.random[[h]] & h == 1){
-        mod.out[[h]]$obj$env$random <- mod.out[[1]]$obj$env$random[-1]
-      }
-    } else {
-      if(mod == "spatial" & "beta"  %in% init.random$h1[[h-1]] & h == 1){
-        mod.out[[h]]$obj$env$random <- mod.out[[1]]$obj$env$random[-1]
-      }
-    }
-    
+   
     if(class(mod.out[[h]])!='try-error'){
+      maxgrad <- ifelse(do.true, NA, 
+                        max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) 
+      ) #!doesn't work if doTrue == TRUE
+      convergestatus <- ifelse(do.true, 0, 
+                               mod.out[[h]]$opt$convergence)
+      convergehessian <- ifelse(do.true, NA, 
+                                mod.out[[h]]$sdr$pdHess)
+      
+      
+      #in spatial model, remove beta from random list
+      if(h == 1){
+        if(mod == "spatial" & "beta"  %in% init.random[[h]] & h == 1){
+          mod.out[[h]]$obj$env$random <- mod.out[[1]]$obj$env$random[-1]
+        }
+      } else {
+        if(mod == "spatial" & "beta"  %in% init.random$h1[[h-1]] & h == 1){
+          mod.out[[h]]$obj$env$random <- mod.out[[1]]$obj$env$random[-1]
+        }
+      }
+      
       if(!do.true){
         ## if estimating, return MLE values
         tmp1 <- true.parms$true.comp[[h]]
@@ -608,12 +609,8 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
          
     }
   }
-  resids <- r[[1]]
-  stats <- out[[1]]
-  for(h in 2:(length(misp)+1)){
-    resids <- rbind(resids, r[[h]])
-    stats <- rbind(stats, out[[h]])
-  }
+  resids <- dplyr::bind_rows(r)
+  stats <- dplyr::bind_rows(out)
   if(nrow(pvals)>0){
     pvals$replicate <- ii
     pvals$do.true <- do.true
