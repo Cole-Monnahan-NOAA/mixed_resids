@@ -31,7 +31,7 @@ for(nobs in nobsvec){
 }
 osa.methods <- c('gen', 'cdf', 'mcmc')
 runtimes <- mles <- pvals <- list(); k <- 1
-(nobsvec <- 2^c(5:11))
+(nobsvec <- 2^c(5:10))
 for(nobs in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
@@ -39,11 +39,11 @@ for(nobs in nobsvec){
     run_iter(ii, n=nobs, mod='randomwalk', type = "GLMM",
              misp='mispre', family = "Gamma", link = "log",
              do.true=do.true, savefiles=FALSE))
-  if(!is.null(tmp$pvals[[k]])){
+#  if(!is.null(tmp$pvals[[k]])){
     pvals[[k]] <- lapply(tmp, function(x) get.value(x, 'pvals', nobs))
-  } else {
-    pvals[[k]] <- NULL
-  }
+  # } else {
+  #   pvals[[k]] <- NULL
+  # }
   mles[[k]] <- lapply(tmp, function(x)  get.value(x, 'mles', nobs))
   runtimes[[k]] <- lapply(tmp, function(x)  get.value(x, 'stats', nobs))
   k <- k+1
@@ -281,3 +281,8 @@ plot_sample_sizes(results.spatial)
 #   geom_line()  +
 #   facet_wrap(~method) +
 #   theme_classic()
+
+for(i in seq_along(5:11)){
+  foo = results.randomwalk$pvals %>% dplyr::filter(nobs == 2^i) %>% dplyr::select(., replicate) %>% unique() %>% nrow()
+  print(foo)
+}
