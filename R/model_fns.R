@@ -229,7 +229,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
   init.par <- mkTMBpar(true.parms, sim.dat, mod, misp, type, do.true)
   init.random <- mkTMBrandom(mod, misp, type, do.true)
   init.map <- mkTMBmap(init.par, mod, misp, type, do.true)
-  mod.out <- osa.out <- dharma.out <- list()
+  mod.out <- osa.out <- dharma.out <-  list()
   pvals <- data.frame(id = character(), type = character(), misp = character(),
                       res.type = character(), method = character(),
                       model = character(), test = character(), 
@@ -291,8 +291,11 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
       maxgrad <- ifelse(do.true, NA, 
                         max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) 
       ) #!doesn't work if doTrue == TRUE
-      convergestatus <- ifelse(do.true, 0, 
-                               mod.out[[h]]$opt$convergence)
+      convergestatus <- 0
+      if(h == 1){
+        convergestatus <- ifelse(do.true, 0, 
+                                 mod.out[[h]]$opt$convergence)
+      }
       convergehessian <- ifelse(do.true, NA, 
                                 mod.out[[h]]$sdr$pdHess)
       
@@ -433,6 +436,31 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
         dharma.out[[h]]$uncond$resids <- NA
         dharma.out[[h]]$uncond$runtime <- NA
       }
+      
+      if('process' %in% dharma.methods & convergestatus == 0 & misp.name != "missre"){
+        if(mod == "spatial"){
+          expr <- expression(obj$simulate()$omega)
+          init.re <- mod.out[[h]]$obj$env$parList()$omega
+        } else {
+          expr <- expression(obj$simulate()$u)
+          init.re <- mod.out[[h]]$obj$env$parList()$u
+        }
+        if(mod == "spatial"){
+          idx. <- sim.dat$mesh$idx$loc
+        } else {
+          idx. <- 1:n_
+        }
+        dharma.out[[h]]$process <- 
+          calculate.dharma(mod.out[[h]]$obj, expr, obs = init.re, 
+                           idx = idx., fpr=rep(0,length(idx.)), 
+                           int.resp = FALSE, rot = "estimated")
+      } else {
+        dharma.out[[h]]$process <- list()
+        dharma.out[[h]]$process$resids <- NA
+        dharma.out[[h]]$process$runtime <- NA
+      }
+      
+      
        
       ## only makes sense to run when MLE is estimated and there
       ## are RE - turning on when do.true == TRUE (AMH, 6/3/2022)
@@ -481,10 +509,18 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
           postmle <- postmle[-length(postmle)] # drop lp__ value
           ## Calculate residuals given the sample
           tmp <- objmle$report(postmle)
+         
+          osa.out[[h]]$process <- calculate.process(mod, postmle, 
+                                                    mod.out[[h]]$obj$env$parList(), 
+                                                    tmp,
+                                                    idx.)
+          
         }
+        
         #if no random effect in model mispecification, return the quantile residual
         if(misp.name == "missre"){ 
           tmp <- mod.out[[h]]$report
+          osa.out[[h]]$process <- NA
         }
         
         # Calculate quantile residual
@@ -497,6 +533,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
       
       } else {
         osa.out[[h]]$mcmc <- osa.out[[h]]$runtime.mcmc <- NA
+        osa.out[[h]]$process <- NA
       }
  
       AIC <- ifelse(do.true, NA, mod.out[[h]]$aic$AIC) #!doesn't work if doTrue == TRUE
@@ -512,17 +549,21 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
                            osa.fg=osa.out[[h]]$fg, 
                            osa.osg=osa.out[[h]]$osg,
                            osa.mcmc=osa.out[[h]]$mcmc, 
+                           osa.proc=osa.out[[h]]$process,
                            pears=osa.out[[h]]$pears,
                            sim_cond_rot= dharma.out[[h]]$cond$resids,
                            sim_uncond_rot=dharma.out[[h]]$uncond$resids,
                            sim_cond_nrot= dharma.out[[h]]$cond_nrot$resids,
-                           sim_uncond_nrot=dharma.out[[h]]$uncond_nrot$resids) 
+                           sim_uncond_nrot=dharma.out[[h]]$uncond_nrot$resids,
+                           sim_proc = dharma.out[[h]]$process$resids) 
+      
      
       out[[h]] <- data.frame(id=id, model=mod, type = type, misp = misp.name, 
                              version = paste0("h", h-1), 
                              replicate = ii, 
                              converge.maxgrad = maxgrad, 
-                             converge.status = convergestatus,
+                             converge.status = ifelse(do.true, 0, 
+                                                      mod.out[[h]]$opt$convergence),
                              converge.hessian = convergehessian,
                              AIC = AIC, 
                              AICc = AICc)

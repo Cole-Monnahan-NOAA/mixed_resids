@@ -93,6 +93,9 @@ calculate.dharma <- function(obj, expr, N=1000, obs, idx, fpr, int.resp, rot){
   #alternative <- match.arg(alternative)
   t0 <- Sys.time()
   tmp <- replicate(N, eval(expr)[idx])
+  if(length(obs) > length(idx)){
+    obs <- obs[idx]
+  }
   dharma <- createDHARMa(tmp, obs, fittedPredictedResponse = fpr,
                          integerResponse = int.resp,
                          rotation = rot)
@@ -116,6 +119,35 @@ calculate.dharma <- function(obj, expr, N=1000, obs, idx, fpr, int.resp, rot){
               # outlier=outlier$p.value, pval.ks=pval.ks,
               # pval.ad=pval.ad))
 }
+
+calculate.process <- function(mod, posterior, parlist, report, idx){
+  if(mod == "spatial"){
+    tau <- 1/(sqrt(2*pi)*(sqrt(8)/report$Range) * report$marg_sp_sd)
+    Sigma <- solve(report$Q * tau^2)
+    
+    L <- t(chol(Sigma))
+    r <- solve(L, posterior)[idx]
+  }
+  if(mod == "randomwalk"){
+    n. <- length(posterior)
+    Q <- matrix(0, n., n.)
+    diag(Q) <- 2
+    Q[n.,n.] <- 1
+    for(i in 2:n.){
+      Q[i, i-1] <- -1
+      Q[i-1, i] <- -1
+    }
+    Sigma <- solve(Q * 1/report$sig_u^2)
+    
+    L <- t(chol(Sigma))
+    r <- solve(L, posterior)[idx]
+  }
+
+  return(r)
+}
+
+
+
 
 calc.quantile <- function(fam, report, y){
   out <- NA
@@ -254,16 +286,18 @@ calc.sac <- function(res.type, dat, res.obj, version){
   
   if(res.type == 'osa'){
     res.names <- c('cdf', 'gen', 'fg', 'mcmc', 'osg',
-                   'pears')
+                   'pears', 'process')
   }
   if(res.type == 'sim'){
-    res.names <- c('cond', 'uncond', 'cond_nrot', 'uncond_nrot')
+    res.names <- c('cond', 'uncond', 'cond_nrot', 'uncond_nrot', 'process')
   }
   df <- data.frame(res.type = character(), method = character(), model = character(),
                    test = character(), version = character(), pvalue = numeric())
   
   dmat.obs <- as.matrix(dist(dat$loc, upper = TRUE))
+  dmat.mesh <- as.matrix(dist(dat$mesh$loc[,1:2], upper = TRUE))
   wt.obs<- 1/dmat.obs; diag(wt.obs) <- 0
+ # wt.mesh <- 1/dmat.mesh; diag(wt.mesh) <- 0
 
  # y <- NA
   
@@ -276,7 +310,11 @@ calc.sac <- function(res.type, dat, res.obj, version){
       x <- res.obj[[m]]$out$scaledResiduals
     }
     if (nms %in% res.names) {
+      # if(nms == "process"){
+      #   wt <- wt.mesh
+      # } else {
         wt <- wt.obs
+    #  }
       if(is.numeric(x)){
         ## only test for positive correlationa
         y <- ape::Moran.I(x, wt, alternative = 'greater')$p.value
@@ -302,10 +340,10 @@ calc.auto <- function(res.type, res.obj, version){
   
   if(res.type == 'osa'){
     res.names <- c('cdf', 'gen', 'fg', 'mcmc', 'osg',
-                   'pears')
+                   'pears', 'process')
   }
   if(res.type == 'sim'){
-    res.names <- c('cond', 'uncond', 'cond_nrot', 'uncond_nrot')
+    res.names <- c('cond', 'uncond', 'cond_nrot', 'uncond_nrot', 'process')
   }
   df <- data.frame(res.type = character(), method = character(), model = character(),
                    test = character(), version = character(), pvalue = numeric())
