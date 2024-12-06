@@ -54,13 +54,13 @@ run_model(reps, mod='glm', misp='pois-zip', type = 'GLMM', do.true = do.true,
 
 ### Random walk from the paper =================================================
 ## possible mispecifications: 'missre', 'normal-lognorm', 'gamma-lognorm', 'mu0'
-reps <- 1:441
+#reps <- 1:441
 a <- Sys.time()
 for(dt in 1:2){
   if(dt == 1){do.true <- TRUE}
   if(dt == 2){do.true <- FALSE}
-  dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
-  osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc','pears')
+  dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot', 'process' )
+  osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc','pears', 'process')
   run_model(reps, n = 100, mod='randomwalk', 
             misp =  c('missre', 'hsk', 'mu0', 'mispre'), 
             type = 'LMM', do.true = do.true)

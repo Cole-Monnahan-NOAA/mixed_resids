@@ -385,6 +385,11 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
           init.obs <- sim.dat$y1[[h-1]]
         }
       }
+      if(mod == "spatial"){
+        idx. <- sim.dat$mesh$idx$loc
+      } else {
+        idx. <- 1:n_
+      }
       dharma.out[[h]] <- list()
       if('cond' %in% dharma.methods & convergestatus == 0){
         dharma.out[[h]]$cond <- 
@@ -445,11 +450,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
           expr <- expression(obj$simulate()$u)
           init.re <- mod.out[[h]]$obj$env$parList()$u
         }
-        if(mod == "spatial"){
-          idx. <- sim.dat$mesh$idx$loc
-        } else {
-          idx. <- 1:n_
-        }
+        
         dharma.out[[h]]$process <- 
           calculate.dharma(mod.out[[h]]$obj, expr, obs = init.re, 
                            idx = idx., fpr=rep(0,length(idx.)), 
