@@ -64,7 +64,7 @@ for(dt in 1:2){
   run_model(reps, n = 100, mod='randomwalk', 
             misp =  c('missre', 'hsk', 'mu0', 'mispre'), 
             type = 'LMM', do.true = do.true)
-  osa.methods <- c('gen', 'cdf', 'mcmc','pears')
+  osa.methods <- c('gen', 'cdf', 'mcmc','pears', 'process')
   run_model(reps, n = 100, mod='randomwalk', 
             misp =  c('missre', 'gamma-normal', 'mu0', 'mispre'), 
             family = "Gamma", link = "log",
@@ -97,12 +97,12 @@ save(c, file = "results/simpleGLMM_local_reps-441.RData")
 
 ### spatial ==================================================================                                                                                    ### Simple spatial SPDE model ==================================================
 ## possible mispecifications: 'missre', 'pois-zip', 'mispre', 'normal-gamma'
-dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot' )
-osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 'pears')
+dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot', 'process' )
+osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 'pears', 'process')
 run_model(reps, n = 100, mod ='spatial',
           misp = c('missre', 'ln-error', 'mispre'), 
           type = 'LMM', do.true = do.true)
-osa.methods <- c('gen', 'cdf', 'mcmc','pears')
+osa.methods <- c('gen', 'cdf', 'mcmc','pears', 'process')
 run_model(reps, n = 100, mod ='spatial',
           misp = c('missre', 'pois-zip', 'mispre'),
           family = "Poisson", link = "log",
