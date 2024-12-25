@@ -20,6 +20,10 @@ setup_trueparms <- function(mod, misp, fam, link, type){
   if(mod == 'spatial'){
     true.pars <- setup_spatial(mod, misp, fam, link, type)
   } 
+  
+  if(mod == 'phylo'){
+    true.pars <- setup_phylo(mod, misp, fam, link, type)
+  }
   return(true.pars)
 }
 
@@ -177,6 +181,50 @@ setup_spatial<- function(mod, misp, fam, link, type){
   return(true.parms)
 }
 
+
+true.comp <- list()
+
+setup_phylo <- function(mod, misp, fam, link, type){
+  if(type == "LMM"){
+    beta_0 <- 0
+    beta_1 <- 1
+    sd.vec <- c(1, sqrt(2))
+    size <- NA
+    
+    true.comp[[1]] <- list(beta_0 = beta_0, beta_1 = beta_1,
+                           ln_sig_u = log(sd.vec[2]),
+                           theta = log(sd.vec[1]))
+  }
+  
+  if(type == "GLMM"){
+    beta_0 <- 0
+    beta_1 <- 1
+    size <- 1
+    sd.vec <- c(0,.75)
+    
+    true.comp[[1]] <- list(beta_0 = beta_0, beta_1 = beta_1,
+                           ln_sig_u = log(sd.vec[2]),
+                           theta = log(size))
+  }
+  
+  for(m in 1:length(misp)){
+    true.comp[[m+1]] <- true.comp[[1]]
+    
+    if(misp[m] == "missre"){
+      true.comp[[m+1]]$ln_sig_u <- NULL
+    }
+    
+    if(misp[m] == 'nb-pois'){
+      true.comp[[m+1]]$theta <- NULL
+    }
+  }
+  
+  true.parms <- list(beta_0=beta_0, beta_1 = beta_1, sd.vec=sd.vec, 
+                     size = size, fam=fam, link=link, true.comp=true.comp)
+  return(true.parms)
+  
+}
+
 run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
                      family, link, do.true = FALSE, savefiles=TRUE){
   library(TMB)
@@ -188,6 +236,8 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
   library(goftest)
   library(tweedie)
   library(car)
+  library(ape)
+  library(phylolm)
   
   if(do.true){
     mod.name <- paste0(mod, "_true")
@@ -268,11 +318,11 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
 
     if(h == 1 | mod == "linmod" | mod == "pois_glm"){
       init.obj <- list(data = init.dat[[h]], parameters = init.par[[h]], 
-                      map = init.map[[h]], random = init.random[[h]], DLL = mod)
+                       map = init.map[[h]], random = init.random[[h]], DLL = mod)
       if(is.null(init.random[[h]])) Random <- FALSE
     } else {
       init.obj <- list(data = init.dat$h1[[h-1]], parameters = init.par$h1[[h-1]], 
-                      map = init.map$h1[[h-1]], random = init.random$h1[[h-1]], DLL = mod)
+                       map = init.map$h1[[h-1]], random = init.random$h1[[h-1]], DLL = mod)
       if(is.null(init.random$h1[[h-1]])) Random <- FALSE
     }
     
@@ -288,9 +338,12 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
     
    
     if(class(mod.out[[h]])!='try-error'){
-      maxgrad <- ifelse(do.true, NA, 
-                        max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) 
-      ) #!doesn't work if doTrue == TRUE
+      if(do.true){
+        maxgrad <- NA
+      } else {
+        maxgrad <- max(abs(mod.out[[h]]$obj$gr(mod.out[[h]]$opt$par))) 
+      }
+   
       convergestatus <- 0
       if(h == 1){
         convergestatus <- ifelse(do.true, 0, 
@@ -357,13 +410,17 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
         ran <- c(0,Inf)
       } 
         
-      if(mod == 'randomwalk' | mod == 'spatial' | mod == 'simpleGLMM') rot <- "estimated"
+      if(mod == 'randomwalk' | mod == 'spatial' | mod == 'simpleGLMM'
+         | mod == "phylo") rot <- "estimated"
+      
       if(convergestatus == 0){
-        osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, mod.fam, methods=osa.methods, 
+        osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, mod.fam, 
+                                      methods=osa.methods, 
                                       observation.name='y', Discrete = disc, 
                                       Range = ran)
       } else {
-        osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, mod.fam, methods=NULL, 
+        osa.out[[h]] <- calculate.osa(mod.out[[h]]$obj, mod.fam, 
+                                      methods=NULL, 
                                       observation.name='y', Discrete = disc, 
                                       Range = ran)
       }
@@ -510,11 +567,16 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
           postmle <- postmle[-length(postmle)] # drop lp__ value
           ## Calculate residuals given the sample
           tmp <- objmle$report(postmle)
-         
+          if(mod == 'phylo'){
+            tree <- sim.dat$tree
+          } else {
+            tree <- NA
+          }
           osa.out[[h]]$process <- calculate.process(mod, postmle, 
                                                     mod.out[[h]]$obj$env$parList(), 
                                                     tmp,
-                                                    idx.)
+                                                    idx.,
+                                                    tree)
           
         }
         
@@ -570,8 +632,8 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
                              AICc = AICc)
       out[[h]][names(osa.out[[h]])[grep("runtime", names(osa.out[[h]]))]] <- 
         sapply(grep("runtime", names(osa.out[[h]])), function(x) osa.out[[h]][[x]] )
-      out[[h]][paste0("runtime.", names(dharma.out[[1]])[!grepl("re", names(dharma.out[[1]]))])] <- 
-        sapply(names(dharma.out[[1]])[!grepl("re", names(dharma.out[[1]]))], function(x) dharma.out[[h]][[x]]$runtime)
+      out[[h]][paste0("runtime.", names(dharma.out[[h]]))] <- 
+        sapply(names(dharma.out[[h]]), function(x) dharma.out[[h]][[x]]$runtime)
         
       if(convergestatus == 0){
         pvals <- rbind(pvals, cbind(id = id, type = type, misp = misp.name,
@@ -613,12 +675,12 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
         } 
       }
       
-      if(mod == 'spatial' & convergestatus == 0){
+      if((mod == 'spatial' | mod == 'phylo') & convergestatus == 0){
         if(!is.null(osa.methods)){
           sac.pvals <- calc.sac( res.type = 'osa', 
                                  dat = sim.dat, 
                                  res.obj = osa.out[[h]],
-                                 version = paste0("h", h-1))
+                                 version = paste0("h", h-1), mod)
           pvals <- rbind(pvals, cbind(id = id, type = type, 
                                       misp = misp.name,  sac.pvals))
         } 
@@ -626,7 +688,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
           sac.pvals <- calc.sac( res.type = 'sim', 
                                  dat = sim.dat, 
                                  res.obj = dharma.out[[h]],
-                                 version = paste0("h", h-1))
+                                 version = paste0("h", h-1), mod)
           pvals <- rbind(pvals, cbind(id = id, type = type, 
                                       misp = misp.name,  sac.pvals))
         } 
@@ -813,6 +875,28 @@ mkTMBdat <- function(Dat, Pars, Mod, Misp, Type, doTrue){
       }
     }
   }
+    
+  if(Mod == "phylo"){
+    Sigma <- ape::vcv(Dat$tree)
+    Q <- as(solve(Sigma), "dgCMatrix")
+    dat0 <- list(y = Dat$y0, X = Dat$x, Q = Q,
+                 mod = 0, sim_re = 0)
+    
+    if(Type == "GLMM"){
+      dat0$mod <- 1  
+    }
+    dat1 <- list()
+    if(length(Misp) != length(Dat$y1)){
+      "Stop, length of mispecifications does not match list of misspecified data"
+    }
+    for(m in 1:length(Misp)){
+      dat1[[m]] <- dat0
+      dat1[[m]]$y <- Dat$y1[[m]]
+      if(Misp[m] == 'nb-pois'){
+        dat1[[m]]$mod <- 2
+      }
+    }
+  }
   
   out = list(h0 = dat0, h1 = dat1)
   return(out)
@@ -833,6 +917,9 @@ mkTMBpar <- function(Pars, Dat, Mod, Misp, Type, doTrue){
   }
   if(Mod == 'spatial'){
     out <- mkTMBpar_spatial(Pars, Dat, Mod, Misp, Type, doTrue)
+  }
+  if(Mod == 'phylo'){
+    out <- mkTMBpar_phylo(Pars, Dat, Mod, Misp, Type, doTrue)
   }
   return(out)
 }
@@ -966,6 +1053,42 @@ mkTMBpar_spatial <- function(Pars, Dat, Mod, Misp, Type, doTrue){
   return(out)
 }
 
+mkTMBpar_phylo <- function(Pars, Dat, Mod, Misp, Type, doTrue){
+  if(doTrue & Type == "LMM"){
+    par0 <-  list(beta = c(Pars$beta_0,Pars$beta_1),
+                  theta = log(Pars$sd.vec[1]), 
+                  ln_sig_u = log(Pars$sd.vec[2]), 
+                  u = unname(Dat$random$u0))
+    
+  } 
+  if(doTrue & Type == "GLMM"){
+    par0 <-  list(beta = c(Pars$beta_0,Pars$beta_1),
+                  theta = log(Pars$size), 
+                  ln_sig_u = log(Pars$sd.vec[2]), 
+                  u = unname(Dat$random$u0))
+  }
+  if(!doTrue){
+    par0 <-  list(beta = c(0,0),
+                  theta = 0, 
+                  ln_sig_u = 0, 
+                  u = rep(0, length(Dat$random$u0)))
+  }
+  
+  par1 <- list()
+  for(m in 1:length(Misp)){
+    par1[[m]] <- par0
+    # if(doTrue){
+    #   par1[[m]]$u <- unname(Dat$random$u1[[m]])
+    # }
+    if(Misp[m] == "missre"){
+      par1[[m]]$ln_sig_u = numeric(0)
+      par1[[m]]$u <- rep(0, length(Dat$random$u0))
+    }
+  }
+  out = list(h0 = par0, h1 = par1)
+  return(out)
+}
+
 mkTMBrandom <- function(Mod, Misp, Type, doTrue){
   if(Mod == 'linmod'){
     Random.h0 = NULL
@@ -975,7 +1098,7 @@ mkTMBrandom <- function(Mod, Misp, Type, doTrue){
     Random.h0 = NULL
     Random.h1 = NULL
   }
-  if(Mod == 'randomwalk' | Mod == "simpleGLMM"){
+  if(Mod == 'randomwalk' | Mod == "simpleGLMM" | Mod == "phylo"){
     Random.h0 <- 'u'
     Random.h1 <- list()
     for(m in 1:length(Misp)){
@@ -1049,6 +1172,18 @@ mkTMBmap <- function(Pars, Mod, Misp, Type, doTrue){
         map.h1[[m]]$ln_tau = factor(NA)
         map.h1[[m]]$ln_kappa = factor(NA)
         map.h1[[m]]$omega = rep(factor(NA), length(Pars$h0$omega))
+      }
+    }
+  }
+  
+  if(Mod == 'phylo'){
+    for(m in 1:length(Misp)){
+      map.h1[[m]] <- map.h0
+      if(Misp[m] == "missre"){
+        map.h1[[m]]$u = rep(factor(NA), length(Pars$h0$u))
+      }
+      if(Misp[m] == "nb-pois"){
+        map.h1[[m]]$theta = factor(NA)
       }
     }
   }
