@@ -37,11 +37,12 @@ simdat <- function(n, ng=0, mod, cov.mod = NULL, type = NULL,
   if(!(misp[i] %in% c('missunifcov', 'missnormcov', 'missre', 
                    'mu0', 'mispre', 'nb-pois', 'overdispersion', 
                    'gamma-normal', 'hsk', 'pois-zip', 
-                   'normal-gamma', 'ln-error'))){
+                   'normal-gamma', 'ln-error', 'identity-log'))){
     stop('incorrect mis-specification name')
   } }
-  if(!(mod %in% c('linmod', 'pois_glm', 'randomwalk', 'simpleGLMM', 'spatial'))) stop('incorrect model name')
-  
+  if(!(mod %in% c('linmod', 'pois_glm', 'randomwalk', 
+                  'simpleGLMM', 'spatial', 'phylo'))) stop('incorrect model name')
+
   #Simulate Covariate
   if(!is.null(cov.mod)){
     set.seed(seed)
@@ -70,6 +71,10 @@ simdat <- function(n, ng=0, mod, cov.mod = NULL, type = NULL,
   if(mod == 'spatial'){
     dat.out <- simdat.spatial(n, mod, type,
                    trueparms, misp, seed, X)
+  }
+  if(mod == 'phylo'){
+    dat.out <- simdat.phylo(n, mod, type,
+                            trueparms, misp, seed, X)
   }
 
   return(dat.out)
@@ -330,6 +335,53 @@ simdat.spatial <- function(n, mod, type, trueparms,
   return(dat.out)
 }
 
+simdat.phylo <- function(n, mod, type, trueparms, 
+                         misp, seed, X){
+  for(i in 1:length(misp)){
+    if(!(misp[i] %in% c('missre', 'nb-pois', 'mispre', 'identity-log'))) {
+      stop(paste0("Misspecification", misp[i]," not available for phlyo"))
+    }
+  }
+  list2env(trueparms, envir = environment(simdat.phylo))
+  
+  mu <- beta_0 + beta_1 * X[,2]
+  set.seed(seed)
+  tree = rtree(n)
+  set.seed(seed*2)
+  u0 <- rTrait(n = 1, phy = tree, model="BM",
+               parameters = list(ancestral.state = 0, sigma2 = sd.vec[2]^2))
+  set.seed(seed*3)
+  if(type == "LMM"){
+    parm=sd.vec[1]
+  }
+  if(type == "GLMM"){
+   parm <- size
+  }
+  y0 <-  sim_y(Eta = mu, omega=u0,
+               parm=parm, fam=fam, link=link)
+  y1 <- u1 <- list()
+  for(m in 1:length(misp)){
+    u1[[m]] <- u0
+    y1[[m]] <- y0
+    
+    if(misp[m] == "identity-log"){
+      y1[[m]] <- sim_y(Eta = mu, omega=u0,
+                  parm=sd.vec[1], fam=fam, link="log")
+    }
+    if(misp[m] == "mispre"){ 
+      set.seed(seed*2)
+      u1[[m]] <- exp(u0)#rTrait(n = 1, phy = tree, model="trend",
+                  # parameters = list(ancestral.state = 0, trend = 2,
+                   #                  sigma2 = sd.vec[2]^2))
+      
+      y1[[m]] <- sim_y(Eta = mu, omega=u1[[m]],
+                       parm=parm, fam=fam, link=link)
+    }
+  }
+  
+  random <- list(u0=u0, u1=u1)
+  dat.out <- list(y0 = y0, y1 = y1, random = random, x = X, tree = tree)
+}
 
 ## functions for simulating spatial data
 cMatern <- function(H, Nu, Kap) {

@@ -75,7 +75,7 @@ calculate.osa <- function(obj, mod.fam, methods, observation.name,
   pears.df <- length(obj$env$data$y) - length(obj$par)
   if('pears' %in% methods){
     report <- obj$report()
-    if(mod.fam == "Poisson"){#Poisson model
+    if(mod.fam == "Poisson" | mod.fam == "NB"){#Poisson model
       pears <- (obj$env$data$y - report$exp_val)/sqrt(report$exp_val)
     } else {
       sig <- if(is.null(report$sig)) report$sig_y else report$sig
@@ -120,7 +120,7 @@ calculate.dharma <- function(obj, expr, N=1000, obs, idx, fpr, int.resp, rot){
               # pval.ad=pval.ad))
 }
 
-calculate.process <- function(mod, posterior, parlist, report, idx){
+calculate.process <- function(mod, posterior, parlist, report, idx, tree = NULL){
   if(mod == "spatial"){
     tau <- 1/(sqrt(2*pi)*(sqrt(8)/report$Range) * report$marg_sp_sd)
     Sigma <- solve(report$Q * tau^2)
@@ -141,6 +141,12 @@ calculate.process <- function(mod, posterior, parlist, report, idx){
     
     L <- t(chol(Sigma))
     r <- solve(L, posterior)[idx]
+  }
+  
+  if(mod == "phylo"){
+    Sigma <- ape::vcv(tree) * report$sig2u^2
+    L <- t(chol(Sigma))
+    r <- unname(solve(L, posterior)[idx])
   }
 
   return(r)
@@ -282,7 +288,7 @@ calculate.jp <- function(obj, sdr, opt, obs, data.name, fpr, N=1000, random = TR
 }
 
 
-calc.sac <- function(res.type, dat, res.obj, version){
+calc.sac <- function(res.type, dat, res.obj, version, mod){
   
   if(res.type == 'osa'){
     res.names <- c('cdf', 'gen', 'fg', 'mcmc', 'osg',
@@ -294,10 +300,21 @@ calc.sac <- function(res.type, dat, res.obj, version){
   df <- data.frame(res.type = character(), method = character(), model = character(),
                    test = character(), version = character(), pvalue = numeric())
   
-  dmat.obs <- as.matrix(dist(dat$loc, upper = TRUE))
-  dmat.mesh <- as.matrix(dist(dat$mesh$loc[,1:2], upper = TRUE))
-  wt.obs<- 1/dmat.obs; diag(wt.obs) <- 0
- # wt.mesh <- 1/dmat.mesh; diag(wt.mesh) <- 0
+  if(mod == "spatial"){
+    dmat.obs <- as.matrix(dist(dat$loc, upper = TRUE))
+    dmat.mesh <- as.matrix(dist(dat$mesh$loc[,1:2], upper = TRUE))
+    wt.obs<- 1/dmat.obs; diag(wt.obs) <- 0
+    # wt.mesh <- 1/dmat.mesh; diag(wt.mesh) <- 0
+    testname <- 'SAC'
+    alt <- 'greater'
+  }
+  if(mod == "phylo"){
+    distMat <- cophenetic(dat$tree)
+    wt.obs <- 1/distMat
+    diag(wt.obs) <- 0
+    testname <- "phyloauto"
+    alt <- 'two.sided'
+  }
 
  # y <- NA
   
@@ -306,22 +323,23 @@ calc.sac <- function(res.type, dat, res.obj, version){
     if(res.type == "osa"){
       x <- res.obj[[m]]
     }
+    
     if(res.type == "sim"){
       x <- res.obj[[m]]$out$scaledResiduals
     }
     if (nms %in% res.names) {
-      # if(nms == "process"){
-      #   wt <- wt.mesh
-      # } else {
-        wt <- wt.obs
-    #  }
+      wt <- wt.obs
+      if(mod == 'phylo'){
+        idx <- which(is.infinite(x))
+        x[idx] <-NA
+      }  
       if(is.numeric(x)){
         ## only test for positive correlationa
-        y <- ape::Moran.I(x, wt, alternative = 'greater')$p.value
+        y <- ape::Moran.I(x, wt, alternative = alt, na.rm = TRUE)$p.value
         df <- rbind(df,data.frame(res.type= res.type, 
                          method = names(res.obj)[m], 
-                         model='spatial', 
-                         test='SAC', 
+                         model=mod, 
+                         test=testname, 
                          version = version,
                          pvalue = y))
       } 

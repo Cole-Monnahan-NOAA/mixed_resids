@@ -111,4 +111,21 @@ run_model(reps, n = 100, mod ='spatial',
 ## stop clusters
 sfStop()
 
+### phylogenetic ==================================================================                                                                                    ### Simple spatial SPDE model ==================================================
+## possible mispecifications: 'missre', 'identity-log', nb-pois', 'mispre'
+dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot', 'process' )
+osa.methods <- c('fg', 'osg', 'gen', 'cdf', #'mcmc',
+                 'pears', 'process')
+run_model(reps, n = 100, mod ='phylo', cov.mod = 'unif', 
+          misp =  c('missre', 'identity-log', 'mispre'),
+          type = 'LMM', do.true = do.true)
+osa.methods <- c('gen', 'cdf', #'mcmc',
+                 'pears', 'process')
+run_model(reps, n = 100, mod = "phylo", cov.mod = 'unif', 
+          misp =  c('missre', 'nb-pois', 'mispre'),
+          family = "NB", link = "log",
+          type = 'GLMM', do.true = do.true)
+
+## stop clusters
+sfStop()
 

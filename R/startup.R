@@ -14,6 +14,8 @@ library(Matrix)
 library(goftest)
 library(tweedie)
 library(car)
+library(ape)
+library(phylolm)
 
 ## Some global settings
 ggwidth <- 7
@@ -31,3 +33,5 @@ TMB::compile('src/randomwalk.cpp', framework = "TMBad")
 TMB::compile('src/simpleGLMM.cpp', framework = "TMBad")
 TMB::compile('src/spatial.cpp', framework = "TMBad")
 TMB::compile('src/pois_glm.cpp', framework = "TMBad")
+TMB::compile('src/phylo.cpp', framework = "TMBad")
+
