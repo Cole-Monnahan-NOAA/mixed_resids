@@ -117,6 +117,7 @@ template <class Type>
   REPORT(fpr);
   REPORT(exp_val);
   REPORT(sig_y);
+  REPORT(size);
   REPORT(nll);
   
   return nll;
