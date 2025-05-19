@@ -55,7 +55,8 @@ setup_randomwalk <- function(mod, misp, fam, link, type){
   }
   if(type == "GLMM"){
     drift <- 0.02
-    sd.vec <- c(0.5, 0.15)
+    #sd.vec <- c(0.5, 0.15)
+    sd.vec <- c(0.1, 0.3)
   }
   
   true.comp[[1]] <- list(mu = drift, 
@@ -146,11 +147,11 @@ setup_simpleGLMM <- function(mod, misp, fam, link, type){
 
 
 setup_spatial<- function(mod, misp, fam, link, type){
-  sp.parm <- 30
+  sp.parm <- 50
   true.comp <- list()
   if(type == "LMM"){
-    beta <- 4
-    sd.vec <- c(1, 1)
+    beta <- 2
+    sd.vec <- c(1, 2)
 
     true.comp[[1]] <- list(beta = beta, theta = log(sd.vec[1]),
            ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd))
@@ -159,9 +160,10 @@ setup_spatial<- function(mod, misp, fam, link, type){
   }
 
   if(type == "GLMM"){
+    sp.parm <- 30
     if(fam == "Poisson"){
       beta <- 2
-      sd.vec <- c(NA, sqrt(0.25))  
+      sd.vec <- c(NA, .5)  
     }
     true.comp[[1]] <- list(beta = beta, 
            ln_tau = log(1/(2*sqrt(pi)*sqrt(8)/sp.parm*sd.vec[2])), #1/(2*sqrt(pi)*kappa*sp.sd))
@@ -186,23 +188,21 @@ true.comp <- list()
 
 setup_phylo <- function(mod, misp, fam, link, type){
   if(type == "LMM"){
-    beta_0 <- 0
-    beta_1 <- 1
+    beta <- c(0,1)
     sd.vec <- c(1, sqrt(2))
     size <- NA
     
-    true.comp[[1]] <- list(beta_0 = beta_0, beta_1 = beta_1,
+    true.comp[[1]] <- list(beta_0 = beta[1], beta_1 = beta[2],
                            ln_sig_u = log(sd.vec[2]),
                            theta = log(sd.vec[1]))
   }
   
   if(type == "GLMM"){
-    beta_0 <- 0
-    beta_1 <- 1
-    size <- 1
-    sd.vec <- c(0,.75)
+    beta <- 3
+    size <- 0.5
+    sd.vec <- c(0,1)
     
-    true.comp[[1]] <- list(beta_0 = beta_0, beta_1 = beta_1,
+    true.comp[[1]] <- list(beta_0 = beta, 
                            ln_sig_u = log(sd.vec[2]),
                            theta = log(size))
   }
@@ -219,7 +219,7 @@ setup_phylo <- function(mod, misp, fam, link, type){
     }
   }
   
-  true.parms <- list(beta_0=beta_0, beta_1 = beta_1, sd.vec=sd.vec, 
+  true.parms <- list(beta = beta, sd.vec=sd.vec, 
                      size = size, fam=fam, link=link, true.comp=true.comp)
   return(true.parms)
   
@@ -345,10 +345,8 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
       }
    
       convergestatus <- 0
-      if(h == 1){
-        convergestatus <- ifelse(do.true, 0, 
+      convergestatus <- ifelse(do.true, 0, 
                                  mod.out[[h]]$opt$convergence)
-      }
       convergehessian <- ifelse(do.true, NA, 
                                 mod.out[[h]]$sdr$pdHess)
       
@@ -804,7 +802,7 @@ mkTMBdat <- function(Dat, Pars, Mod, Misp, Type, doTrue){
   
   if(Mod == 'randomwalk'){
     dat0 <- list(y = Dat$y0, mod = 0, sim_re = 0, doTrue = 0) #default: type = LMM
-    if(Type == "GLMM"){
+    if(Type == "GLMM" ){
       dat0$mod <- 2 # Gamma
     }
     if(doTrue){
@@ -819,6 +817,10 @@ mkTMBdat <- function(Dat, Pars, Mod, Misp, Type, doTrue){
       dat1[[m]]$y <- Dat$y1[[m]]
       if(Misp[m] == 'gamma-normal'){
         dat1[[m]]$mod <- 0 # Normal
+      }
+      
+      if(Misp[m] == 'normal-gamma'){
+        dat1[[m]]$mod <- 2 # Gamma
       }
     }
     
@@ -872,6 +874,13 @@ mkTMBdat <- function(Dat, Pars, Mod, Misp, Type, doTrue){
       }
       if(Misp[m] == "norm-gamma"){
         dat1[[m]]$family <- fam_enum("Gamma")
+      }
+      if(Misp[m] == "aniso"){
+        dat1[[m]]$mesh_i = Dat$mesh.aniso$idx$loc-1
+        spde.aniso <- fmesher::fm_fem(Dat$mesh.aniso, order = 2)
+        dat1[[m]]$spde <-  list(M0 = spde.aniso$c0,
+                           M1 = spde.aniso$g1,
+                           M2 = spde.aniso$g2)
       }
     }
   }
@@ -1047,6 +1056,15 @@ mkTMBpar_spatial <- function(Pars, Dat, Mod, Misp, Type, doTrue){
       par1[[m]]$ln_kappa = 0
       par1[[m]]$omega = rep(0, Dat$mesh$n)
     }
+    if(Misp[m] == "aniso"){
+      if(doTrue){
+        omega.true <- rep(0, Dat$mesh.aniso$n)
+        omega.true[Dat$mesh.aniso$idx$loc] <- as.vector(Dat$random$omega0)
+        par1[[m]]$omega = omega.true
+      } else {
+        par1[[m]]$omega <- rep(0, Dat$mesh.aniso$n)
+      }
+    }
   }
 
   out = list(h0 = par0, h1 = par1)
@@ -1055,20 +1073,26 @@ mkTMBpar_spatial <- function(Pars, Dat, Mod, Misp, Type, doTrue){
 
 mkTMBpar_phylo <- function(Pars, Dat, Mod, Misp, Type, doTrue){
   if(doTrue & Type == "LMM"){
-    par0 <-  list(beta = c(Pars$beta_0,Pars$beta_1),
+    par0 <-  list(beta = Pars$beta,
                   theta = log(Pars$sd.vec[1]), 
                   ln_sig_u = log(Pars$sd.vec[2]), 
                   u = unname(Dat$random$u0))
     
   } 
   if(doTrue & Type == "GLMM"){
-    par0 <-  list(beta = c(Pars$beta_0,Pars$beta_1),
+    par0 <-  list(beta = Pars$beta,
                   theta = log(Pars$size), 
                   ln_sig_u = log(Pars$sd.vec[2]), 
                   u = unname(Dat$random$u0))
   }
-  if(!doTrue){
+  if(!doTrue & Type == "LMM"){
     par0 <-  list(beta = c(0,0),
+                  theta = 0, 
+                  ln_sig_u = 0, 
+                  u = rep(0, length(Dat$random$u0)))
+  }
+  if(!doTrue & Type == "GLMM"){
+    par0 <-  list(beta = 0,
                   theta = 0, 
                   ln_sig_u = 0, 
                   u = rep(0, length(Dat$random$u0)))

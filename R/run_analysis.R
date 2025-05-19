@@ -62,11 +62,11 @@ for(dt in 1:2){
   dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot', 'process' )
   osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc','pears', 'process')
   run_model(reps, n = 100, mod='randomwalk', 
-            misp =  c('missre', 'hsk', 'mu0', 'mispre'), 
+            misp =  c('missre', 'hsk', 'mu0'), 
             type = 'LMM', do.true = do.true)
   osa.methods <- c('gen', 'cdf', 'mcmc','pears', 'process')
   run_model(reps, n = 100, mod='randomwalk', 
-            misp =  c('missre', 'gamma-normal', 'mu0', 'mispre'), 
+            misp =  c('missre', 'gamma-normal', 'mispre'), 
             family = "Gamma", link = "log",
             type = 'GLMM', do.true = do.true)
 }
@@ -97,34 +97,42 @@ save(c, file = "results/simpleGLMM_local_reps-441.RData")
 
 ### spatial ==================================================================                                                                                    ### Simple spatial SPDE model ==================================================
 ## possible mispecifications: 'missre', 'pois-zip', 'mispre', 'normal-gamma'
-dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot', 'process' )
-osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc', 'pears', 'process')
-run_model(reps, n = 100, mod ='spatial',
-          misp = c('missre', 'ln-error', 'mispre'), 
-          type = 'LMM', do.true = do.true)
-osa.methods <- c('gen', 'cdf', 'mcmc','pears', 'process')
-run_model(reps, n = 100, mod ='spatial',
-          misp = c('missre', 'pois-zip', 'mispre'),
-          family = "Poisson", link = "log",
-          type = 'GLMM', do.true = do.true)
-
+for(dt in 1:2){
+  if(dt == 1){do.true <- TRUE}
+  if(dt == 2){do.true <- FALSE}
+  dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot', 'process' )
+  osa.methods <- c('fg', 'osg', 'gen', 
+                   'cdf', 'mcmc', 'pears', 'process')
+  run_model(reps, n = 100, mod ='spatial',
+            misp = c('missre', 'ln-error', 'mispre'), 
+            type = 'LMM', do.true = do.true)
+  osa.methods <- c('gen', 
+                   'cdf', 'mcmc','pears', 'process')
+  run_model(reps, n = 100, mod ='spatial',
+            misp = c('missre', 'pois-zip', 'aniso'),
+            family = "Poisson", link = "log",
+            type = 'GLMM', do.true = do.true)
+}
 ## stop clusters
 sfStop()
 
 ### phylogenetic ==================================================================                                                                                    ### Simple spatial SPDE model ==================================================
 ## possible mispecifications: 'missre', 'identity-log', nb-pois', 'mispre'
-dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot', 'process' )
-osa.methods <- c('fg', 'osg', 'gen', 'cdf', #'mcmc',
-                 'pears', 'process')
-run_model(reps, n = 100, mod ='phylo', cov.mod = 'unif', 
-          misp =  c('missre', 'identity-log', 'mispre'),
-          type = 'LMM', do.true = do.true)
-osa.methods <- c('gen', 'cdf', #'mcmc',
-                 'pears', 'process')
-run_model(reps, n = 100, mod = "phylo", cov.mod = 'unif', 
-          misp =  c('missre', 'nb-pois', 'mispre'),
-          family = "NB", link = "log",
-          type = 'GLMM', do.true = do.true)
+for(dt in 1:2){
+  if(dt == 1){do.true <- TRUE}
+  if(dt == 2){do.true <- FALSE}
+  dharma.methods <- c('uncond', 'cond', 'uncond_nrot', 'cond_nrot', 'process' )
+  osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc','pears', 'process')
+  run_model(reps, n = 100, mod ='phylo', cov.mod = 'unif', 
+            misp =  c('missre', 'identity-log', 'mispre'),
+            type = 'LMM', do.true = do.true)
+  osa.methods <- c('gen', 'cdf', 'mcmc',
+                   'pears', 'process')
+  run_model(reps, n = 100, mod = "phylo", 
+            misp =  c('missre', 'nb-pois', 'mispre'),
+            family = "NB", link = "log",
+            type = 'GLMM', do.true = do.true)
+}
 
 ## stop clusters
 sfStop()

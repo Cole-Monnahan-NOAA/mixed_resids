@@ -36,7 +36,7 @@ simdat <- function(n, ng=0, mod, cov.mod = NULL, type = NULL,
   for(i in 1:length(misp)){
   if(!(misp[i] %in% c('missunifcov', 'missnormcov', 'missre', 
                    'mu0', 'mispre', 'nb-pois', 'overdispersion', 
-                   'gamma-normal', 'hsk', 'pois-zip', 
+                   'gamma-normal', 'hsk', 'pois-zip', 'aniso',
                    'normal-gamma', 'ln-error', 'identity-log'))){
     stop('incorrect mis-specification name')
   } }
@@ -113,7 +113,7 @@ simdat.glm <- function(n, mod, cov.mod, type = NULL,
 simdat.randomwalk <- function(n, mod, cov.mod, type, 
   trueparms, misp, seed){
   for(i in 1:length(misp)){
-    if(!(misp[i] %in% c('missre', 'hsk', 'gamma-normal', 
+    if(!(misp[i] %in% c('missre', 'hsk', 'gamma-normal', 'normal-gamma',
                         'mu0', 'mispre'))) {
       stop("Misspecification not available for random walk")
     }
@@ -140,7 +140,8 @@ simdat.randomwalk <- function(n, mod, cov.mod, type,
       }
       if(type == "GLMM"){
         set.seed(seed)
-        u.misp <- cumsum( rgamma(n, 0.5, 20) )
+       # u.misp <- cumsum( rgamma(n, 0.5, 20) )
+        u.misp <- cumsum( rgamma(n, 0.5, 10) )
       }
       set.seed(seed)
       y.misp <- sim_y(Eta = u.misp, omega = rep(0, n), parm = sd.vec[1], 
@@ -153,7 +154,8 @@ simdat.randomwalk <- function(n, mod, cov.mod, type,
     if(misp[i] == "hsk"){
       #simulate data with heterosckadicity
       set.seed(123)
-      y.misp <- sim_y(Eta = u0, omega = rep(0, n), parm = sqrt((1:n)^2), 
+      var.hsk <- 5 + c(rep(30, 25), rep(-4.5, 25), rep(30, 25), rep(-4.5, 25))
+      y.misp <- sim_y(Eta = u0, omega = rep(0, n), parm = sqrt(var.hsk), 
                   fam = fam, link = link)
       y1[[i]] <- y.misp
     }
@@ -245,7 +247,7 @@ simdat.simpleGLMM <- function(n, ng, mod, cov.mod, type,
 simdat.spatial <- function(n, mod, type, trueparms, 
                            misp, seed, X){
   for(i in 1:length(misp)){
-    if(!(misp[i] %in% c('missre', 'pois-zip', 'mispre', 'ln-error',
+    if(!(misp[i] %in% c('missre', 'pois-zip', 'mispre', 'aniso', 'ln-error',
       'normal-gamma'))) {
       stop(paste0("Misspecification", misp[i]," not available for spatial"))
     }
@@ -277,13 +279,14 @@ simdat.spatial <- function(n, mod, type, trueparms,
       timeout = 30, onTimeout = 'silent' ))
     
   if("aniso" %in% misp){
-    loc.aniso <- loc
+    Loc.aniso <- Loc
     rad <- 45*pi/180
     R <- rbind(c(cos(rad), sin(rad)), c(-sin(rad), cos(rad)))
-    S <- rbind(c(sqrt(10), 0), c(0, 1/sqrt(10)))
-    for(s in 1:nrow(loc)){
-      loc.aniso[s,] <- loc[s,]%*% solve(S) %*% solve(R)
+    S <- rbind(c(sqrt(15), 0), c(0, 1/sqrt(15)))
+    for(s in 1:nrow(Loc)){
+      Loc.aniso[s,] <- Loc[s,]%*% solve(S) %*% solve(R)
     }
+    loc.aniso <- Loc.aniso[samp.idx,]
     mesh.aniso <- try(
       R.utils::withTimeout( 
         fmesher::fm_mesh_2d(loc.aniso, max.edge = c(sp.parm/3,sp.parm), 
@@ -344,7 +347,7 @@ simdat.phylo <- function(n, mod, type, trueparms,
   }
   list2env(trueparms, envir = environment(simdat.phylo))
   
-  mu <- beta_0 + beta_1 * X[,2]
+  mu <- X %*% beta
   set.seed(seed)
   tree = rtree(n)
   set.seed(seed*2)
@@ -370,10 +373,24 @@ simdat.phylo <- function(n, mod, type, trueparms,
     }
     if(misp[m] == "mispre"){ 
       set.seed(seed*2)
-      u1[[m]] <- exp(u0)#rTrait(n = 1, phy = tree, model="trend",
-                  # parameters = list(ancestral.state = 0, trend = 2,
-                   #                  sigma2 = sd.vec[2]^2))
-      
+      if(type == "LMM"){
+        u1[[m]] <- exp(u0)
+      }
+      if(type == "GLMM"){       
+        # u1[[m]] <- rTrait(n = 1, phy = tree, model="OU",
+        #                                            parameters = list(trend = 2,
+        #                                                              optimal.value = 2,
+        #                                                              alpha = -.1,
+        #                                                              sigma2 = sd.vec[2]^2))
+        u1[[m]] <- rTrait(n = 1, phy = tree, model="EB",
+                          parameters = list(
+                            ancestral.state = 1,
+                            rate = -2,
+                            sigma2 = sd.vec[2]^2))
+        # u1[[m]] <- rTrait(n = 1, phy = tree, model="lambda",
+        #                   parameters = list(lambda = 0.5,
+        #                                     sigma2 = sd.vec[2]^2))
+      }
       y1[[m]] <- sim_y(Eta = mu, omega=u1[[m]],
                        parm=parm, fam=fam, link=link)
     }

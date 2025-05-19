@@ -71,9 +71,9 @@ run_model <- function(reps, n=100, ng=0, mod, cov.mod = NULL,
   }
   res.name <- paste0('results/', mod.name, '_', type)
   ## Clean up the old runs
-  unlink(paste0('results/', res.name))
-  unlink(paste0('results/', res.name))
-  unlink(paste0('results/', res.name))
+  # unlink(paste0('results/', res.name))
+  # unlink(paste0('results/', res.name))
+  # unlink(paste0('results/', res.name))
 
   message(mod,": Preparing workspace to run ", length(reps), " iterations in parallel...")
   ## TMB::compile(paste0("src/",mod,".cpp")) # modified for simulation

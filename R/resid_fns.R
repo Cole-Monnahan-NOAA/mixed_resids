@@ -144,7 +144,7 @@ calculate.process <- function(mod, posterior, parlist, report, idx, tree = NULL)
   }
   
   if(mod == "phylo"){
-    Sigma <- ape::vcv(tree) * report$sig2u^2
+    Sigma <- ape::vcv(tree) * report$sig_u^2
     L <- t(chol(Sigma))
     r <- unname(solve(L, posterior)[idx])
   }
@@ -333,7 +333,7 @@ calc.sac <- function(res.type, dat, res.obj, version, mod){
         idx <- which(is.infinite(x))
         x[idx] <-NA
       }  
-      if(is.numeric(x)){
+      if(is.numeric(x) & sum(is.na(x))<20){
         ## only test for positive correlationa
         y <- ape::Moran.I(x, wt, alternative = alt, na.rm = TRUE)$p.value
         df <- rbind(df,data.frame(res.type= res.type, 
