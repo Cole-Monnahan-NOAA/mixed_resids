@@ -349,6 +349,9 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
                                  mod.out[[h]]$opt$convergence)
       convergehessian <- ifelse(do.true, NA, 
                                 mod.out[[h]]$sdr$pdHess)
+      if(h==1 & convergestatus == 0){
+        convergestatus = ifelse(convergehessian, 0, 1)
+      }
       
       
       #in spatial model, remove beta from random list

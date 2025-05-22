@@ -376,7 +376,7 @@ calc.auto <- function(res.type, res.obj, version){
       x <- res.obj[[m]]$out$scaledResiduals
     }
     if (nms %in% res.names) {
-      if(is.numeric(x)){
+      if(is.numeric(x) & length(unique(x[is.finite(x)])) > 1){
         p <- lmtest::dwtest(x[is.finite(x)] ~ 1)$p.value
         df <- rbind(df,data.frame(res.type= res.type, 
                                   method = names(res.obj)[m], 
@@ -388,7 +388,7 @@ calc.auto <- function(res.type, res.obj, version){
     }
   }
   if(nrow(df) == 0){
-    df <- data.frame(type = type, method = NA, model = NA,
+    df <- data.frame(res.type = res.type, method = NA, model = NA,
                      test = 'Auto', version = version, pvalue = NA)
   }
   

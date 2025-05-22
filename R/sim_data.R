@@ -154,7 +154,7 @@ simdat.randomwalk <- function(n, mod, cov.mod, type,
     if(misp[i] == "hsk"){
       #simulate data with heterosckadicity
       set.seed(123)
-      var.hsk <- 5 + c(rep(30, 25), rep(-4.5, 25), rep(30, 25), rep(-4.5, 25))
+      var.hsk <- 5 + c(rep(30, n/4), rep(-4.5, n/4), rep(30, n/4), rep(-4.5, n/4))
       y.misp <- sim_y(Eta = u0, omega = rep(0, n), parm = sqrt(var.hsk), 
                   fam = fam, link = link)
       y1[[i]] <- y.misp

@@ -13,7 +13,7 @@ dharma.methods <- c('uncond', 'cond',
 
 ### randomwalk
 runtimes <- mles <- pvals <- list(); k <- 1
-(nobsvec <- 2^c(5:11))
+nobsvec <- c(52, 100, 250, 500, 1000, 2000)
 for(nobs in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
@@ -31,7 +31,7 @@ for(nobs in nobsvec){
 }
 osa.methods <- c('gen', 'cdf', 'mcmc')
 runtimes <- mles <- pvals <- list(); k <- 1
-(nobsvec <- 2^c(5:10))
+nobsvec <- c(52, 100, 250, 500, 1000, 2000)
 for(nobs in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
@@ -61,7 +61,7 @@ for(nobs in nobsvec){
 ## matters
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc')
 runtimes <- mles <- pvals <- list(); k <- 1
-(nobsvec <- c(32,64))#2^c(5:11))
+nobsvec <- c(52, 100, 250, 500, 1000, 2000)
 ngroups <- 4
 for(nxng in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
@@ -104,7 +104,7 @@ for(nxng in nobsvec){
 ### Spatial
 osa.methods <- c('fg', 'osg', 'gen', 'cdf', 'mcmc')
 runtimes <- mles <- pvals <- list(); k <- 1
-(nobsvec <- 2^c(5:11))
+nobsvec <- c(52, 100, 250, 500, 1000, 2000)
 for(nobs in nobsvec){
   sfInit( parallel=cpus>1, cpus=cpus )
   sfExportAll()
