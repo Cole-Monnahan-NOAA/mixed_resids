@@ -35,6 +35,13 @@ results/spatial_LMM_pvals/
 results/spatial_LMM_resids/
 results/spatial_LMM_stats/
 results/spatial_LMM_mles/
+results/phylo_true_LMM_pvals/
+results/phylo_true_LMM_resids/
+results/phylo_true_LMM_stats/
+results/phylo_LMM_pvals/
+results/phylo_LMM_resids/
+results/phylo_LMM_stats/
+results/phylo_LMM_mles/
 
 #GLMM results
 results/linmod_true_GLMM_pvals/
@@ -65,4 +72,11 @@ results/spatial_GLMM_pvals/
 results/spatial_GLMM_resids/
 results/spatial_GLMM_stats/
 results/spatial_GLMM_mles/
+results/phylo_true_GLMM_pvals/
+results/phylo_true_GLMM_resids/
+results/phylo_true_GLMM_stats/
+results/phylo_GLMM_pvals/
+results/phylo_GLMM_resids/
+results/phylo_GLMM_stats/
+results/phylo_GLMM_mles/
 

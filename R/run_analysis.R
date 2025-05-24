@@ -128,9 +128,9 @@ for(dt in 1:2){
             type = 'LMM', do.true = do.true)
   osa.methods <- c('gen', 'cdf', 'mcmc',
                    'pears', 'process')
-  run_model(reps, n = 100, mod = "phylo", 
-            misp =  c('missre', 'nb-pois', 'mispre'),
-            family = "NB", link = "log",
+  run_model(reps, n = 100, mod = "phylo", cov.mod = 'unif', 
+            misp =  c('missre', 'misscov', 'mispre'),
+            family = "Poisson", link = "log",
             type = 'GLMM', do.true = do.true)
 }
 

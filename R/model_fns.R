@@ -198,13 +198,14 @@ setup_phylo <- function(mod, misp, fam, link, type){
   }
   
   if(type == "GLMM"){
-    beta <- 3
-    size <- 0.5
-    sd.vec <- c(0,1)
+    beta <- c(1,2)
+    size <- NA#0.5
+    sd.vec <- c(0,sqrt(2))
     
-    true.comp[[1]] <- list(beta_0 = beta, 
-                           ln_sig_u = log(sd.vec[2]),
-                           theta = log(size))
+    true.comp[[1]] <- list(beta_0 = beta[1],
+                           beta_1 = beta[2],
+                           ln_sig_u = log(sd.vec[2]))#,
+                           #theta = log(size))
   }
   
   for(m in 1:length(misp)){
@@ -216,6 +217,9 @@ setup_phylo <- function(mod, misp, fam, link, type){
     
     if(misp[m] == 'nb-pois'){
       true.comp[[m+1]]$theta <- NULL
+    }
+    if(misp[m] == 'misscov'){
+      true.comp[[m+1]]$beta_1 <- NULL
     }
   }
   
@@ -349,7 +353,7 @@ run_iter <- function(ii, n=100, ng=0, mod, cov.mod = NULL, misp, type,
                                  mod.out[[h]]$opt$convergence)
       convergehessian <- ifelse(do.true, NA, 
                                 mod.out[[h]]$sdr$pdHess)
-      if(h==1 & convergestatus == 0){
+      if(h==1 & convergestatus == 0 & do.true == FALSE){
         convergestatus = ifelse(convergehessian, 0, 1)
       }
       
@@ -895,7 +899,8 @@ mkTMBdat <- function(Dat, Pars, Mod, Misp, Type, doTrue){
                  mod = 0, sim_re = 0)
     
     if(Type == "GLMM"){
-      dat0$mod <- 1  
+      dat0$X <- as.matrix(Dat$x)
+      dat0$mod <- 2  
     }
     dat1 <- list()
     if(length(Misp) != length(Dat$y1)){
@@ -904,8 +909,12 @@ mkTMBdat <- function(Dat, Pars, Mod, Misp, Type, doTrue){
     for(m in 1:length(Misp)){
       dat1[[m]] <- dat0
       dat1[[m]]$y <- Dat$y1[[m]]
+      dat1[[m]]$X <- dat0$X
       if(Misp[m] == 'nb-pois'){
         dat1[[m]]$mod <- 2
+      }
+      if(Misp[m] == 'misscov'){
+        dat1[[m]]$X <- matrix(1, length(Dat$y0),1)
       }
     }
   }
@@ -1084,7 +1093,7 @@ mkTMBpar_phylo <- function(Pars, Dat, Mod, Misp, Type, doTrue){
   } 
   if(doTrue & Type == "GLMM"){
     par0 <-  list(beta = Pars$beta,
-                  theta = log(Pars$size), 
+                  theta = 0,#log(Pars$size), 
                   ln_sig_u = log(Pars$sd.vec[2]), 
                   u = unname(Dat$random$u0))
   }
@@ -1095,7 +1104,7 @@ mkTMBpar_phylo <- function(Pars, Dat, Mod, Misp, Type, doTrue){
                   u = rep(0, length(Dat$random$u0)))
   }
   if(!doTrue & Type == "GLMM"){
-    par0 <-  list(beta = 0,
+    par0 <-  list(beta = c(0,0),
                   theta = 0, 
                   ln_sig_u = 0, 
                   u = rep(0, length(Dat$random$u0)))
@@ -1110,6 +1119,9 @@ mkTMBpar_phylo <- function(Pars, Dat, Mod, Misp, Type, doTrue){
     if(Misp[m] == "missre"){
       par1[[m]]$ln_sig_u = numeric(0)
       par1[[m]]$u <- rep(0, length(Dat$random$u0))
+    }
+    if(Misp[m] == 'misscov'){
+      par1[[m]]$beta <- par0$beta[1]
     }
   }
   out = list(h0 = par0, h1 = par1)
@@ -1204,6 +1216,9 @@ mkTMBmap <- function(Pars, Mod, Misp, Type, doTrue){
   }
   
   if(Mod == 'phylo'){
+    if(Type == 'GLMM'){
+      map.h0 <- list(theta = factor(NA))
+    }
     for(m in 1:length(Misp)){
       map.h1[[m]] <- map.h0
       if(Misp[m] == "missre"){

@@ -34,7 +34,7 @@ simdat <- function(n, ng=0, mod, cov.mod = NULL, type = NULL,
                    trueparms = list(beta, sd.vec, sp.parm, fam, link),
                    misp, seed) {
   for(i in 1:length(misp)){
-  if(!(misp[i] %in% c('missunifcov', 'missnormcov', 'missre', 
+  if(!(misp[i] %in% c('misscov', 'missunifcov', 'missnormcov', 'missre', 
                    'mu0', 'mispre', 'nb-pois', 'overdispersion', 
                    'gamma-normal', 'hsk', 'pois-zip', 'aniso',
                    'normal-gamma', 'ln-error', 'identity-log'))){
@@ -341,7 +341,7 @@ simdat.spatial <- function(n, mod, type, trueparms,
 simdat.phylo <- function(n, mod, type, trueparms, 
                          misp, seed, X){
   for(i in 1:length(misp)){
-    if(!(misp[i] %in% c('missre', 'nb-pois', 'mispre', 'identity-log'))) {
+    if(!(misp[i] %in% c('missre', 'nb-pois', 'mispre', 'identity-log', 'misscov'))) {
       stop(paste0("Misspecification", misp[i]," not available for phlyo"))
     }
   }
@@ -358,7 +358,8 @@ simdat.phylo <- function(n, mod, type, trueparms,
     parm=sd.vec[1]
   }
   if(type == "GLMM"){
-   parm <- size
+   #parm <- size
+    parm <- sd.vec[1]
   }
   y0 <-  sim_y(Eta = mu, omega=u0,
                parm=parm, fam=fam, link=link)
