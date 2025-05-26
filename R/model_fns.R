@@ -198,9 +198,9 @@ setup_phylo <- function(mod, misp, fam, link, type){
   }
   
   if(type == "GLMM"){
-    beta <- c(1,2)
+    beta <- c(0.5,-2)
     size <- NA#0.5
-    sd.vec <- c(0,sqrt(2))
+    sd.vec <- c(0,sqrt(1))
     
     true.comp[[1]] <- list(beta_0 = beta[1],
                            beta_1 = beta[2],
